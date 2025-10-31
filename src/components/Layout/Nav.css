@@ -1,0 +1,56 @@
+.topbar {
+  position: fixed;
+  top: 0;
+  left: 250px;
+  right: 0;
+  height: 60px;
+  background: #fff;
+  border-bottom: 1px solid #eee;
+  z-index: 1050;
+  display: flex;
+  align-items: center;
+  padding: 0 1rem;
+}
+.navbar .alert-count {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: #ff3b30;
+  color: #fff;
+  padding: 2px 6px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+}
+.user-box {
+  margin-left: 12px;
+  display: flex;
+  align-items: center;
+}
+.user-img {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.user-info {
+  margin-left: 8px;
+}
+.user-name {
+  font-weight: 700;
+  margin: 0;
+}
+.user-role {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #666;
+}
+.dropdown-menu {
+  min-width: 300px;
+  border-radius: 8px;
+}
+.alert-image img {
+  width: 60px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 8px;
+}

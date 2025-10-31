@@ -1,0 +1,63 @@
+.dashboard-wrapper {
+  min-height: 100vh;
+  background: #f7f7ff;
+}
+
+.page-wrapper {
+  margin-left: 0;
+  padding: 65px 1rem 1rem;
+}
+
+.topbar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 60px;
+  background: #fff;
+  border-bottom: 1px solid #e4e4e4;
+  z-index: 10;
+  padding: 0 1rem;
+}
+
+.card {
+  margin-bottom: 1.5rem;
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+.bg-gradient-cosmic {
+  background: linear-gradient(to right, #8e2de2, #4a00e0);
+}
+
+.bg-gradient-ibiza {
+  background: linear-gradient(to right, #cd4dcc, #0474dc);
+}
+
+.bg-gradient-ohhappiness {
+  background: linear-gradient(to right, #00b09b, #96c93d);
+}
+
+.bg-gradient-kyoto {
+  background: linear-gradient(to right, #f7971e, #ffd200);
+}
+
+.user-img {
+  width: 42px;
+  height: 43px;
+  border-radius: 50%;
+}
+
+/* añade/combina con tu CSS actual */
+.dashboard-layout {
+  display: flex;
+  min-height: 100vh;
+}
+.main-area {
+  margin-left: 250px;
+  width: calc(100% - 250px);
+}
+.page-wrapper {
+  padding: 80px 20px 20px;
+  background: #f7f8fc;
+  min-height: 100vh;
+}

@@ -1,0 +1,16 @@
+.error-message {
+  color: red;
+  font-size: 0.9em;
+  margin-top: 10px;
+  text-align: center;
+}
+
+.form-error {
+  color: red;
+  font-size: 0.9em;
+}
+
+.card-container {
+  max-width: 400px;
+  margin: 0 auto;
+}
