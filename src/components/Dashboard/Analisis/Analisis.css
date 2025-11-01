@@ -47,7 +47,6 @@
   border-radius: 50%;
 }
 
-/* añade/combina con tu CSS actual */
 .dashboard-layout {
   display: flex;
   min-height: 100vh;

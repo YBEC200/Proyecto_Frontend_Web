@@ -1,0 +1,32 @@
+.nav-tabs .nav-link {
+  color: #566a7f;
+  border: 0;
+  border-radius: 0;
+  border-bottom: 2px solid transparent;
+}
+
+.nav-tabs .nav-link:hover {
+  border-color: transparent;
+}
+
+.nav-tabs .nav-link.active {
+  color: #36a2e0;
+  border-bottom: 2px solid #36a2e0;
+}
+
+.table {
+  margin-bottom: 0;
+}
+
+.table > :not(caption) > * > * {
+  padding: 1rem;
+}
+
+.badge {
+  padding: 0.5em 0.9em;
+}
+
+.btn-sm {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+}

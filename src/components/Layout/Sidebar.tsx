@@ -1,4 +1,5 @@
 import "./Sidebar.css";
+import { Link } from "react-router-dom";
 
 export default function Sidebar() {
   return (
@@ -39,19 +40,28 @@ export default function Sidebar() {
           </a>
           <ul className="collapse" id="submenuDashboard">
             <li>
-              <a href="#/dashboard">
-                <i className="bx bx-bar-chart"></i>Analisis de Ventas
-              </a>
+              <Link to="/dashboard" className="d-flex align-items-center">
+                <i className="bx bx-bar-chart"></i>
+                <span>Analisis de Ventas</span>
+              </Link>
             </li>
             <li>
-              <a href="#/historial">
-                <i className="bx bx-list-ul"></i>Lista de Pendiente
-              </a>
+              <Link
+                to="/dashboard/historial"
+                className="d-flex align-items-center"
+              >
+                <i className="bx bx-list-ul"></i>
+                <span>Lista de Pendientes</span>
+              </Link>
             </li>
             <li>
-              <a href="#/notificaciones">
-                <i className="bx bx-bell"></i>Notificaciones y alertas
-              </a>
+              <Link
+                to="/dashboard/notificaciones"
+                className="d-flex align-items-center"
+              >
+                <i className="bx bx-bell"></i>
+                <span>Notificaciones y alertas</span>
+              </Link>
             </li>
           </ul>
         </li>

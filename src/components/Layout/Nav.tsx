@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import "./Nav.css";
 
 export default function Nav() {
@@ -88,11 +89,13 @@ export default function Nav() {
                   </div>
 
                   <div className="text-center msg-footer sticky-bottom bg-white">
-                    <a href="#/notificaciones">
-                      <button className="btn btn-primary w-100">
-                        Ir a todas las notificaciones
-                      </button>
-                    </a>
+                    <div className="text-center msg-footer sticky-bottom bg-white">
+                      <Link to="/dashboard/notificaciones">
+                        <button className="btn btn-primary w-100">
+                          Ir a todas las notificaciones
+                        </button>
+                      </Link>
+                    </div>
                   </div>
                 </div>
               </li>

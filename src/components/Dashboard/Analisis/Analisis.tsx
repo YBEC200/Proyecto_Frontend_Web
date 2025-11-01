@@ -1,8 +1,8 @@
-import Nav from "../Layout/Nav";
-import Sidebar from "../Layout/Sidebar";
-import "./Dashboard.css";
+import Nav from "../../Layout/Nav";
+import Sidebar from "../../Layout/Sidebar";
+import "./Analisis.css";
 
-function Dashboard() {
+function Analisis() {
   return (
     <div className="dashboard-layout">
       <Sidebar />
@@ -97,4 +97,4 @@ function Dashboard() {
   );
 }
 
-export default Dashboard;
+export default Analisis;
