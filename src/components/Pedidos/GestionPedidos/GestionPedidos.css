@@ -1,0 +1,88 @@
+.table td,
+.table th {
+  vertical-align: middle;
+  text-align: center;
+  border: 1px solid #ddd;
+  padding: 10px 15px;
+}
+
+.modal-header {
+  border-bottom: 2px solid #ddd;
+}
+
+.table-bordered {
+  border: 1px solid #ddd;
+}
+
+.table-hover tbody tr:hover {
+  background-color: #f9f9f9;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-radius: 20px;
+  text-align: center;
+}
+
+.badge-pendiente {
+  background-color: rgb(255 193 7 / 0.11);
+  color: #ffc107;
+  box-shadow: 0 2px 4px #d4e395;
+}
+
+.badge-entregado {
+  background-color: rgb(23 160 14 / 0.11);
+  color: #15ca20;
+  box-shadow: 0 2px 4px #b2dea9;
+}
+
+.badge-cancelado {
+  background-color: rgb(244 17 39 / 0.11);
+  color: #fd3550;
+  box-shadow: 0 2px 4px #f0bcbc;
+}
+
+.cliente-nombre {
+  background-color: #509faf;
+  color: white;
+  padding: 5px 10px;
+  border-radius: 20px;
+  font-weight: 500;
+  text-align: center;
+  box-shadow: 0 2px 4px #2f7c80;
+}
+
+.btn-action {
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 18px;
+}
+
+/* Gradientes para las cards */
+.bg-gradient-cosmic {
+  background: linear-gradient(to right, #8e2de2, #4a00e0);
+}
+
+.bg-gradient-kyoto {
+  background: linear-gradient(to right, #f7971e, #ffd200);
+}
+
+.bg-gradient-ohhappiness {
+  background: linear-gradient(to right, #00b09b, #96c93d);
+}
+
+.bg-gradient-ibiza {
+  background: linear-gradient(to right, #ee0979, #ff6a00);
+}
+
+.modal.show {
+  background-color: rgba(0, 0, 0, 0.5);
+}

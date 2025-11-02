@@ -84,14 +84,16 @@ export default function Sidebar() {
           </a>
           <ul className="collapse" id="submenuPedidos">
             <li>
-              <a href="#/gestion-pedidos">
-                <i className="bx bx-task"></i>Gestión de Pedidos
-              </a>
+              <Link to="/pedidos" className="d-flex align-items-center">
+                <i className="bx bx-task"></i>
+                <span>Gestión de Pedidos</span>
+              </Link>
             </li>
             <li>
-              <a href="#/asignar-pedidos">
-                <i className="bx bx-bell"></i>Asignar Pedido
-              </a>
+              <Link to="/pedidos/asignar" className="d-flex align-items-center">
+                <i className="bx bx-bell"></i>
+                <span>Asignar Pedido</span>
+              </Link>
             </li>
           </ul>
         </li>
@@ -113,31 +115,37 @@ export default function Sidebar() {
           </a>
           <ul className="collapse" id="submenuProductos">
             <li>
-              <a href="#/gestion-productos">
-                <i className="bx bx-box"></i>Gestión de Productos
-              </a>
+              <Link to="/productos" className="d-flex align-items-center">
+                <i className="bx bx-box"></i>
+                <span>Gestión de Productos</span>
+              </Link>
             </li>
             <li>
-              <a href="#/agregar-categoria">
-                <i className="bx bx-plus-circle"></i>Agregar Categoria
-              </a>
+              <Link to="/productos/lotes" className="d-flex align-items-center">
+                <i className="bx bx-plus-circle"></i>
+                <span>Gestion de Lotes</span>
+              </Link>
             </li>
             <li>
-              <a href="#/agregar-productos">
-                <i className="bx bx-layer-plus"></i>Agregar Producto
-              </a>
+              <Link
+                to="/productos/agregarproductos"
+                className="d-flex align-items-center"
+              >
+                <i className="bx bx-layer-plus"></i>
+                <span>Agregar Producto</span>
+              </Link>
             </li>
           </ul>
         </li>
 
         <li className="menu-label">Usuarios</li>
         <li>
-          <a href="#/usuarios" className="d-flex align-items-center">
+          <Link to="/usuarios" className="d-flex align-items-center">
             <div className="parent-icon">
               <i className="bx bx-user"></i>
             </div>
             <div className="menu-title">Lista de Usuarios</div>
-          </a>
+          </Link>
         </li>
       </ul>
     </aside>

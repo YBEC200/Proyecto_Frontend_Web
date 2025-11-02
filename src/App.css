@@ -1,0 +1,37 @@
+:root {
+  --topbar-height: 60px; /* coincide con Nav.css */
+  --layout-gap: 6px; /* espacio entre topbar y contenido */
+}
+
+/* asegura que el topbar tenga la misma altura esperada */
+.topbar {
+  height: var(--topbar-height);
+}
+
+/* espacio superior reducido: topbar height + pequeño gap */
+.page-wrapper {
+  padding: calc(var(--topbar-height) + var(--layout-gap)) 20px 20px;
+}
+
+/* quitar márgenes sobrantes del breadcrumb y cartas */
+.page-breadcrumb {
+  margin-top: 0 !important;
+  padding-top: 0;
+}
+
+.page-content > .card,
+.card.radius-10 {
+  margin-top: 0;
+}
+
+/* si usas containers internos con clases bootstrap */
+.page-content > .row {
+  margin-top: 0;
+}
+
+/* ajuste opcional si el contenido aun queda muy abajo */
+@media (min-width: 768px) {
+  .page-wrapper {
+    padding-top: calc(10px);
+  }
+}

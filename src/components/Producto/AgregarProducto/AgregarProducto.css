@@ -1,0 +1,59 @@
+/* Estilos coherentes con el resto del proyecto */
+.card-title {
+  font-weight: 600;
+  color: #333;
+}
+
+.custom-btn {
+  padding: 6px 12px;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.radius-30 {
+  border-radius: 30px;
+}
+
+/* Bordes y separación */
+.border-3 {
+  border-width: 1px !important;
+  border-color: #e6eef0 !important;
+}
+
+/* Previews de imagen */
+.preview-wrap {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.preview-img {
+  object-fit: cover;
+  border-radius: 8px;
+  border: 2px solid rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+.preview-main {
+  width: 150px;
+  height: 150px;
+}
+
+.preview-secondary {
+  width: 120px;
+  height: 120px;
+}
+
+/* Ajustes responsivos */
+@media (max-width: 992px) {
+  .preview-main {
+    width: 120px;
+    height: 120px;
+  }
+  .preview-secondary {
+    width: 100px;
+    height: 100px;
+  }
+}

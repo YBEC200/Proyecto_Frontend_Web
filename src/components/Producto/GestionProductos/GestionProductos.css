@@ -1,0 +1,87 @@
+.custom-divider {
+  display: block;
+  border-left: 1px solid #ddd;
+  height: 100%;
+  width: 0;
+}
+
+.btn-success,
+.btn-warning {
+  background-color: #3ea556d3;
+  border-color: #28a745;
+  font-size: 12px;
+  color: #fff;
+  font-weight: 400;
+  line-height: 10px;
+}
+
+.btn-warning {
+  background-color: #ffd149;
+  border-color: #ffc107;
+}
+
+.table th,
+.table td {
+  text-align: center;
+  border: 1px solid #ddd;
+  padding: 9px 15px;
+  vertical-align: middle;
+}
+
+.table tbody tr {
+  border-bottom: 1px solid #ddd;
+}
+
+.product-show {
+  position: absolute;
+  top: 50%;
+  left: 5px;
+  transform: translateY(-50%);
+}
+
+.badge {
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.badge-abastecido {
+  background-color: rgba(23, 160, 14, 0.11);
+  color: #15ca20;
+  box-shadow: 0 2px 4px #b2dea9;
+}
+
+.badge-agotado {
+  background-color: rgba(244, 17, 39, 0.11);
+  color: #fd3550;
+  box-shadow: 0 2px 4px #f0bcbc;
+}
+
+.modal.show {
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+.form-control:hover {
+  box-shadow: 0 2px 4px #fc9090;
+}
+
+.form-control:focus {
+  outline: none !important;
+  box-shadow: 0 0 20px #ffa4a4;
+}
+
+@media (max-width: 995px) {
+  .d-lg-flex {
+    flex-wrap: wrap !important;
+  }
+
+  .d-lg-flex > div {
+    width: 100%;
+    margin-bottom: 10px;
+  }
+
+  .form-select {
+    width: 100%;
+  }
+}
