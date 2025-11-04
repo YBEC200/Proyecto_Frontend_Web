@@ -12,12 +12,14 @@ import GestionPedidos from "./components/Pedidos/GestionPedidos/GestionPedidos";
 import GestionProductos from "./components/Producto/GestionProductos/GestionProductos";
 import GestionLotes from "./components/Producto/GestionLotes/GestionLotes";
 import AgregarProducto from "./components/Producto/AgregarProducto/AgregarProducto";
+import Sidebar from "./components/Layout/Sidebar";
 
 function App() {
   return (
     <Router>
       <Routes>
         <Route path="/" element={<Login />} />
+        <Route path="/sidebar" element={<Sidebar />} />
         <Route path="/dashboard" element={<Analisis />} />
         <Route path="/dashboard/historial" element={<ListaPendientes />} />
         <Route path="/dashboard/notificaciones" element={<Notificaciones />} />

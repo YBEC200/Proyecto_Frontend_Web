@@ -23,6 +23,10 @@
 .card.radius-10 {
   margin-top: 0;
 }
+.main-area {
+  transition: margin-left 220ms ease, width 220ms ease;
+  min-width: 0; /* evita desbordes cuando se reduce el ancho */
+}
 
 /* si usas containers internos con clases bootstrap */
 .page-content > .row {
@@ -33,5 +37,8 @@
 @media (min-width: 768px) {
   .page-wrapper {
     padding-top: calc(10px);
+  }
+  .main-area {
+    margin-left: 0px; /* o 0 si quieres full-width */
   }
 }

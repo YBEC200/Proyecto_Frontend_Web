@@ -1,41 +1,110 @@
+/* ==============================
+   SIDEBAR WRAPPER
+================================*/
 .sidebar-wrapper {
-  width: 250px;
   position: fixed;
   top: 0;
   left: 0;
   bottom: 0;
-  background: #ffffff;
+  width: 250px;
+  background: #fff;
   border-right: 1px solid #eee;
-  overflow-y: auto;
   z-index: 1000;
+  transition: width 220ms ease;
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  -ms-overflow-style: none; /* IE/Edge */
+  scrollbar-width: none; /* Firefox */
+  overflow: visible;
 }
+
+.sidebar-wrapper::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+/* Estado colapsado */
+.sidebar-wrapper.collapsed {
+  width: 90px;
+}
+
+/* ==============================
+   CONTENIDO PRINCIPAL
+================================*/
+.sidebar-wrapper + .main-area,
+.sidebar-wrapper ~ .main-area {
+  margin-left: 250px;
+  width: calc(100% - 250px);
+  transition: margin-left 220ms ease, width 220ms ease;
+}
+
+.sidebar-wrapper.collapsed + .main-area,
+.sidebar-wrapper.collapsed ~ .main-area {
+  margin-left: 72px;
+  width: calc(100% - 72px);
+}
+
+/* ==============================
+   HEADER
+================================*/
 .sidebar-header {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 1rem;
+  padding: 15px;
+  position: absolute;
+  height: 80px;
+  transition: all 220ms ease;
 }
+
 .logo-icon {
   width: 42px;
   height: 42px;
   object-fit: contain;
+  transition: opacity 180ms ease;
 }
+
+.logo-text {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+}
+
 .logo-text .cd {
   color: #222;
   font-weight: 700;
 }
+
 .logo-text .tech {
   color: #36a2e0;
   font-weight: 700;
 }
+
+.sidebar-wrapper.collapsed .logo-icon {
+  margin: 0 auto;
+  width: 40px;
+  height: 40px;
+}
+/* Ocultar texto cuando está colapsada */
+.sidebar-wrapper.collapsed .logo-text .tech,
+.sidebar-wrapper.collapsed .logo-text .cd {
+  display: none;
+}
+
+/* ==============================
+   MENÚ
+================================*/
 .metismenu {
   list-style: none;
-  padding: 0.5rem;
   margin: 0;
+  padding: 0.25rem 0.5rem; /* menos padding-top para acercar items al tope */
+  margin-top: 4px;
 }
+
 .metismenu li {
   margin-bottom: 6px;
 }
+
 .metismenu a {
   display: flex;
   align-items: center;
@@ -45,23 +114,88 @@
   text-decoration: none;
   border-radius: 6px;
 }
+
 .metismenu a:hover {
   background: #f1f5ff;
   color: #0366d6;
 }
+
 .parent-icon {
   width: 28px;
   text-align: center;
 }
-.arrow-menu {
-  margin-left: 8px;
-}
+
 .menu-label {
   padding: 10px 12px;
   font-size: 0.85rem;
   color: #666;
   text-transform: uppercase;
 }
-.collapse {
-  padding-left: 10px;
+
+/* Activo */
+.metismenu a.active-menu,
+.metismenu li.active > a {
+  background: #e7f9ff;
+  color: #0b78a1;
+  box-shadow: inset 4px 0 0 #32acbe;
+}
+
+/* ==============================
+   COLAPSO
+================================*/
+.sidebar-wrapper.collapsed .menu-title,
+.sidebar-wrapper.collapsed .menu-label {
+  display: none;
+}
+
+.sidebar-wrapper.collapsed .metismenu a {
+  justify-content: center;
+  padding: 10px 6px;
+}
+
+.sidebar-wrapper.collapsed .metismenu a span {
+  display: none;
+}
+/* ==============================
+   BOTÓN TOGGLE FIJO
+================================*/
+.toggle-icon {
+  position: absolute;
+  top: 18px;
+  right: 12px;
+  font-size: 1.6rem;
+  cursor: pointer;
+  color: #333;
+  z-index: 1200;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.toggle-icon:hover {
+  color: #007bff;
+  transform: scale(1.1);
+}
+
+/* Ajuste cuando la sidebar está colapsada */
+.sidebar-wrapper.collapsed .toggle-icon {
+  right: auto;
+  left: 50px;
+}
+
+/* ==============================
+   RESPONSIVE
+================================*/
+@media (max-width: 768px) {
+  .sidebar-wrapper {
+    z-index: 1100;
+  }
+  .sidebar-wrapper + .main-area,
+  .sidebar-wrapper ~ .main-area {
+    margin-left: 0;
+    width: 100%;
+  }
+}
+
+.sidebar-wrapper.collapsed .sidebar-header {
+  justify-content: flex-start;
+  padding: 0.5rem;
 }

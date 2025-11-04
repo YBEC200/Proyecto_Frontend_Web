@@ -35,26 +35,22 @@ export default function Nav() {
                 </a>
 
                 <div className="dropdown-menu dropdown-menu-end">
-                  <div className="msg-header sticky-top bg-white">
+                  <div className="msg-header">
                     <p className="msg-header-title">Notificaciones</p>
                     <p className="msg-header-badge">
                       {notificationsCount} Nuevas
                     </p>
                   </div>
 
-                  <div
-                    className="header-notifications-list"
-                    style={{ maxHeight: 260, overflowY: "auto" }}
-                  >
-                    {/* notificaciones estáticas de ejemplo */}
+                  <div className="header-notifications-list">
                     <a className="dropdown-item" href="#">
-                      <div className="d-flex align-items-center">
+                      <div className="d-flex align-items-start">
                         <div className="alert-image riesgo-medio">
                           <img src="/assets/images/default.png" alt="img" />
                         </div>
                         <div className="flex-grow-1">
                           <h6 className="msg-name">
-                            Pocos existencias{" "}
+                            Pocos existencias
                             <span className="msg-time float-end">
                               Hace poco
                             </span>
@@ -88,14 +84,12 @@ export default function Nav() {
                     </a>
                   </div>
 
-                  <div className="text-center msg-footer sticky-bottom bg-white">
-                    <div className="text-center msg-footer sticky-bottom bg-white">
-                      <Link to="/dashboard/notificaciones">
-                        <button className="btn btn-primary w-100">
-                          Ir a todas las notificaciones
-                        </button>
-                      </Link>
-                    </div>
+                  <div className="text-center msg-footer p-2">
+                    <Link to="/dashboard/notificaciones" className="w-100">
+                      <button className="btn btn-primary w-100">
+                        Ir a todas las notificaciones
+                      </button>
+                    </Link>
                   </div>
                 </div>
               </li>

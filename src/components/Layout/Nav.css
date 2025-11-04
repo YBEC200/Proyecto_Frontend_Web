@@ -54,3 +54,141 @@
   object-fit: cover;
   border-radius: 8px;
 }
+
+/* ...existing code... */
+
+/* Mejoras para el dropdown del usuario */
+.user-box .dropdown-toggle::after {
+  display: inline-block;
+  margin-left: 0.5em;
+  vertical-align: middle;
+  content: "";
+  border-top: 0.3em solid;
+  border-right: 0.3em solid transparent;
+  border-bottom: 0;
+  border-left: 0.3em solid transparent;
+  color: #333;
+}
+
+.user-box .dropdown-toggle {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* Eliminar el borde del botón al hacer focus */
+.user-box .dropdown-toggle:focus {
+  box-shadow: none;
+}
+
+/* Mejoras para el dropdown de notificaciones */
+.header-notifications-list {
+  max-height: 260px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  width: 100%;
+  padding: 0.5rem;
+}
+
+/* Estilo para las notificaciones */
+.dropdown-menu {
+  min-width: 300px;
+  max-width: 300px;
+  border-radius: 8px;
+  padding: 0;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.dropdown-item {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.msg-header {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #eee;
+}
+
+.msg-header-title {
+  font-weight: 600;
+  margin-bottom: 0;
+}
+
+.msg-header-badge {
+  color: #666;
+  font-size: 0.875rem;
+  margin-bottom: 0;
+}
+
+/* Mejorar el aspecto de las alertas */
+.alert-image {
+  margin-right: 1rem;
+  flex-shrink: 0;
+}
+
+.msg-name {
+  font-size: 0.9rem;
+  margin-bottom: 0.25rem;
+}
+
+.msg-time {
+  font-size: 0.75rem;
+  color: #666;
+}
+
+.msg-info {
+  font-size: 0.85rem;
+  color: #666;
+  margin-bottom: 0;
+  line-height: 1.4;
+}
+
+.msg-name,
+.msg-info {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* Personalizar scrollbar para un aspecto más moderno */
+.header-notifications-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.header-notifications-list::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.header-notifications-list::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 3px;
+}
+
+.header-notifications-list::-webkit-scrollbar-thumb:hover {
+  background: #999;
+}
+
+/* Asegurar que el dropdown no muestre scroll horizontal y que el texto pueda envolver */
+.dropdown-menu,
+.header-notifications-list {
+  overflow-x: hidden; /* evitar scrollbar horizontal */
+  box-sizing: border-box;
+}
+
+/* Permitir que el contenedor de texto dentro del item pueda encoger y envolver */
+.header-notifications-list .flex-grow-1 {
+  min-width: 0; /* importante para que flex items puedan reducirse */
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Ajuste opcional: limitar ancho del texto por ítem para mayor control */
+.header-notifications-list .dropdown-item .flex-grow-1 {
+  max-width: calc(
+    100% - 72px
+  ); /* resta ancho de la imagen + gap (ajusta si cambias tamaños) */
+}
