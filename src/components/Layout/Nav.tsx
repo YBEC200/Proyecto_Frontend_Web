@@ -116,25 +116,25 @@ export default function Nav() {
             </a>
             <ul className="dropdown-menu dropdown-menu-end">
               <li>
-                <a
+                <Link
+                  to="/tu_perfil"
                   className="dropdown-item d-flex align-items-center"
-                  href="#/perfil"
                 >
                   <i className="bx bx-user fs-5"></i>
                   <span>Perfil</span>
-                </a>
+                </Link>
               </li>
               <li>
                 <div className="dropdown-divider mb-0"></div>
               </li>
               <li>
-                <a
+                <Link
+                  to="/"
                   className="dropdown-item d-flex align-items-center"
-                  href="#/logout"
                 >
                   <i className="bx bx-log-out-circle"></i>
                   <span>Cerrar Sesión</span>
-                </a>
+                </Link>
               </li>
             </ul>
           </div>

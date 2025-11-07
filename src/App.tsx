@@ -13,6 +13,7 @@ import GestionProductos from "./components/Producto/GestionProductos/GestionProd
 import GestionLotes from "./components/Producto/GestionLotes/GestionLotes";
 import AgregarProducto from "./components/Producto/AgregarProducto/AgregarProducto";
 import Sidebar from "./components/Layout/Sidebar";
+import Perfil from "./components/Usuarios/Perfil/Perfil";
 
 function App() {
   return (
@@ -32,6 +33,7 @@ function App() {
           element={<AgregarProducto />}
         />
         <Route path="/usuarios" element={<Usuarios />} />
+        <Route path="/tu_perfil" element={<Perfil />} />
       </Routes>
     </Router>
   );

@@ -1,6 +1,6 @@
 :root {
   --topbar-height: 60px; /* coincide con Nav.css */
-  --layout-gap: 6px; /* espacio entre topbar y contenido */
+  --layout-gap: 2px; /* espacio entre topbar y contenido */
 }
 
 /* asegura que el topbar tenga la misma altura esperada */
@@ -36,9 +36,9 @@
 /* ajuste opcional si el contenido aun queda muy abajo */
 @media (min-width: 768px) {
   .page-wrapper {
-    padding-top: calc(10px);
+    padding-top: calc(10px) !important; /* reducido a 5px */
   }
   .main-area {
-    margin-left: 0px; /* o 0 si quieres full-width */
+    margin-left: 10px; /* o 0 si quieres full-width */
   }
 }
