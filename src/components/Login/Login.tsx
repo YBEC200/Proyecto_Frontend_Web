@@ -37,6 +37,7 @@ export default function Login() {
     if (!valido) return;
 
     if (email === "admin@example.com" && password === "123") {
+      localStorage.setItem("isAuthenticated", "true");
       window.location.href = "/dashboard";
     } else {
       setErrorMessage("Correo electrónico y/o contraseña incorrectos.");

@@ -14,26 +14,101 @@ import GestionLotes from "./components/Producto/GestionLotes/GestionLotes";
 import AgregarProducto from "./components/Producto/AgregarProducto/AgregarProducto";
 import Sidebar from "./components/Layout/Sidebar";
 import Perfil from "./components/Usuarios/Perfil/Perfil";
+import PrivateRoute from "./components/PrivateRoute";
 
 function App() {
   return (
     <Router>
       <Routes>
         <Route path="/" element={<Login />} />
-        <Route path="/sidebar" element={<Sidebar />} />
-        <Route path="/dashboard" element={<Analisis />} />
-        <Route path="/dashboard/historial" element={<ListaPendientes />} />
-        <Route path="/dashboard/notificaciones" element={<Notificaciones />} />
-        <Route path="/pedidos" element={<GestionPedidos />} />
-        <Route path="/pedidos/asignar" element={<AsignarPedidos />} />
-        <Route path="/productos" element={<GestionProductos />} />
-        <Route path="/productos/lotes" element={<GestionLotes />} />
+        <Route
+          path="/sidebar"
+          element={
+            <PrivateRoute>
+              <Sidebar />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/dashboard"
+          element={
+            <PrivateRoute>
+              <Analisis />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/dashboard/historial"
+          element={
+            <PrivateRoute>
+              <ListaPendientes />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/dashboard/notificaciones"
+          element={
+            <PrivateRoute>
+              <Notificaciones />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/pedidos"
+          element={
+            <PrivateRoute>
+              <GestionPedidos />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/pedidos/asignar"
+          element={
+            <PrivateRoute>
+              <AsignarPedidos />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/productos"
+          element={
+            <PrivateRoute>
+              <GestionProductos />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/productos/lotes"
+          element={
+            <PrivateRoute>
+              <GestionLotes />
+            </PrivateRoute>
+          }
+        />
         <Route
           path="/productos/agregarproductos"
-          element={<AgregarProducto />}
+          element={
+            <PrivateRoute>
+              <AgregarProducto />
+            </PrivateRoute>
+          }
         />
-        <Route path="/usuarios" element={<Usuarios />} />
-        <Route path="/tu_perfil" element={<Perfil />} />
+        <Route
+          path="/usuarios"
+          element={
+            <PrivateRoute>
+              <Usuarios />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/tu_perfil"
+          element={
+            <PrivateRoute>
+              <Perfil />
+            </PrivateRoute>
+          }
+        />
       </Routes>
     </Router>
   );

@@ -192,3 +192,12 @@
     100% - 72px
   ); /* resta ancho de la imagen + gap (ajusta si cambias tamaños) */
 }
+
+.modal.fade.show {
+  z-index: 1050;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
