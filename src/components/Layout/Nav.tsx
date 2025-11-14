@@ -6,8 +6,9 @@ export default function Nav() {
   const [showChatModal, setShowChatModal] = useState(false);
   // Valores estáticos por ahora (sin backend)
   const notificationsCount = 3;
-  const adminName = "Administrador";
-  const adminRole = "Admin";
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const adminName = user.nombre || "Administrador";
+  const adminRole = user.rol || "Admin";
 
   return (
     <header>
@@ -140,6 +141,8 @@ export default function Nav() {
                   className="dropdown-item d-flex align-items-center"
                   onClick={() => {
                     localStorage.setItem("isAuthenticated", "false");
+                    localStorage.removeItem("token");
+                    localStorage.removeItem("user");
                   }}
                 >
                   <i className="bx bx-log-out-circle"></i>

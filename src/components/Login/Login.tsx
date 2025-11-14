@@ -14,7 +14,7 @@ export default function Login() {
     return re.test(email);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setEmailError("");
     setPasswordError("");
@@ -36,11 +36,31 @@ export default function Login() {
 
     if (!valido) return;
 
-    if (email === "admin@example.com" && password === "123") {
-      localStorage.setItem("isAuthenticated", "true");
-      window.location.href = "/dashboard";
-    } else {
-      setErrorMessage("Correo electrónico y/o contraseña incorrectos.");
+    try {
+      const response = await fetch("http://127.0.0.1:8000/api/admin/login", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + localStorage.getItem("token"),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ correo: email, password }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("user", JSON.stringify(data.user));
+        localStorage.setItem("isAuthenticated", "true");
+        window.location.href = "/dashboard";
+      } else {
+        setErrorMessage(
+          data.message || "Correo electrónico y/o contraseña incorrectos."
+        );
+      }
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (error) {
+      setErrorMessage("Error al conectar con el servidor. Inténtalo de nuevo.");
     }
   };
 

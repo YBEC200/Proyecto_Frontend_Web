@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Nav from "../../Layout/Nav";
 import Sidebar from "../../Layout/Sidebar";
 import "./GestionProductos.css";
@@ -7,11 +7,12 @@ interface Producto {
   id: string;
   nombre: string;
   marca: string;
-  precio: number;
-  estado: "Abastecido" | "Agotado";
+  costo_unit: number;
+  estado: "Abastecido" | "Agotado" | "Inactivo";
   lotes: number;
-  categoria: string;
-  ultimoAbastecimiento: string;
+  id_categoria: string;
+  categoria?: { id: string; nombre: string };
+  fecha_registro: string;
 }
 
 export default function GestionProductos() {
@@ -24,50 +25,73 @@ export default function GestionProductos() {
   const [selectedProduct, setSelectedProduct] = useState<Producto | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
+  const [productos, setProductos] = useState<Producto[]>([]);
+  const [categorias, setCategorias] = useState<
+    { id: string; nombre: string }[]
+  >([]);
+  const [loading, setLoading] = useState(false);
+  // Fetch productos desde la API
+  const fetchProductos = async () => {
+    setLoading(true);
+    const token = localStorage.getItem("token");
+    const params = new URLSearchParams();
 
-  // Datos de ejemplo
-  const productos: Producto[] = [
-    {
-      id: "001",
-      nombre: "Laptop Dell XPS",
-      marca: "Dell",
-      precio: 4500.0,
-      estado: "Abastecido",
-      lotes: 3,
-      categoria: "Laptops",
-      ultimoAbastecimiento: "2023-11-01",
-    },
-    {
-      id: "002",
-      nombre: "Monitor LG 27'",
-      marca: "LG",
-      precio: 899.9,
-      estado: "Agotado",
-      lotes: 0,
-      categoria: "Monitores",
-      ultimoAbastecimiento: "2023-10-15",
-    },
-  ];
+    if (searchTerm) params.append("nombre", searchTerm);
+    if (priceRange.min) params.append("precio_min", priceRange.min);
+    if (priceRange.max) params.append("precio_max", priceRange.max);
+    if (categoryFilter) params.append("categoria", categoryFilter);
+    if (statusFilter) params.append("estado", statusFilter);
 
-  const categorias = [
-    { id: "1", nombre: "Laptops" },
-    { id: "2", nombre: "Monitores" },
-    { id: "3", nombre: "Accesorios" },
-  ];
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:8000/api/productos?${params.toString()}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      const data = await response.json();
+      console.log(data); // <-- Agrega esto
+      setProductos(data);
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (error) {
+      setProductos([]);
+    }
+    setLoading(false);
+  };
 
-  // Filtros
-  const filteredProducts = productos.filter((producto) => {
-    const matchesSearch = producto.nombre
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase());
-    const matchesCategory =
-      !categoryFilter || producto.categoria === categoryFilter;
-    const matchesStatus = !statusFilter || producto.estado === statusFilter;
-    const matchesPrice =
-      (!priceRange.min || producto.precio >= Number(priceRange.min)) &&
-      (!priceRange.max || producto.precio <= Number(priceRange.max));
-    return matchesSearch && matchesCategory && matchesStatus && matchesPrice;
-  });
+  const fetchCategorias = async () => {
+    const token = localStorage.getItem("token");
+    try {
+      const response = await fetch(`http://127.0.0.1:8000/api/categorias`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+      const data = await response.json();
+      setCategorias(data);
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (error) {
+      setCategorias([]);
+    }
+  };
+  useEffect(() => {
+    fetchCategorias();
+  }, []);
+
+  useEffect(() => {
+    fetchProductos();
+    // eslint-disable-next-line
+  }, [
+    searchTerm,
+    priceRange.min,
+    priceRange.max,
+    categoryFilter,
+    statusFilter,
+  ]);
 
   // Handlers
   const handleEdit = (producto: Producto) => {
@@ -108,123 +132,195 @@ export default function GestionProductos() {
             </div>
 
             {/* Card principal */}
-            <div className="card">
+            <div className="card radius-10">
+              <div className="card-header">
+                <div className="d-flex align-items-center">
+                  <div>
+                    <h6 className="mb-0">Gestion de Productos</h6>
+                  </div>
+                </div>
+              </div>
               <div className="card-body">
-                <div className="d-flex justify-content-between align-items-center mb-4 gap-3 flex-wrap">
-                  {/* Búsqueda y filtros */}
-                  <div className="d-flex align-items-center gap-3 flex-grow-1 flex-wrap">
-                    <div className="position-relative flex-grow-1">
-                      <input
-                        type="search"
-                        className="form-control ps-5 radius-30"
-                        placeholder="Buscar producto por nombre"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                      />
-                      <span className="position-absolute top-50 product-show translate-middle-y">
-                        <i className="bx bx-search"></i>
-                      </span>
+                <div className="table-responsive">
+                  <div className="filtros-productos d-flex flex-wrap gap-3 align-items-end mb-4">
+                    {/* === FILTROS PRINCIPALES === */}
+                    {/* Buscar */}
+                    <div className="filtro-item flex-grow-1 position-relative">
+                      <label className="form-label fw-semibold text-muted mb-1">
+                        Buscar producto
+                      </label>
+                      <div className="input-icon-wrapper">
+                        <i className="bx bx-search search-icon"></i>
+                        <input
+                          type="search"
+                          className="form-control ps-5 radius-30"
+                          placeholder="Ej. Laptop Dell XPS"
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                      </div>
                     </div>
-                    <div className="d-flex align-items-center gap-2 flex-wrap">
+
+                    {/* Precio mínimo */}
+                    <div className="filtro-item">
+                      <label className="form-label fw-semibold text-muted mb-1">
+                        Precio mínimo
+                      </label>
                       <input
                         type="number"
-                        className="form-control"
-                        placeholder="Precio mínimo"
+                        className="form-control radius-30"
+                        placeholder="S/ mínimo"
                         value={priceRange.min}
                         onChange={(e) =>
-                          setPriceRange((prev) => ({
-                            ...prev,
+                          setPriceRange({
+                            ...priceRange,
                             min: e.target.value,
-                          }))
-                        }
-                      />
-                      <input
-                        type="number"
-                        className="form-control"
-                        placeholder="Precio máximo"
-                        value={priceRange.max}
-                        onChange={(e) =>
-                          setPriceRange((prev) => ({
-                            ...prev,
-                            max: e.target.value,
-                          }))
+                          })
                         }
                       />
                     </div>
-                  </div>
 
-                  {/* Filtros adicionales */}
-                  <div className="d-flex align-items-center gap-2 flex-wrap">
-                    <select
-                      className="form-select"
-                      value={categoryFilter}
-                      onChange={(e) => setCategoryFilter(e.target.value)}
-                    >
-                      <option value="">Todas las categorías</option>
-                      {categorias.map((cat) => (
-                        <option key={cat.id} value={cat.nombre}>
-                          {cat.nombre}
-                        </option>
-                      ))}
-                    </select>
-                    <select
-                      className="form-select"
-                      value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value)}
-                    >
-                      <option value="">Todos los estados</option>
-                      <option value="Abastecido">Abastecido</option>
-                      <option value="Agotado">Agotado</option>
-                    </select>
+                    {/* Precio máximo */}
+                    <div className="filtro-item">
+                      <label className="form-label fw-semibold text-muted mb-1">
+                        Precio máximo
+                      </label>
+                      <input
+                        type="number"
+                        className="form-control radius-30"
+                        placeholder="S/ máximo"
+                        value={priceRange.max}
+                        onChange={(e) =>
+                          setPriceRange({
+                            ...priceRange,
+                            max: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+
+                    {/* Categoría */}
+                    <div className="filtro-item">
+                      <label className="form-label fw-semibold text-muted mb-1">
+                        Categoría
+                      </label>
+                      <select
+                        className="form-select radius-30"
+                        value={categoryFilter}
+                        onChange={(e) => setCategoryFilter(e.target.value)}
+                      >
+                        <option value="">Todas</option>
+                        {categorias.map((cat) => (
+                          <option key={cat.id} value={cat.id}>
+                            {cat.nombre}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Estado */}
+                    <div className="filtro-item">
+                      <label className="form-label fw-semibold text-muted mb-1">
+                        Estado
+                      </label>
+                      <select
+                        className="form-select radius-30"
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                      >
+                        <option value="">Todos</option>
+                        <option value="Abastecido">Abastecido</option>
+                        <option value="Agotado">Agotado</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
 
                 {/* Tabla */}
-                <div className="table-responsive">
-                  <table className="table">
-                    <thead className="table-light">
-                      <tr>
-                        <th>ID</th>
-                        <th>Nombre</th>
-                        <th>Marca</th>
-                        <th>Precio</th>
-                        <th>Estado</th>
-                        <th>Lotes</th>
-                        <th>Categoría</th>
-                        <th>Último Abastecimiento</th>
-                        <th>Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredProducts.map((producto) => (
-                        <tr key={producto.id}>
-                          <td>{producto.id}</td>
-                          <td>{producto.nombre}</td>
-                          <td>{producto.marca}</td>
-                          <td>S/ {producto.precio.toFixed(2)}</td>
-                          <td>
-                            <span
-                              className={`badge badge-${producto.estado.toLowerCase()}`}
-                            >
-                              {producto.estado}
-                            </span>
-                          </td>
-                          <td>{producto.lotes}</td>
-                          <td>{producto.categoria}</td>
-                          <td>{producto.ultimoAbastecimiento}</td>
-                          <td>
+
+                <table className="table">
+                  <thead className="table-light">
+                    <tr>
+                      <th>ID</th>
+                      <th>Nombre</th>
+                      <th>Marca</th>
+                      <th>Precio</th>
+                      <th>Estado</th>
+                      <th>Lotes</th>
+                      <th>Categoría</th>
+                      <th>Último Abastecimiento</th>
+                      <th>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {productos.map((producto) => (
+                      <tr key={producto.id}>
+                        <td>{producto.id}</td>
+                        <td>{producto.nombre}</td>
+                        <td>{producto.marca}</td>
+                        <td>S/ {producto.costo_unit?.toFixed(2)}</td>
+                        <td>
+                          <span
+                            className={`badge badge-${producto.estado?.toLowerCase()}`}
+                          >
+                            {producto.estado}
+                          </span>
+                        </td>
+                        <td>{producto.lotes ?? 0}</td>
+                        <td>{producto.id_categoria}</td>
+                        <td>{producto.fecha_registro}</td>
+                        <td>
+                          <div className="d-flex justify-content-center gap-2">
                             <button
-                              className="btn btn-warning btn-sm"
+                              className="btn-action-edit"
                               onClick={() => handleEdit(producto)}
                             >
-                              Editar
+                              <i className="bx bx-edit"></i>
                             </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                            <button
+                              className="btn-action-delete"
+                              onClick={() =>
+                                alert(
+                                  "Funcionalidad de eliminar aún no implementada"
+                                )
+                              }
+                            >
+                              <i className="bx bx-trash"></i>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {loading && (
+                  <div style={{ textAlign: "center", padding: "2em" }}>
+                    <div className="spinner-border text-primary" role="status">
+                      <span className="visually-hidden">Cargando...</span>
+                    </div>
+                    <div
+                      style={{
+                        marginTop: "1em",
+                        color: "#0d6efd",
+                        fontWeight: "bold",
+                      }}
+                    >
+                      Cargando productos, por favor espera...
+                    </div>
+                  </div>
+                )}
+                {!loading && productos.length === 0 && (
+                  <div
+                    style={{
+                      marginTop: "1em",
+                      color: "#0d6efd",
+                      fontWeight: "bold",
+                      textAlign: "center",
+                    }}
+                  >
+                    No hay productos que encajen con los filtros
+                  </div>
+                )}
               </div>
             </div>
 
@@ -267,7 +363,7 @@ export default function GestionProductos() {
                             type="number"
                             step="0.01"
                             className="form-control"
-                            defaultValue={selectedProduct.precio}
+                            defaultValue={selectedProduct.costo_unit}
                             required
                           />
                         </div>
@@ -285,10 +381,17 @@ export default function GestionProductos() {
                           <label className="form-label">Categoría</label>
                           <select
                             className="form-select"
-                            defaultValue={selectedProduct.categoria}
+                            defaultValue={selectedProduct?.id_categoria}
+                            onChange={(e) => {
+                              // Actualiza el estado del producto editado
+                              setSelectedProduct({
+                                ...selectedProduct!,
+                                id_categoria: e.target.value,
+                              });
+                            }}
                           >
                             {categorias.map((cat) => (
-                              <option key={cat.id} value={cat.nombre}>
+                              <option key={cat.id} value={cat.id}>
                                 {cat.nombre}
                               </option>
                             ))}

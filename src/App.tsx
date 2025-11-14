@@ -14,7 +14,7 @@ import GestionLotes from "./components/Producto/GestionLotes/GestionLotes";
 import AgregarProducto from "./components/Producto/AgregarProducto/AgregarProducto";
 import Sidebar from "./components/Layout/Sidebar";
 import Perfil from "./components/Usuarios/Perfil/Perfil";
-import PrivateRoute from "./components/PrivateRoute";
+import PrivateRoute from "./utilities/PrivateRoute";
 
 function App() {
   return (
