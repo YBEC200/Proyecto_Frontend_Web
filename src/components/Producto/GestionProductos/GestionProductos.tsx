@@ -15,21 +15,52 @@ interface Producto {
   fecha_registro: string;
 }
 
+function formatFecha(fecha: string) {
+  if (!fecha) return "";
+  const date = new Date(fecha);
+  // Ejemplo: 2025-11-13 07:00:42
+  return `${date.getFullYear()}-${(date.getMonth() + 1)
+    .toString()
+    .padStart(2, "0")}-${date.getDate().toString().padStart(2, "0")} ${date
+    .getHours()
+    .toString()
+    .padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}:${date
+    .getSeconds()
+    .toString()
+    .padStart(2, "0")}`;
+}
+
+function formatPrice(v: number | string | undefined) {
+  const n =
+    typeof v === "number" ? v : Number(String(v ?? "0").replace(",", "."));
+  return isNaN(n) ? "0.00" : n.toFixed(2);
+}
+
 export default function GestionProductos() {
-  // Estados
+  // Filtros de búsqueda
   const [searchTerm, setSearchTerm] = useState("");
   const [priceRange, setPriceRange] = useState({ min: "", max: "" });
+  const [searchInput, setSearchInput] = useState("");
+  const [minInput, setMinInput] = useState("");
+  const [maxInput, setMaxInput] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  // Modales
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Producto | null>(null);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [mensaje, setMensaje] = useState("");
+  const [mensajeTipo, setMensajeTipo] = useState<"success" | "error" | "">("");
+  // Datos de productos y categorías
   const [productos, setProductos] = useState<Producto[]>([]);
   const [categorias, setCategorias] = useState<
     { id: string; nombre: string }[]
   >([]);
   const [loading, setLoading] = useState(false);
+
+  // Obtener nombre de categoría por ID
+  const getCategoryName = (idCategoria?: string) =>
+    categorias.find((c) => c.id === idCategoria)?.nombre || idCategoria || "";
+
   // Fetch productos desde la API
   const fetchProductos = async () => {
     setLoading(true);
@@ -62,6 +93,7 @@ export default function GestionProductos() {
     setLoading(false);
   };
 
+  // Fetch categorías desde la API
   const fetchCategorias = async () => {
     const token = localStorage.getItem("token");
     try {
@@ -78,9 +110,111 @@ export default function GestionProductos() {
       setCategorias([]);
     }
   };
-  useEffect(() => {
-    fetchCategorias();
-  }, []);
+
+  // Aplicar filtros
+  const applyFilters = () => {
+    // Sólo aplicar si hay cambios (evita re-fetch innecesario)
+    if (searchTerm !== searchInput.trim()) {
+      setSearchTerm(searchInput.trim());
+    }
+    if (
+      priceRange.min !== (minInput ?? "") ||
+      priceRange.max !== (maxInput ?? "")
+    ) {
+      setPriceRange({ min: minInput ?? "", max: maxInput ?? "" });
+    }
+    // categoryFilter y statusFilter se mantienen como antes (si quieres, puedes hacerlos pendientes igual)
+  };
+
+  // Aplicar filtros al presionar Enter en los inputs
+  const handleKeyDownApply = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      applyFilters();
+    }
+  };
+
+  // Handlers
+  const handleEdit = (producto: Producto) => {
+    setSelectedProduct(producto);
+    setShowEditModal(true);
+  };
+
+  const handleUpdate = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!selectedProduct) return;
+    setMensaje("");
+    setMensajeTipo("");
+
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+    const nombre = String(formData.get("nombre") ?? "").trim();
+    const marca = String(formData.get("marca") ?? "").trim();
+    const precioRaw = String(formData.get("precio") ?? "");
+    const precio = Number(precioRaw);
+    const estado = String(formData.get("estado") ?? "");
+    const id_categoria = String(formData.get("categoria") ?? "");
+
+    // Validaciones sencillas (como en Usuarios)
+    if (!nombre) {
+      setMensaje("El nombre es obligatorio.");
+      setMensajeTipo("error");
+      return;
+    }
+    if (isNaN(precio) || precio < 0) {
+      setMensaje("Precio inválido.");
+      setMensajeTipo("error");
+      return;
+    }
+    if (!["Abastecido", "Agotado", "Inactivo"].includes(estado)) {
+      setMensaje("Estado inválido.");
+      setMensajeTipo("error");
+      return;
+    }
+
+    const token = localStorage.getItem("token");
+    try {
+      const res = await fetch(
+        `http://127.0.0.1:8000/api/productos/${selectedProduct.id}`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            nombre,
+            marca,
+            costo_unit: precio,
+            estado,
+            id_categoria,
+          }),
+        }
+      );
+
+      if (res.ok) {
+        // Refresca la lista como en Usuarios
+        await fetchProductos();
+        setShowEditModal(false);
+        setMensaje("Producto editado correctamente.");
+        setMensajeTipo("success");
+      } else {
+        const err = await res.json().catch(() => null);
+        console.error("Error update:", res.status, err);
+        setMensaje(err?.message || "Error al actualizar el producto.");
+        setMensajeTipo("error");
+      }
+    } catch (error) {
+      console.error("Fetch error:", error);
+      setMensaje("Error de conexión al actualizar el producto.");
+      setMensajeTipo("error");
+    } finally {
+      window.setTimeout(() => {
+        setMensaje("");
+        setMensajeTipo("");
+      }, 4000);
+    }
+  };
 
   useEffect(() => {
     fetchProductos();
@@ -93,19 +227,9 @@ export default function GestionProductos() {
     statusFilter,
   ]);
 
-  // Handlers
-  const handleEdit = (producto: Producto) => {
-    setSelectedProduct(producto);
-    setShowEditModal(true);
-  };
-
-  const handleUpdate = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    // Simulación de actualización exitosa
-    setShowEditModal(false);
-    setShowSuccessModal(true);
-    setTimeout(() => setShowSuccessModal(false), 3000);
-  };
+  useEffect(() => {
+    fetchCategorias();
+  }, []);
 
   return (
     <div className="dashboard-layout">
@@ -114,6 +238,21 @@ export default function GestionProductos() {
         <Nav />
         <div className="page-wrapper">
           <div className="page-content">
+            {mensaje && (
+              <div
+                className={`alert alert-${
+                  mensajeTipo === "success" ? "success" : "danger"
+                } alert-dismissible fade show`}
+                role="alert"
+              >
+                {mensaje}
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setMensaje("")}
+                ></button>
+              </div>
+            )}
             {/* Breadcrumb */}
             <div className="page-breadcrumb d-none d-sm-flex align-items-center mb-3">
               <div className="breadcrumb-title pe-3">Productos</div>
@@ -154,9 +293,10 @@ export default function GestionProductos() {
                         <input
                           type="search"
                           className="form-control ps-5 radius-30"
-                          placeholder="Ej. Laptop Dell XPS"
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
+                          placeholder="Presione 'Enter' para confirmar la búsqueda"
+                          value={searchInput}
+                          onChange={(e) => setSearchInput(e.target.value)}
+                          onKeyDown={handleKeyDownApply}
                         />
                       </div>
                     </div>
@@ -170,13 +310,9 @@ export default function GestionProductos() {
                         type="number"
                         className="form-control radius-30"
                         placeholder="S/ mínimo"
-                        value={priceRange.min}
-                        onChange={(e) =>
-                          setPriceRange({
-                            ...priceRange,
-                            min: e.target.value,
-                          })
-                        }
+                        value={minInput}
+                        onChange={(e) => setMinInput(e.target.value)}
+                        onKeyDown={handleKeyDownApply}
                       />
                     </div>
 
@@ -189,13 +325,9 @@ export default function GestionProductos() {
                         type="number"
                         className="form-control radius-30"
                         placeholder="S/ máximo"
-                        value={priceRange.max}
-                        onChange={(e) =>
-                          setPriceRange({
-                            ...priceRange,
-                            max: e.target.value,
-                          })
-                        }
+                        value={maxInput}
+                        onChange={(e) => setMaxInput(e.target.value)}
+                        onKeyDown={handleKeyDownApply}
                       />
                     </div>
 
@@ -258,7 +390,7 @@ export default function GestionProductos() {
                         <td>{producto.id}</td>
                         <td>{producto.nombre}</td>
                         <td>{producto.marca}</td>
-                        <td>S/ {producto.costo_unit?.toFixed(2)}</td>
+                        <td>S/ {formatPrice(producto.costo_unit)}</td>
                         <td>
                           <span
                             className={`badge badge-${producto.estado?.toLowerCase()}`}
@@ -267,8 +399,8 @@ export default function GestionProductos() {
                           </span>
                         </td>
                         <td>{producto.lotes ?? 0}</td>
-                        <td>{producto.id_categoria}</td>
-                        <td>{producto.fecha_registro}</td>
+                        <td>{getCategoryName(producto.id_categoria)}</td>
+                        <td>{formatFecha(producto.fecha_registro)}</td>
                         <td>
                           <div className="d-flex justify-content-center gap-2">
                             <button
@@ -342,6 +474,7 @@ export default function GestionProductos() {
                         <div className="mb-3">
                           <label className="form-label">Nombre</label>
                           <input
+                            name="nombre"
                             type="text"
                             className="form-control"
                             defaultValue={selectedProduct.nombre}
@@ -351,6 +484,7 @@ export default function GestionProductos() {
                         <div className="mb-3">
                           <label className="form-label">Marca</label>
                           <input
+                            name="marca"
                             type="text"
                             className="form-control"
                             defaultValue={selectedProduct.marca}
@@ -360,16 +494,19 @@ export default function GestionProductos() {
                         <div className="mb-3">
                           <label className="form-label">Precio</label>
                           <input
+                            name="precio"
                             type="number"
                             step="0.01"
                             className="form-control"
-                            defaultValue={selectedProduct.costo_unit}
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            defaultValue={selectedProduct.costo_unit as any}
                             required
                           />
                         </div>
                         <div className="mb-3">
                           <label className="form-label">Estado</label>
                           <select
+                            name="estado"
                             className="form-select"
                             defaultValue={selectedProduct.estado}
                           >
@@ -380,10 +517,10 @@ export default function GestionProductos() {
                         <div className="mb-3">
                           <label className="form-label">Categoría</label>
                           <select
+                            name="categoria"
                             className="form-select"
                             defaultValue={selectedProduct?.id_categoria}
                             onChange={(e) => {
-                              // Actualiza el estado del producto editado
                               setSelectedProduct({
                                 ...selectedProduct!,
                                 id_categoria: e.target.value,
@@ -411,48 +548,6 @@ export default function GestionProductos() {
                         </button>
                       </div>
                     </form>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Modal Éxito */}
-            {showSuccessModal && (
-              <div className="modal show d-block" tabIndex={-1}>
-                <div className="modal-dialog modal-dialog-centered">
-                  <div className="modal-content">
-                    <div className="modal-header bg-success text-white">
-                      <h5 className="modal-title">✅ Éxito</h5>
-                      <button
-                        type="button"
-                        className="btn-close"
-                        onClick={() => setShowSuccessModal(false)}
-                      ></button>
-                    </div>
-                    <div className="modal-body">
-                      ¡El producto se actualizó correctamente!
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Modal Error */}
-            {showErrorModal && (
-              <div className="modal show d-block" tabIndex={-1}>
-                <div className="modal-dialog modal-dialog-centered">
-                  <div className="modal-content">
-                    <div className="modal-header bg-danger text-white">
-                      <h5 className="modal-title">❌ Error</h5>
-                      <button
-                        type="button"
-                        className="btn-close"
-                        onClick={() => setShowErrorModal(false)}
-                      ></button>
-                    </div>
-                    <div className="modal-body">
-                      Hubo un error al actualizar el producto.
-                    </div>
                   </div>
                 </div>
               </div>

@@ -42,6 +42,9 @@ function Usuarios() {
   const [roleFilter, setRoleFilter] = useState("");
   const [fechaRegistroFiltro, setFechaRegistroFiltro] = useState("");
   const [fechaActualizacionFiltro, setFechaActualizacionFiltro] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+
+  // Users data state
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [loading, setLoading] = useState(false);
   // Edit user state
@@ -59,6 +62,7 @@ function Usuarios() {
   const [mensaje, setMensaje] = useState("");
   const [mensajeTipo, setMensajeTipo] = useState<"success" | "error" | "">("");
 
+  // Función para obtener usuarios desde la API con filtros
   const fetchUsuarios = async () => {
     setLoading(true);
     const token = localStorage.getItem("token");
@@ -90,6 +94,7 @@ function Usuarios() {
     setLoading(false);
   };
 
+  // Función para manejar la edición de usuario
   const handleEditUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setEditError("");
@@ -149,6 +154,7 @@ function Usuarios() {
     }
   };
 
+  // Función para manejar la eliminación de usuario
   const handleDeleteUser = async () => {
     if (!selectedUser) return;
     setMensaje("");
@@ -180,6 +186,22 @@ function Usuarios() {
       setShowDeleteModal(false);
       setMensaje("Error de conexión al eliminar.");
       setMensajeTipo("error");
+    }
+  };
+
+  // Función para aplicar filtros
+  const applyFilters = () => {
+    // Sólo aplicar si hay cambios (evita re-fetch innecesario)
+    if (searchTerm !== searchInput.trim()) {
+      setSearchTerm(searchInput.trim());
+    }
+  };
+
+  // Función para manejar "Enter" en el campo de búsqueda
+  const handleKeyDownApply = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      applyFilters();
     }
   };
 
@@ -261,9 +283,10 @@ function Usuarios() {
                         <input
                           type="search"
                           className="form-control ps-5 radius-30"
-                          placeholder="Ej. Juan Pérez"
+                          placeholder="Presione 'Enter' para confirmar la búsqueda"
                           value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
+                          onChange={(e) => setSearchInput(e.target.value)}
+                          onKeyDown={handleKeyDownApply}
                         />
                       </div>
                     </div>
