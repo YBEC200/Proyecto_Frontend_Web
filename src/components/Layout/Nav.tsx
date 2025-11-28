@@ -10,6 +10,29 @@ export default function Nav() {
   const adminName = user.nombre || "Administrador";
   const adminRole = user.rol || "Admin";
 
+  const handleLogout = async () => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      try {
+        await fetch("http://127.0.0.1:8000/api/admin/logout", {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer " + token,
+            "Content-Type": "application/json",
+          },
+        });
+        /* eslint-disable @typescript-eslint/no-unused-vars */
+      } catch (error) {
+        // Puedes mostrar un mensaje de error si lo deseas
+      }
+    }
+    localStorage.setItem("isAuthenticated", "false");
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    // Redirige si es necesario, por ejemplo:
+    // window.location.href = "/";
+  };
+
   return (
     <header>
       <div className="topbar d-flex align-items-center">
@@ -139,11 +162,7 @@ export default function Nav() {
                 <Link
                   to="/"
                   className="dropdown-item d-flex align-items-center"
-                  onClick={() => {
-                    localStorage.setItem("isAuthenticated", "false");
-                    localStorage.removeItem("token");
-                    localStorage.removeItem("user");
-                  }}
+                  onClick={handleLogout}
                 >
                   <i className="bx bx-log-out-circle"></i>
                   <span>Cerrar Sesión</span>

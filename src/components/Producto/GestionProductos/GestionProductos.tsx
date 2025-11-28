@@ -84,7 +84,6 @@ export default function GestionProductos() {
         }
       );
       const data = await response.json();
-      console.log(data); // <-- Agrega esto
       setProductos(data);
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (error) {
@@ -150,36 +149,19 @@ export default function GestionProductos() {
     const formData = new FormData(form);
     const nombre = String(formData.get("nombre") ?? "").trim();
     const marca = String(formData.get("marca") ?? "").trim();
-    const precioRaw = String(formData.get("precio") ?? "");
-    const precio = Number(precioRaw);
+    const precio = Number(String(formData.get("precio") ?? ""));
     const estado = String(formData.get("estado") ?? "");
     const id_categoria = String(formData.get("categoria") ?? "");
 
-    // Validaciones sencillas (como en Usuarios)
-    if (!nombre) {
-      setMensaje("El nombre es obligatorio.");
-      setMensajeTipo("error");
-      return;
-    }
-    if (isNaN(precio) || precio < 0) {
-      setMensaje("Precio inválido.");
-      setMensajeTipo("error");
-      return;
-    }
-    if (!["Abastecido", "Agotado", "Inactivo"].includes(estado)) {
-      setMensaje("Estado inválido.");
-      setMensajeTipo("error");
-      return;
-    }
-
     const token = localStorage.getItem("token");
+
     try {
       const res = await fetch(
         `http://127.0.0.1:8000/api/productos/${selectedProduct.id}`,
         {
           method: "PUT",
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: token ? `Bearer ${token}` : "",
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -192,27 +174,36 @@ export default function GestionProductos() {
         }
       );
 
+      const body = await res.json().catch(() => null);
+
       if (res.ok) {
-        // Refresca la lista como en Usuarios
         await fetchProductos();
         setShowEditModal(false);
         setMensaje("Producto editado correctamente.");
         setMensajeTipo("success");
-      } else {
-        const err = await res.json().catch(() => null);
-        console.error("Error update:", res.status, err);
-        setMensaje(err?.message || "Error al actualizar el producto.");
+      } else if (res.status === 422) {
+        // Validación Laravel: mostrar los mensajes de error
+        const validationMsg =
+          body && typeof body === "object"
+            ? Object.values(body).flat().join(" - ")
+            : "Error de validación.";
+        setMensaje(validationMsg);
         setMensajeTipo("error");
+        console.error("Validation errors:", body);
+      } else {
+        setMensaje(body?.message || `Error ${res.status}`);
+        setMensajeTipo("error");
+        console.error("Update error:", res.status, body);
+      }
+      if (!res.ok) {
+        const text = await res.text();
+        console.error("Update error raw:", res.status, text);
+        // luego intenta parsear JSON si aplica
       }
     } catch (error) {
       console.error("Fetch error:", error);
       setMensaje("Error de conexión al actualizar el producto.");
       setMensajeTipo("error");
-    } finally {
-      window.setTimeout(() => {
-        setMensaje("");
-        setMensajeTipo("");
-      }, 4000);
     }
   };
 
@@ -474,44 +465,48 @@ export default function GestionProductos() {
                         <div className="mb-3">
                           <label className="form-label">Nombre</label>
                           <input
-                            name="nombre"
+                            name="nombre" // <-- AQUI: name
                             type="text"
                             className="form-control"
-                            defaultValue={selectedProduct.nombre}
+                            defaultValue={selectedProduct?.nombre || ""}
                             required
                           />
                         </div>
+
                         <div className="mb-3">
                           <label className="form-label">Marca</label>
                           <input
-                            name="marca"
+                            name="marca" // <-- AQUI
                             type="text"
                             className="form-control"
-                            defaultValue={selectedProduct.marca}
-                            required
+                            defaultValue={selectedProduct?.marca || ""}
                           />
                         </div>
+
                         <div className="mb-3">
                           <label className="form-label">Precio</label>
                           <input
-                            name="precio"
+                            name="precio" // <-- AQUI
                             type="number"
                             step="0.01"
                             className="form-control"
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                            defaultValue={selectedProduct.costo_unit as any}
+                            defaultValue={selectedProduct?.costo_unit ?? ""}
                             required
                           />
                         </div>
+
                         <div className="mb-3">
                           <label className="form-label">Estado</label>
                           <select
-                            name="estado"
+                            name="estado" // <-- AQUI
                             className="form-select"
-                            defaultValue={selectedProduct.estado}
+                            defaultValue={
+                              selectedProduct?.estado || "Abastecido"
+                            }
+                            required
                           >
-                            <option value="Abastecido">Abastecido</option>
-                            <option value="Agotado">Agotado</option>
+                            <option>Abastecido</option>
+                            <option>Agotado</option>
                           </select>
                         </div>
                         <div className="mb-3">
