@@ -166,12 +166,72 @@
   color: #36a2e0;
 }
 
-@media (max-width: 768px) {
+/* estilos para que los modales (editar / eliminar) calcen y tengan apariencia consistente */
+.modal-dialog.modal-md {
+  max-width: 680px;
+  margin: 1.75rem auto;
+}
+
+.modal-custom-shared,
+.modal-content {
+  border-radius: 0.75rem;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(10, 25, 47, 0.12);
+}
+
+/* cabeceras homogéneas: padding, tipografía y botón cerrar visible en fondos oscuros */
+.modal-header {
+  padding: 0.9rem 1rem;
+  align-items: center;
+}
+.modal-header .modal-title {
+  font-weight: 700;
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+/* forzar botón cerrar visible en headers con background oscuro */
+.modal-header .btn-close {
+  filter: invert(1) brightness(2);
+  opacity: 0.95;
+  border: none;
+  width: 1.6rem;
+  height: 1.6rem;
+}
+
+/* cuerpo y footer con espaciados consistentes */
+.modal-body {
+  padding: 1rem;
+  color: #333;
+}
+.modal-footer {
+  padding: 0.75rem 1rem;
+  border-top: none;
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+/* botones */
+.modal-footer .btn-danger {
+  background-color: #d9534f;
+  border-color: #d43f3a;
+}
+.modal-footer .btn-secondary {
+  background-color: #6c757d;
+  border-color: #6c757d;
+}
+
+@media (max-width: 576px) {
   .filtros-productos {
     flex-direction: column;
     gap: 10px;
   }
   .filtro-item {
     width: 100%;
+  }
+  .modal-dialog.modal-md {
+    max-width: calc(100% - 2rem);
+    margin: 1rem;
   }
 }

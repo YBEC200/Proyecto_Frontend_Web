@@ -48,6 +48,8 @@ export default function GestionProductos() {
   // Modales
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Producto | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Producto | null>(null);
   const [mensaje, setMensaje] = useState("");
   const [mensajeTipo, setMensajeTipo] = useState<"success" | "error" | "">("");
   // Datos de productos y categorías
@@ -204,6 +206,47 @@ export default function GestionProductos() {
       console.error("Fetch error:", error);
       setMensaje("Error de conexión al actualizar el producto.");
       setMensajeTipo("error");
+    }
+  };
+
+  // Eliminar producto (si no tiene lotes vinculados)
+  const handleDelete = async (id: string) => {
+    setMensaje("");
+    setMensajeTipo("");
+    const token = localStorage.getItem("token");
+    try {
+      const res = await fetch(`http://127.0.0.1:8000/api/productos/${id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: token ? `Bearer ${token}` : "",
+          "Content-Type": "application/json",
+        },
+      });
+      const body = await res.json().catch(() => null);
+      if (res.ok) {
+        await fetchProductos();
+        setMensaje("Producto eliminado correctamente.");
+        setMensajeTipo("success");
+      } else if (res.status === 409) {
+        // Según tu controlador: 409 cuando tiene lotes vinculados
+        setMensaje(body?.message || "El producto tiene lotes vinculados.");
+        setMensajeTipo("error");
+      } else if (res.status === 404) {
+        setMensaje(body?.message || "Producto no encontrado.");
+        setMensajeTipo("error");
+      } else {
+        setMensaje(body?.message || `Error ${res.status}`);
+        setMensajeTipo("error");
+      }
+    } catch (error) {
+      console.error("Delete error:", error);
+      setMensaje("Error de conexión al eliminar el producto.");
+      setMensajeTipo("error");
+    } finally {
+      setTimeout(() => {
+        setMensaje("");
+        setMensajeTipo("");
+      }, 4000);
     }
   };
 
@@ -402,11 +445,10 @@ export default function GestionProductos() {
                             </button>
                             <button
                               className="btn-action-delete"
-                              onClick={() =>
-                                alert(
-                                  "Funcionalidad de eliminar aún no implementada"
-                                )
-                              }
+                              onClick={() => {
+                                setDeleteTarget(producto);
+                                setShowDeleteModal(true);
+                              }}
                             >
                               <i className="bx bx-trash"></i>
                             </button>
@@ -450,9 +492,9 @@ export default function GestionProductos() {
             {/* Modal Editar */}
             {showEditModal && selectedProduct && (
               <div className="modal show d-block" tabIndex={-1}>
-                <div className="modal-dialog">
+                <div className="modal-dialog modal-dialog-centered modal-md">
                   <div className="modal-content">
-                    <div className="modal-header">
+                    <div className="modal-header bg-primary text-white">
                       <h5 className="modal-title">Editar Producto</h5>
                       <button
                         type="button"
@@ -543,6 +585,61 @@ export default function GestionProductos() {
                         </button>
                       </div>
                     </form>
+                  </div>
+                </div>
+              </div>
+            )}
+            {/* Modal Confirmación Eliminar */}
+            {showDeleteModal && deleteTarget && (
+              <div className="modal show d-block" tabIndex={-1}>
+                <div className="modal-dialog modal-dialog-centered modal-md">
+                  <div className="modal-content">
+                    <div className="modal-header bg-danger text-white">
+                      <h5 className="modal-title">Confirmar eliminación</h5>
+                      <button
+                        type="button"
+                        className="btn-close"
+                        onClick={() => {
+                          setShowDeleteModal(false);
+                          setDeleteTarget(null);
+                        }}
+                      ></button>
+                    </div>
+                    <div className="modal-body">
+                      <p>
+                        ¿Estás seguro de eliminar el producto{" "}
+                        <strong>{deleteTarget.nombre}</strong>? Esta acción no
+                        se puede deshacer.
+                      </p>
+                      <p className="text-muted small">
+                        Si el producto tiene lotes vinculados, la eliminación
+                        fallará.
+                      </p>
+                    </div>
+                    <div className="modal-footer">
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => {
+                          setShowDeleteModal(false);
+                          setDeleteTarget(null);
+                        }}
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-danger"
+                        onClick={async () => {
+                          if (!deleteTarget) return;
+                          await handleDelete(deleteTarget.id);
+                          setShowDeleteModal(false);
+                          setDeleteTarget(null);
+                        }}
+                      >
+                        Eliminar
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

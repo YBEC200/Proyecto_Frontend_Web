@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Nav from "../../Layout/Nav";
 import Sidebar from "../../Layout/Sidebar";
 import "./GestionLotes.css";
@@ -15,6 +15,7 @@ interface Lote {
   productoId: string;
   cantidad: number;
   fechaRegistro: string;
+  productoNombre?: string;
 }
 
 interface Producto {
@@ -46,34 +47,93 @@ export default function GestionLotes() {
     null
   );
   const [selectedLote, setSelectedLote] = useState<Lote | null>(null);
+  const [lotes, setLotes] = useState<Lote[]>([]);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  // Datos de ejemplo
-  const categorias: Categoria[] = [
-    { id: "1", nombre: "Laptops", descripcion: "Computadoras portátiles" },
-    { id: "2", nombre: "Monitores", descripcion: "Pantallas de computadora" },
-  ];
+  const fetchLotes = useCallback(async () => {
+    setLoading(true);
+    const token = localStorage.getItem("token");
+    try {
+      const params = new URLSearchParams();
+      if (loteSearch) {
+        params.append("lote", loteSearch);
+        params.append("product_name", loteSearch);
+      }
+      const res = await fetch(
+        `http://127.0.0.1:8000/api/lotes?${params.toString()}`,
+        {
+          headers: {
+            Authorization: token ? `Bearer ${token}` : "",
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      if (!res.ok) {
+        const txt = await res.text().catch(() => null);
+        throw new Error(txt || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      // Mapear respuesta al interfaz Lote usado en el componente
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mapped: Lote[] = data.map((l: any) => ({
+        id: String(l.Id ?? l.id ?? ""),
+        nombre: l.Lote ?? l.nombre ?? "",
+        productoId: String(l.Id_Producto ?? l.producto?.id ?? ""),
+        cantidad: Number(l.Cantidad ?? 0),
+        fechaRegistro: l.Fecha_Registro ?? l.fechaRegistro ?? "",
+        productoNombre: l.producto?.nombre ?? undefined,
+      }));
+      setLotes(mapped);
+    } catch (err) {
+      console.error("Error fetching lotes:", err);
+      setErrorMessage("Error al cargar lotes desde el servidor.");
+      setShowErrorModal(true);
+      setLotes([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [loteSearch]);
+
+  // Fetch categorías desde API
+  const fetchCategorias = useCallback(async () => {
+    setLoading(true);
+    const token = localStorage.getItem("token");
+    try {
+      const res = await fetch("http://127.0.0.1:8000/api/categorias", {
+        headers: {
+          Authorization: token ? `Bearer ${token}` : "",
+          "Content-Type": "application/json",
+        },
+      });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => null);
+        throw new Error(txt || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      setCategorias(data);
+    } catch (err) {
+      console.error("Error fetching categorias:", err);
+      setErrorMessage("Error al cargar categorías desde el servidor.");
+      setShowErrorModal(true);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchCategorias();
+  }, [fetchCategorias]);
+
+  useEffect(() => {
+    // lanzar fetchLotes al montar y cuando cambie loteSearch (debounce opcional)
+    fetchLotes();
+  }, [fetchLotes]);
 
   const productos: Producto[] = [
     { id: "1", nombre: "Laptop Dell XPS" },
     { id: "2", nombre: "Monitor LG 27'" },
     { id: "3", nombre: "Laptop HP Pavilion" },
-  ];
-
-  const lotes: Lote[] = [
-    {
-      id: "1",
-      nombre: "LOTE001",
-      productoId: "1",
-      cantidad: 10,
-      fechaRegistro: "2023-11-01",
-    },
-    {
-      id: "2",
-      nombre: "LOTE002",
-      productoId: "2",
-      cantidad: 15,
-      fechaRegistro: "2023-11-01",
-    },
   ];
 
   // Helper tipado seguro para acceder a window.bootstrap (evita 'any')
@@ -249,6 +309,37 @@ export default function GestionLotes() {
                             ))}
                         </tbody>
                       </table>
+                      {loading && (
+                        <div style={{ textAlign: "center", padding: "2em" }}>
+                          <div
+                            className="spinner-border text-primary"
+                            role="status"
+                          >
+                            <span className="visually-hidden">Cargando...</span>
+                          </div>
+                          <div
+                            style={{
+                              marginTop: "1em",
+                              color: "#0d6efd",
+                              fontWeight: "bold",
+                            }}
+                          >
+                            Cargando categorias, por favor espera...
+                          </div>
+                        </div>
+                      )}
+                      {!loading && productos.length === 0 && (
+                        <div
+                          style={{
+                            marginTop: "1em",
+                            color: "#0d6efd",
+                            fontWeight: "bold",
+                            textAlign: "center",
+                          }}
+                        >
+                          No hay categorias que encajen con los filtros
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -293,54 +384,42 @@ export default function GestionLotes() {
                           </tr>
                         </thead>
                         <tbody>
-                          {lotes
-                            .filter(
-                              (lote) =>
-                                lote.nombre
-                                  .toLowerCase()
-                                  .includes(loteSearch.toLowerCase()) ||
-                                productos
-                                  .find((p) => p.id === lote.productoId)
-                                  ?.nombre.toLowerCase()
-                                  .includes(loteSearch.toLowerCase())
-                            )
-                            .map((lote) => (
-                              <tr key={lote.id}>
-                                <td>{lote.id}</td>
-                                <td>{lote.nombre}</td>
-                                <td>
-                                  {
-                                    productos.find(
-                                      (p) => p.id === lote.productoId
-                                    )?.nombre
-                                  }
-                                </td>
-                                <td>{lote.fechaRegistro}</td>
-                                <td>{lote.cantidad}</td>
-                                <td>
-                                  <div className="d-flex justify-content-center gap-2">
-                                    <button
-                                      className="btn btn-warning btn-sm"
-                                      onClick={() => handleEditLote(lote)}
-                                    >
-                                      Editar
-                                    </button>
-                                    <button
-                                      className="btn btn-danger btn-sm"
-                                      onClick={() => {
-                                        setShowSuccessModal(true);
-                                        setTimeout(
-                                          () => setShowSuccessModal(false),
-                                          1000
-                                        );
-                                      }}
-                                    >
-                                      Eliminar
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))}
+                          {lotes.map((lote) => (
+                            <tr key={lote.id}>
+                              <td>{lote.id}</td>
+                              <td>{lote.nombre}</td>
+                              <td>
+                                {lote.productoNombre ??
+                                  productos.find(
+                                    (p) => p.id === lote.productoId
+                                  )?.nombre}
+                              </td>
+                              <td>{lote.fechaRegistro}</td>
+                              <td>{lote.cantidad}</td>
+                              <td>
+                                <div className="d-flex justify-content-center gap-2">
+                                  <button
+                                    className="btn btn-warning btn-sm"
+                                    onClick={() => handleEditLote(lote)}
+                                  >
+                                    Editar
+                                  </button>
+                                  <button
+                                    className="btn btn-danger btn-sm"
+                                    onClick={() => {
+                                      setShowSuccessModal(true);
+                                      setTimeout(
+                                        () => setShowSuccessModal(false),
+                                        1000
+                                      );
+                                    }}
+                                  >
+                                    Eliminar
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
                         </tbody>
                       </table>
                     </div>
