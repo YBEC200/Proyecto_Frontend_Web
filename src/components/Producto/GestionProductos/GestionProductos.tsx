@@ -13,6 +13,7 @@ interface Producto {
   id_categoria: string;
   categoria?: { id: string; nombre: string };
   fecha_registro: string;
+  ultimo_abastecimiento: string | null;
 }
 
 function formatFecha(fecha: string) {
@@ -86,8 +87,19 @@ export default function GestionProductos() {
         }
       );
       const data = await response.json();
-      setProductos(data);
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
+      // Normalizar campos esperados en el frontend
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const normalized = (data || []).map((p: any) => ({
+        ...p,
+        lotes: Number(p.lotes ?? 0),
+        fecha_registro: p.fecha_registro ?? p.fechaRegistro ?? "",
+        ultimo_abastecimiento:
+          p.ultimo_abastecimiento ?? p.ultimoAbastecimiento ?? null,
+      }));
+
+      setProductos(normalized);
+      /* eslint-disable @typescript-eslint/no-unused-vars */
     } catch (error) {
       setProductos([]);
     }
@@ -106,7 +118,7 @@ export default function GestionProductos() {
       });
       const data = await response.json();
       setCategorias(data);
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      /* eslint-disable @typescript-eslint/no-unused-vars */
     } catch (error) {
       setCategorias([]);
     }
@@ -434,7 +446,12 @@ export default function GestionProductos() {
                         </td>
                         <td>{producto.lotes ?? 0}</td>
                         <td>{getCategoryName(producto.id_categoria)}</td>
-                        <td>{formatFecha(producto.fecha_registro)}</td>
+                        <td>
+                          {formatFecha(
+                            producto.ultimo_abastecimiento ??
+                              producto.fecha_registro
+                          )}
+                        </td>
                         <td>
                           <div className="d-flex justify-content-center gap-2">
                             <button

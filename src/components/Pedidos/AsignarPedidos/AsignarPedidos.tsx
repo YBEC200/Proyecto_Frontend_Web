@@ -3,8 +3,6 @@ import Nav from "../../Layout/Nav";
 import Sidebar from "../../Layout/Sidebar";
 import "./AsignarPedidos.css";
 
-type TipoEnvio = "Envio" | "Recoger";
-
 interface DetalleRow {
   id: string;
   productoId: string;
@@ -13,103 +11,123 @@ interface DetalleRow {
   subtotal: number;
 }
 
-interface Direccion {
-  ciudad: string;
-  calle: string;
-  referencia: string;
+interface ProductoAPI {
+  id: number;
+  nombre: string;
+  costo_unit?: number;
 }
 
-const sampleProducts = [
-  { id: "p1", nombre: "Producto A", precio: 25.0 },
-  { id: "p2", nombre: "Producto B", precio: 45.5 },
-  { id: "p3", nombre: "Producto C", precio: 12.3 },
-];
+interface LoteAPI {
+  Id: number;
+  Lote: string;
+  Id_Producto: number;
+  Cantidad: number;
+  Fecha_Registro: string;
+}
 
-const sampleUsers = [
-  { id: "u1", nombre: "Juan Pérez" },
-  { id: "u2", nombre: "María García" },
-];
+interface UsuarioAPI {
+  id: number;
+  nombre: string;
+}
 
 const sampleComprobantes = [
   { id: "c1", nombre: "Boleta" },
   { id: "c2", nombre: "Factura" },
 ];
 
-const sampleMetodos = [
-  { id: "m1", nombre: "Efectivo" },
-  { id: "m2", nombre: "Tarjeta" },
-];
-
 export default function AsignarPedidos() {
   // Estados
   const [ventaCreada, setVentaCreada] = useState(false);
-  const [tipo, setTipo] = useState<TipoEnvio>("Envio");
   const [idDireccion, setIdDireccion] = useState<string | null>(null);
-  const [direccion, setDireccion] = useState<Direccion | null>(null);
-  const [rucRequired, setRucRequired] = useState(false);
-  const [ruc, setRuc] = useState("");
   const [rows, setRows] = useState<DetalleRow[]>([
-    { id: "r1", productoId: "", cantidad: 1, precioUnit: 0, subtotal: 0 },
+    {
+      id: "r1",
+      productoId: "",
+      cantidad: 1,
+      precioUnit: 0,
+      subtotal: 0,
+    },
   ]);
   const [total, setTotal] = useState(0);
+
+  const [productos, setProductos] = useState<ProductoAPI[]>([]);
+  const [lotesByProduct, setLotesByProduct] = useState<
+    Record<number, LoteAPI[]>
+  >({});
+  const [usuarios, setUsuarios] = useState<UsuarioAPI[]>([]);
+  const [selectedUsuario, setSelectedUsuario] = useState<string>("");
 
   useEffect(() => {
     const t = rows.reduce((s, r) => s + r.subtotal, 0);
     setTotal(parseFloat(t.toFixed(2)));
   }, [rows]);
 
-  function handleCrearVenta(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setVentaCreada(true);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
+  // Fetch inicial: productos y usuarios
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    const headers = {
+      Authorization: token ? `Bearer ${token}` : "",
+      "Content-Type": "application/json",
+    };
 
-  function handleTipoChange(v: TipoEnvio) {
-    setTipo(v);
-    if (v === "Recoger") {
-      setIdDireccion(null);
-      setDireccion(null);
-    }
-  }
-
-  function handleComprobanteChange(id: string) {
-    const comp = sampleComprobantes.find((c) => c.id === id);
-    setRucRequired(comp?.nombre?.toLowerCase() === "factura");
-    if (!(comp?.nombre?.toLowerCase() === "factura")) setRuc("");
-  }
-
-  // modal dirección (simulado)
-  function guardarDireccionSimulada() {
-    const ciudad =
-      (document.getElementById("ciudadInput") as HTMLInputElement)?.value || "";
-    const calle =
-      (document.getElementById("calleInput") as HTMLInputElement)?.value || "";
-    const referencia =
-      (document.getElementById("refInput") as HTMLTextAreaElement)?.value || "";
-
-    if (ciudad) {
-      const nuevaDireccion = { ciudad, calle, referencia };
-      setDireccion(nuevaDireccion);
-      setIdDireccion("dir-" + Date.now());
-
-      // Mostrar la dirección guardada
-      const direccionTexto = `${nuevaDireccion.ciudad}, ${nuevaDireccion.calle}`;
-      const direccionSpan = document.querySelector(".direccion-guardada");
-      if (direccionSpan) {
-        direccionSpan.textContent = direccionTexto;
+    (async () => {
+      try {
+        const [pRes, uRes] = await Promise.all([
+          fetch("http://127.0.0.1:8000/api/productos", { headers }),
+          fetch("http://127.0.0.1:8000/api/usuarios", { headers }),
+        ]);
+        if (pRes.ok) {
+          const pData = await pRes.json();
+          // Normalizar id/nombre
+          setProductos(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (pData || []).map((p: any) => ({
+              id: Number(p.id ?? p.Id ?? p.id_producto),
+              nombre: p.nombre ?? p.Nombre,
+              costo_unit: Number(p.costo_unit ?? p.Costo_unit ?? 0),
+            }))
+          );
+        }
+        if (uRes.ok) {
+          const uData = await uRes.json();
+          setUsuarios(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (uData || []).map((u: any) => ({
+              id: Number(u.id ?? u.Id ?? u.IdUsuario),
+              nombre: u.nombre ?? (u.Nombre || u.correo),
+            }))
+          );
+        }
+      } catch (err) {
+        console.error("Error fetch inicial:", err);
       }
+    })();
+  }, []);
 
-      // Cerrar modal usando Bootstrap 5
-      const modalElement = document.getElementById("modalDireccion");
-      if (modalElement) {
-        // @ts-expect-error Bootstrap types not available
-        const modal = window.bootstrap?.Modal.getInstance(modalElement);
-        modal?.hide();
-      }
+  // Obtener lotes para un producto
+  const fetchLotesForProduct = async (productId: number) => {
+    if (!productId) return;
+    if (lotesByProduct[productId]) return; // ya cargado
+    const token = localStorage.getItem("token");
+    try {
+      const res = await fetch(
+        `http://127.0.0.1:8000/api/lotes?product_id=${productId}`,
+        {
+          headers: {
+            Authorization: token ? `Bearer ${token}` : "",
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      setLotesByProduct((s) => ({ ...s, [productId]: data }));
+    } catch (err) {
+      console.error("Error fetching lotes:", err);
     }
-  }
+  };
 
-  // detalle filas
+  // Gestión de filas
   function addRow() {
     setRows((r) => [
       ...r,
@@ -126,16 +144,23 @@ export default function AsignarPedidos() {
     setRows((r) => r.filter((x) => x.id !== id));
   }
   function updateRowProducto(id: string, productoId: string) {
-    const prod = sampleProducts.find((p) => p.id === productoId);
+    const prod = productos.find((p) => String(p.id) === productoId);
+    const pid = prod ? prod.id : 0;
+    // cargar lotes del producto
+    if (pid) fetchLotesForProduct(pid);
     setRows((r) =>
       r.map((row) =>
         row.id === id
           ? {
               ...row,
-              productoId,
-              precioUnit: prod ? prod.precio : 0,
+              productoId: productoId,
+              precioUnit: prod
+                ? Number(prod.costo_unit ?? prod.costo_unit ?? 0)
+                : 0,
               subtotal: Number(
-                ((prod ? prod.precio : 0) * row.cantidad).toFixed(2)
+                (
+                  (prod ? Number(prod.costo_unit ?? 0) : 0) * row.cantidad
+                ).toFixed(2)
               ),
             }
           : row
@@ -154,6 +179,109 @@ export default function AsignarPedidos() {
           : row
       )
     );
+  }
+
+  // Crear venta y enviar al backend
+  async function handleCrearVenta(e?: React.FormEvent<HTMLFormElement>) {
+    if (e) e.preventDefault();
+
+    if (!selectedUsuario) {
+      alert("Seleccione un usuario.");
+      return;
+    }
+
+    // Validar que todos los productos tengan cantidad mayor a 0
+    if (rows.some((r) => !r.productoId || r.cantidad <= 0)) {
+      alert("Complete todos los detalles de productos con cantidad válida.");
+      return;
+    }
+
+    const detalles = rows.map((r) => ({
+      Id_Producto: Number(r.productoId),
+      Cantidad: Number(r.cantidad),
+      Costo: Number(r.precioUnit),
+    }));
+
+    const payload = {
+      Id_Usuario: Number(selectedUsuario),
+      Id_Metodo_Pago: null,
+      Id_Comprobante: null,
+      Id_Direccion: idDireccion ? idDireccion : null,
+      Fecha: new Date().toISOString().slice(0, 10),
+      Costo_total: Number(total),
+      estado: "pendiente",
+      detalles,
+    };
+
+    console.log("Payload a enviar:", payload);
+
+    const token = localStorage.getItem("token");
+    try {
+      const res = await fetch("http://127.0.0.1:8000/api/ventas", {
+        method: "POST",
+        headers: {
+          Authorization: token ? `Bearer ${token}` : "",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+      const body = await res.json().catch(() => null);
+      if (res.ok) {
+        alert("Venta creada correctamente.");
+        // Reset básico
+        setRows([
+          {
+            id: "r" + Date.now(),
+            productoId: "",
+            cantidad: 1,
+            precioUnit: 0,
+            subtotal: 0,
+          },
+        ]);
+        setTotal(0);
+        setSelectedUsuario("");
+        setIdDireccion(null);
+        setVentaCreada(false);
+      } else {
+        console.error("Error crear venta:", body);
+        alert(body?.message || `Error ${res.status}: ${JSON.stringify(body)}`);
+      }
+    } catch (err) {
+      console.error("Fetch error crear venta:", err);
+      alert("Error de conexión al crear la venta.");
+    }
+  }
+
+  function handleComprobanteChange(id: string) {
+    const comp = sampleComprobantes.find((c) => c.id === id);
+    const isFactura = comp?.nombre?.toLowerCase() === "factura";
+    if (!isFactura) {
+      const rucInput = document.getElementById("rucInput") as HTMLInputElement;
+      if (rucInput) rucInput.value = "";
+    }
+  }
+
+  // modal dirección (simulado)
+  function guardarDireccionSimulada() {
+    const ciudad =
+      (document.getElementById("ciudadInput") as HTMLInputElement)?.value || "";
+    const calle =
+      (document.getElementById("calleInput") as HTMLInputElement)?.value || "";
+
+    if (ciudad) {
+      setIdDireccion("dir-" + Date.now());
+      const direccionTexto = `${ciudad}, ${calle}`;
+      const direccionSpan = document.querySelector(".direccion-guardada");
+      if (direccionSpan) direccionSpan.textContent = direccionTexto;
+      const modalElement = document.getElementById("modalDireccion");
+      if (modalElement) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const modal = (window as any).bootstrap?.Modal.getInstance(
+          modalElement
+        );
+        modal?.hide();
+      }
+    }
   }
 
   return (
@@ -180,7 +308,13 @@ export default function AsignarPedidos() {
             <div className="card">
               <div className="card-body">
                 {!ventaCreada ? (
-                  <form onSubmit={handleCrearVenta}>
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      setVentaCreada(true);
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }}
+                  >
                     <div className="row mb-3">
                       <div className="col-md-3">
                         <label>Fecha Pedido</label>
@@ -201,16 +335,18 @@ export default function AsignarPedidos() {
                         />
                       </div>
                       <div className="col-md-3">
-                        <label>Tipo</label>
+                        <label>Usuario</label>
                         <select
                           className="form-select"
-                          value={tipo}
-                          onChange={(e) =>
-                            handleTipoChange(e.target.value as TipoEnvio)
-                          }
+                          value={selectedUsuario}
+                          onChange={(e) => setSelectedUsuario(e.target.value)}
                         >
-                          <option value="Envio">Envio</option>
-                          <option value="Recoger">Recoger</option>
+                          <option value="">Seleccione</option>
+                          {usuarios.map((u) => (
+                            <option key={u.id} value={u.id}>
+                              {u.nombre}
+                            </option>
+                          ))}
                         </select>
                       </div>
                       <div className="col-md-3">
@@ -232,75 +368,6 @@ export default function AsignarPedidos() {
                       </div>
                     </div>
 
-                    <div
-                      className="row mb-3"
-                      style={{ display: rucRequired ? "flex" : "none" }}
-                    >
-                      <div className="col-md-4">
-                        <label>RUC</label>
-                        <input
-                          className="form-control"
-                          value={ruc}
-                          onChange={(e) => setRuc(e.target.value)}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="row mb-3">
-                      <div className="col-md-3">
-                        <label>Usuario</label>
-                        <select className="form-select" defaultValue="">
-                          <option value="">Seleccione</option>
-                          {sampleUsers.map((u) => (
-                            <option key={u.id} value={u.id}>
-                              {u.nombre}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="col-md-3">
-                        <label>Método de Pago</label>
-                        <select className="form-select" defaultValue="">
-                          <option value="">Seleccione</option>
-                          {sampleMetodos.map((m) => (
-                            <option key={m.id} value={m.id}>
-                              {m.nombre}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div
-                        className="col-md-3"
-                        style={{
-                          display: tipo === "Envio" ? undefined : "none",
-                        }}
-                      >
-                        <label>Dirección de Envío</label>
-                        <br />
-                        <button
-                          type="button"
-                          className="btn btn-secondary"
-                          data-bs-toggle="modal"
-                          data-bs-target="#modalDireccion"
-                        >
-                          Agregar Dirección
-                        </button>
-                        {idDireccion && (
-                          <div className="mt-2">
-                            <span className="text-success">
-                              Dirección guardada:
-                            </span>
-                            <br />
-                            <small className="direccion-guardada">
-                              {direccion
-                                ? `${direccion.ciudad}, ${direccion.calle}`
-                                : ""}
-                            </small>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
                     <div className="text-end">
                       <button className="btn btn-primary" type="submit">
                         Crear Venta
@@ -308,8 +375,7 @@ export default function AsignarPedidos() {
                     </div>
                   </form>
                 ) : (
-                  <form>
-                    <input type="hidden" name="id_venta" value="SIMULADO" />
+                  <form onSubmit={handleCrearVenta}>
                     <table className="table table-bordered" id="tablaDetalles">
                       <thead>
                         <tr>
@@ -323,7 +389,7 @@ export default function AsignarPedidos() {
                       <tbody>
                         {rows.map((row) => (
                           <tr key={row.id}>
-                            <td>
+                            <td style={{ minWidth: 220 }}>
                               <select
                                 className="form-select"
                                 value={row.productoId}
@@ -332,12 +398,8 @@ export default function AsignarPedidos() {
                                 }
                               >
                                 <option value="">Seleccione</option>
-                                {sampleProducts.map((p) => (
-                                  <option
-                                    key={p.id}
-                                    value={p.id}
-                                    data-precio={p.precio}
-                                  >
+                                {productos.map((p) => (
+                                  <option key={p.id} value={p.id}>
                                     {p.nombre}
                                   </option>
                                 ))}
@@ -377,15 +439,18 @@ export default function AsignarPedidos() {
                               <div className="d-flex gap-2">
                                 <button
                                   type="button"
-                                  className="btn btn-success"
+                                  className="btn btn-success btn-sm"
                                   onClick={addRow}
+                                  title="Agregar fila"
                                 >
                                   <i className="bx bx-plus"></i>
                                 </button>
                                 <button
                                   type="button"
-                                  className="btn btn-danger"
+                                  className="btn btn-danger btn-sm"
                                   onClick={() => removeRow(row.id)}
+                                  disabled={rows.length === 1}
+                                  title="Eliminar fila"
                                 >
                                   <i className="bx bx-minus"></i>
                                 </button>
@@ -402,14 +467,8 @@ export default function AsignarPedidos() {
                     </div>
 
                     <div className="text-end">
-                      <button
-                        type="button"
-                        className="btn btn-primary"
-                        onClick={() =>
-                          alert("Simulación: detalles guardados (frontend).")
-                        }
-                      >
-                        Guardar Detalles y Finalizar
+                      <button type="submit" className="btn btn-primary">
+                        Guardar Venta
                       </button>
                     </div>
                   </form>
@@ -417,6 +476,7 @@ export default function AsignarPedidos() {
               </div>
             </div>
 
+            {/* Modal Dirección (simulado) */}
             {/* Modal Dirección (simulado) */}
             <div
               className="modal fade"

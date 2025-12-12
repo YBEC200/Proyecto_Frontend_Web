@@ -4,208 +4,401 @@ import Sidebar from "../../Layout/Sidebar";
 import "./GestionLotes.css";
 
 interface Categoria {
-  id: string;
+  id: number;
   nombre: string;
-  descripcion: string;
-}
-
-interface Lote {
-  id: string;
-  nombre: string;
-  productoId: string;
-  cantidad: number;
-  fechaRegistro: string;
-  productoNombre?: string;
+  descripcion?: string;
 }
 
 interface Producto {
-  id: string;
+  id: number;
   nombre: string;
 }
 
-/* Tipado mínimo para lo que usamos de Bootstrap (evita `any` y el import de tipos) */
-interface BsModalInstance {
-  show(): void;
-  hide(): void;
-}
-interface BootstrapLike {
-  Modal: {
-    new (el: Element): BsModalInstance;
-    getInstance(el: Element): BsModalInstance | null;
-  };
+interface Lote {
+  Id: number;
+  Id_Producto: number;
+  Lote: string;
+  Cantidad: number;
+  Fecha_Registro: string;
+  productoNombre?: string;
 }
 
 export default function GestionLotes() {
-  // Estados
+  // Estados para Categorías
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [categoriaSearch, setCategoriaSearch] = useState("");
-  const [loteSearch, setLoteSearch] = useState("");
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [showErrorModal, setShowErrorModal] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [isEditing, setIsEditing] = useState(false);
   const [selectedCategoria, setSelectedCategoria] = useState<Categoria | null>(
     null
   );
-  const [selectedLote, setSelectedLote] = useState<Lote | null>(null);
-  const [lotes, setLotes] = useState<Lote[]>([]);
-  const [categorias, setCategorias] = useState<Categoria[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [formNombre, setFormNombre] = useState("");
+  const [formDescripcion, setFormDescripcion] = useState("");
+  const [loadingCategorias, setLoadingCategorias] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
-  const fetchLotes = useCallback(async () => {
-    setLoading(true);
-    const token = localStorage.getItem("token");
+  // Estados para Lotes
+  const [lotes, setLotes] = useState<Lote[]>([]);
+  const [loteSearch, setLoteSearch] = useState("");
+  const [selectedLote, setSelectedLote] = useState<Lote | null>(null);
+  const [formLoteNombre, setFormLoteNombre] = useState("");
+  const [formLoteProductoId, setFormLoteProductoId] = useState("");
+  const [formLoteCantidad, setFormLoteCantidad] = useState(0);
+  const [formLoteFecha, setFormLoteFecha] = useState("");
+  const [loadingLotes, setLoadingLotes] = useState(false);
+
+  // Estados para Productos
+  const [productos, setProductos] = useState<Producto[]>([]);
+
+  // Estados para Modales
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmMessage, setConfirmMessage] = useState("");
+  const [deleteType, setDeleteType] = useState<"categoria" | "lote" | null>(
+    null
+  );
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+  // ==================== CATEGORÍAS ====================
+
+  // Obtener token del localStorage
+  const getToken = () => localStorage.getItem("token");
+
+  // Obtener todas las categorías
+  const fetchCategorias = useCallback(async () => {
+    setLoadingCategorias(true);
     try {
-      const params = new URLSearchParams();
-      if (loteSearch) {
-        params.append("lote", loteSearch);
-        params.append("product_name", loteSearch);
-      }
-      const res = await fetch(
-        `http://127.0.0.1:8000/api/lotes?${params.toString()}`,
+      const token = getToken();
+      const response = await fetch(`http://127.0.0.1:8000/api/categorias`, {
+        headers: {
+          Authorization: token ? `Bearer ${token}` : "",
+        },
+      });
+
+      if (!response.ok) throw new Error("Error al cargar categorías");
+
+      const data = await response.json();
+      setCategorias(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Error fetching categorías:", error);
+      setErrorMessage("Error al cargar las categorías");
+      setShowErrorModal(true);
+    } finally {
+      setLoadingCategorias(false);
+    }
+  }, []);
+
+  // Manejar edición de categoría
+  const handleEditCategoria = (categoria: Categoria) => {
+    setIsEditing(true);
+    setSelectedCategoria(categoria);
+  };
+
+  // Eliminar categoría
+  const handleDeleteCategoria = async (categoriaId: number) => {
+    const token = getToken();
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:8000/api/categorias/${categoriaId}`,
         {
+          method: "DELETE",
           headers: {
             Authorization: token ? `Bearer ${token}` : "",
-            "Content-Type": "application/json",
           },
         }
       );
-      if (!res.ok) {
-        const txt = await res.text().catch(() => null);
-        throw new Error(txt || `HTTP ${res.status}`);
-      }
-      const data = await res.json();
-      // Mapear respuesta al interfaz Lote usado en el componente
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const mapped: Lote[] = data.map((l: any) => ({
-        id: String(l.Id ?? l.id ?? ""),
-        nombre: l.Lote ?? l.nombre ?? "",
-        productoId: String(l.Id_Producto ?? l.producto?.id ?? ""),
-        cantidad: Number(l.Cantidad ?? 0),
-        fechaRegistro: l.Fecha_Registro ?? l.fechaRegistro ?? "",
-        productoNombre: l.producto?.nombre ?? undefined,
-      }));
-      setLotes(mapped);
-    } catch (err) {
-      console.error("Error fetching lotes:", err);
-      setErrorMessage("Error al cargar lotes desde el servidor.");
-      setShowErrorModal(true);
-      setLotes([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [loteSearch]);
 
-  // Fetch categorías desde API
-  const fetchCategorias = useCallback(async () => {
-    setLoading(true);
-    const token = localStorage.getItem("token");
+      if (response.ok) {
+        await fetchCategorias();
+        setShowSuccessModal(true);
+        setTimeout(() => setShowSuccessModal(false), 1500);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        setErrorMessage(errorData.message || "Error al eliminar la categoría");
+        setShowErrorModal(true);
+      }
+    } catch (error) {
+      console.error("Error deleting categoría:", error);
+      setErrorMessage("Error al eliminar la categoría");
+      setShowErrorModal(true);
+    }
+  };
+
+  // Mostrar confirmación de eliminación
+  const confirmDelete = (
+    type: "categoria" | "lote",
+    id: number,
+    nombre: string
+  ) => {
+    setConfirmMessage(
+      `¿Estás seguro de que deseas eliminar ${
+        type === "categoria" ? "la categoría" : "el lote"
+      } "${nombre}"? Esta acción no se puede deshacer.`
+    );
+    setDeleteType(type);
+    setDeleteId(id);
+    setShowConfirmModal(true);
+  };
+
+  // Enviar formulario de categoría
+  const handleSubmitCategoria = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const token = getToken();
+
+    const payload = {
+      nombre: formNombre.trim(),
+      descripcion: formDescripcion.trim(),
+    };
+
+    if (!payload.nombre) {
+      setErrorMessage("El nombre es obligatorio.");
+      setShowErrorModal(true);
+      return;
+    }
+
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/categorias", {
+      const method = isEditing && selectedCategoria ? "PUT" : "POST";
+      const url =
+        method === "PUT"
+          ? `http://127.0.0.1:8000/api/categorias/${selectedCategoria?.id}`
+          : `http://127.0.0.1:8000/api/categorias`;
+
+      const response = await fetch(url, {
+        method,
         headers: {
           Authorization: token ? `Bearer ${token}` : "",
           "Content-Type": "application/json",
         },
+        body: JSON.stringify(payload),
       });
-      if (!res.ok) {
-        const txt = await res.text().catch(() => null);
-        throw new Error(txt || `HTTP ${res.status}`);
+
+      if (response.ok) {
+        await fetchCategorias();
+        setShowSuccessModal(true);
+        setTimeout(() => setShowSuccessModal(false), 1500);
+
+        // Limpiar y cerrar modal
+        setIsEditing(false);
+        setSelectedCategoria(null);
+        setFormNombre("");
+        setFormDescripcion("");
+
+        const modalElement = document.getElementById("categoriaModal");
+        if (modalElement) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const bsModal = (window as any).bootstrap?.Modal.getInstance(
+            modalElement
+          );
+          bsModal?.hide();
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        setErrorMessage(errorData.message || `Error ${response.status}`);
+        setShowErrorModal(true);
       }
-      const data = await res.json();
-      setCategorias(data);
-    } catch (err) {
-      console.error("Error fetching categorias:", err);
-      setErrorMessage("Error al cargar categorías desde el servidor.");
+    } catch (error) {
+      console.error("Error guardando categoría:", error);
+      setErrorMessage("Error de conexión al guardar la categoría.");
+      setShowErrorModal(true);
+    }
+  };
+
+  // ==================== LOTES ====================
+
+  // Obtener todos los lotes
+  const fetchLotes = useCallback(async () => {
+    setLoadingLotes(true);
+    try {
+      const token = getToken();
+      const response = await fetch(`http://127.0.0.1:8000/api/lotes`, {
+        headers: {
+          Authorization: token ? `Bearer ${token}` : "",
+        },
+      });
+
+      if (!response.ok) throw new Error("Error al cargar lotes");
+
+      const data = await response.json();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const lotesFormateados = data.map((lote: any) => ({
+        Id: lote.Id,
+        Id_Producto: lote.Id_Producto,
+        Lote: lote.Lote,
+        Cantidad: lote.Cantidad,
+        Fecha_Registro: lote.Fecha_Registro || lote.fecha_registro,
+        productoNombre: lote.producto?.nombre,
+      }));
+      setLotes(lotesFormateados);
+    } catch (error) {
+      console.error("Error fetching lotes:", error);
+      setErrorMessage("Error al cargar los lotes");
       setShowErrorModal(true);
     } finally {
-      setLoading(false);
+      setLoadingLotes(false);
     }
   }, []);
 
-  useEffect(() => {
-    fetchCategorias();
-  }, [fetchCategorias]);
+  // Obtener todos los productos
+  const fetchProductos = useCallback(async () => {
+    try {
+      const token = getToken();
+      const response = await fetch(`http://127.0.0.1:8000/api/productos`, {
+        headers: {
+          Authorization: token ? `Bearer ${token}` : "",
+        },
+      });
 
-  useEffect(() => {
-    // lanzar fetchLotes al montar y cuando cambie loteSearch (debounce opcional)
-    fetchLotes();
-  }, [fetchLotes]);
+      if (!response.ok) throw new Error("Error al cargar productos");
 
-  const productos: Producto[] = [
-    { id: "1", nombre: "Laptop Dell XPS" },
-    { id: "2", nombre: "Monitor LG 27'" },
-    { id: "3", nombre: "Laptop HP Pavilion" },
-  ];
-
-  // Helper tipado seguro para acceder a window.bootstrap (evita 'any')
-  const getBootstrap = (): BootstrapLike | undefined => {
-    const w = window as unknown as { bootstrap?: unknown };
-    return w.bootstrap as BootstrapLike | undefined;
-  };
-
-  // Handlers para abrir modal en modo edición (rellena selected*)
-  const handleEditCategoria = (categoria: Categoria) => {
-    setIsEditing(true);
-    setSelectedCategoria(categoria);
-    const bs = getBootstrap();
-    const modalEl = document.getElementById("categoriaModal");
-    if (bs && modalEl) {
-      const modal = new bs.Modal(modalEl);
-      modal.show();
-    } else if (modalEl) {
-      // fallback: add 'show' class (very basic) if bootstrap not loaded
-      modalEl.classList.add("show", "d-block");
+      const data = await response.json();
+      setProductos(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Error fetching productos:", error);
     }
-  };
+  }, []);
 
+  // Manejar edición de lote
   const handleEditLote = (lote: Lote) => {
     setIsEditing(true);
     setSelectedLote(lote);
-    const bs = getBootstrap();
-    const modalEl = document.getElementById("loteModal");
-    if (bs && modalEl) {
-      const modal = new bs.Modal(modalEl);
-      modal.show();
-    } else if (modalEl) {
-      modalEl.classList.add("show", "d-block");
+  };
+
+  // Enviar formulario de lote
+  const handleAddLote = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const token = getToken();
+
+    const payload = {
+      Lote: formLoteNombre.trim(),
+      Id_Producto: parseInt(formLoteProductoId),
+      Cantidad: formLoteCantidad,
+      FechaRegistro: formLoteFecha,
+    };
+
+    if (!payload.Lote || !payload.Id_Producto || payload.Cantidad <= 0) {
+      setErrorMessage("Complete todos los campos correctamente.");
+      setShowErrorModal(true);
+      return;
+    }
+
+    try {
+      const method = isEditing && selectedLote ? "PUT" : "POST";
+      const url =
+        method === "PUT"
+          ? `http://127.0.0.1:8000/api/lotes/${selectedLote?.Id}`
+          : `http://127.0.0.1:8000/api/lotes`;
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          Authorization: token ? `Bearer ${token}` : "",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok) {
+        await fetchLotes();
+        setShowSuccessModal(true);
+        setTimeout(() => setShowSuccessModal(false), 1500);
+
+        // Limpiar y cerrar modal
+        setIsEditing(false);
+        setSelectedLote(null);
+        setFormLoteNombre("");
+        setFormLoteProductoId("");
+        setFormLoteCantidad(0);
+        setFormLoteFecha("");
+
+        const modalElement = document.getElementById("loteModal");
+        if (modalElement) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const bsModal = (window as any).bootstrap?.Modal.getInstance(
+            modalElement
+          );
+          bsModal?.hide();
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        setErrorMessage(errorData.message || `Error ${response.status}`);
+        setShowErrorModal(true);
+      }
+    } catch (error) {
+      console.error("Error guardando lote:", error);
+      setErrorMessage("Error de conexión al guardar el lote.");
+      setShowErrorModal(true);
     }
   };
 
-  // Handlers de submit (simulados)
-  const handleAddCategoria = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setShowSuccessModal(true);
-    setTimeout(() => {
-      setShowSuccessModal(false);
-      setIsEditing(false);
-      setSelectedCategoria(null);
-      const bs = getBootstrap();
-      const el = document.getElementById("categoriaModal");
-      if (bs && el) {
-        const instance = bs.Modal.getInstance(el);
-        instance?.hide();
-      } else if (el) {
-        el.classList.remove("show", "d-block");
+  // Eliminar lote
+  const handleDeleteLote = async (loteId: number) => {
+    const token = getToken();
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:8000/api/lotes/${loteId}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: token ? `Bearer ${token}` : "",
+          },
+        }
+      );
+
+      if (response.ok) {
+        await fetchLotes();
+        setShowSuccessModal(true);
+        setTimeout(() => setShowSuccessModal(false), 1500);
+      } else {
+        setErrorMessage("Error al eliminar el lote");
+        setShowErrorModal(true);
       }
-    }, 1000);
+    } catch (error) {
+      console.error("Error deleting lote:", error);
+      setErrorMessage("Error al eliminar el lote");
+      setShowErrorModal(true);
+    }
   };
 
-  const handleAddLote = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setShowSuccessModal(true);
-    setTimeout(() => {
-      setShowSuccessModal(false);
-      setIsEditing(false);
-      setSelectedLote(null);
-      const bs = getBootstrap();
-      const el = document.getElementById("loteModal");
-      if (bs && el) {
-        const instance = bs.Modal.getInstance(el);
-        instance?.hide();
-      } else if (el) {
-        el.classList.remove("show", "d-block");
-      }
-    }, 1000);
-  };
+  // Filtrar lotes
+  const filteredLotes = lotes.filter(
+    (lote) =>
+      lote.Lote.toLowerCase().includes(loteSearch.toLowerCase()) ||
+      (lote.productoNombre || "")
+        .toLowerCase()
+        .includes(loteSearch.toLowerCase())
+  );
+
+  // Sincronizar formulario de categoría cuando se edita
+  useEffect(() => {
+    if (selectedCategoria && isEditing) {
+      setFormNombre(selectedCategoria.nombre);
+      setFormDescripcion(selectedCategoria.descripcion || "");
+    } else {
+      setFormNombre("");
+      setFormDescripcion("");
+    }
+  }, [selectedCategoria, isEditing]);
+
+  // Cargar datos al montar el componente
+  useEffect(() => {
+    fetchCategorias();
+    fetchLotes();
+    fetchProductos();
+  }, [fetchCategorias, fetchLotes, fetchProductos]);
+
+  // Sincronizar formulario de lote cuando se edita
+  useEffect(() => {
+    if (selectedLote && isEditing) {
+      setFormLoteNombre(selectedLote.Lote);
+      setFormLoteProductoId(selectedLote.Id_Producto.toString());
+      setFormLoteCantidad(selectedLote.Cantidad);
+      setFormLoteFecha(selectedLote.Fecha_Registro);
+    } else {
+      setFormLoteNombre("");
+      setFormLoteProductoId("");
+      setFormLoteCantidad(0);
+      setFormLoteFecha(new Date().toISOString().split("T")[0]);
+    }
+  }, [selectedLote, isEditing]);
 
   return (
     <div className="dashboard-layout">
@@ -256,6 +449,8 @@ export default function GestionLotes() {
                         onClick={() => {
                           setIsEditing(false);
                           setSelectedCategoria(null);
+                          setFormNombre("");
+                          setFormDescripcion("");
                         }}
                       >
                         Agregar Nueva Categoría
@@ -286,6 +481,8 @@ export default function GestionLotes() {
                                   <div className="d-flex justify-content-center gap-2">
                                     <button
                                       className="btn btn-warning btn-sm"
+                                      data-bs-toggle="modal"
+                                      data-bs-target="#categoriaModal"
                                       onClick={() =>
                                         handleEditCategoria(categoria)
                                       }
@@ -294,12 +491,13 @@ export default function GestionLotes() {
                                     </button>
                                     <button
                                       className="btn btn-danger btn-sm"
-                                      onClick={() => {
-                                        setErrorMessage(
-                                          "No se puede eliminar una categoría con productos asociados"
-                                        );
-                                        setShowErrorModal(true);
-                                      }}
+                                      onClick={() =>
+                                        confirmDelete(
+                                          "categoria",
+                                          categoria.id,
+                                          categoria.nombre
+                                        )
+                                      }
                                     >
                                       Eliminar
                                     </button>
@@ -309,7 +507,7 @@ export default function GestionLotes() {
                             ))}
                         </tbody>
                       </table>
-                      {loading && (
+                      {loadingCategorias && (
                         <div style={{ textAlign: "center", padding: "2em" }}>
                           <div
                             className="spinner-border text-primary"
@@ -324,11 +522,11 @@ export default function GestionLotes() {
                               fontWeight: "bold",
                             }}
                           >
-                            Cargando categorias, por favor espera...
+                            Cargando categorías, por favor espera...
                           </div>
                         </div>
                       )}
-                      {!loading && productos.length === 0 && (
+                      {!loadingCategorias && categorias.length === 0 && (
                         <div
                           style={{
                             marginTop: "1em",
@@ -337,7 +535,7 @@ export default function GestionLotes() {
                             textAlign: "center",
                           }}
                         >
-                          No hay categorias que encajen con los filtros
+                          No hay categorías disponibles
                         </div>
                       )}
                     </div>
@@ -365,6 +563,12 @@ export default function GestionLotes() {
                         onClick={() => {
                           setIsEditing(false);
                           setSelectedLote(null);
+                          setFormLoteNombre("");
+                          setFormLoteProductoId("");
+                          setFormLoteCantidad(0);
+                          setFormLoteFecha(
+                            new Date().toISOString().split("T")[0]
+                          );
                         }}
                       >
                         Agregar Nuevo Lote
@@ -384,35 +588,28 @@ export default function GestionLotes() {
                           </tr>
                         </thead>
                         <tbody>
-                          {lotes.map((lote) => (
-                            <tr key={lote.id}>
-                              <td>{lote.id}</td>
-                              <td>{lote.nombre}</td>
-                              <td>
-                                {lote.productoNombre ??
-                                  productos.find(
-                                    (p) => p.id === lote.productoId
-                                  )?.nombre}
-                              </td>
-                              <td>{lote.fechaRegistro}</td>
-                              <td>{lote.cantidad}</td>
+                          {filteredLotes.map((lote) => (
+                            <tr key={lote.Id}>
+                              <td>{lote.Id}</td>
+                              <td>{lote.Lote}</td>
+                              <td>{lote.productoNombre || "Sin producto"}</td>
+                              <td>{lote.Fecha_Registro}</td>
+                              <td>{lote.Cantidad}</td>
                               <td>
                                 <div className="d-flex justify-content-center gap-2">
                                   <button
                                     className="btn btn-warning btn-sm"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#loteModal"
                                     onClick={() => handleEditLote(lote)}
                                   >
                                     Editar
                                   </button>
                                   <button
                                     className="btn btn-danger btn-sm"
-                                    onClick={() => {
-                                      setShowSuccessModal(true);
-                                      setTimeout(
-                                        () => setShowSuccessModal(false),
-                                        1000
-                                      );
-                                    }}
+                                    onClick={() =>
+                                      confirmDelete("lote", lote.Id, lote.Lote)
+                                    }
                                   >
                                     Eliminar
                                   </button>
@@ -422,6 +619,37 @@ export default function GestionLotes() {
                           ))}
                         </tbody>
                       </table>
+                      {loadingLotes && (
+                        <div style={{ textAlign: "center", padding: "2em" }}>
+                          <div
+                            className="spinner-border text-primary"
+                            role="status"
+                          >
+                            <span className="visually-hidden">Cargando...</span>
+                          </div>
+                          <div
+                            style={{
+                              marginTop: "1em",
+                              color: "#0d6efd",
+                              fontWeight: "bold",
+                            }}
+                          >
+                            Cargando lotes, por favor espera...
+                          </div>
+                        </div>
+                      )}
+                      {!loadingLotes && lotes.length === 0 && (
+                        <div
+                          style={{
+                            marginTop: "1em",
+                            color: "#0d6efd",
+                            fontWeight: "bold",
+                            textAlign: "center",
+                          }}
+                        >
+                          No hay lotes disponibles
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -446,26 +674,32 @@ export default function GestionLotes() {
                 onClick={() => {
                   setIsEditing(false);
                   setSelectedCategoria(null);
+                  setFormNombre("");
+                  setFormDescripcion("");
                 }}
               ></button>
             </div>
             <div className="modal-body">
-              <form onSubmit={handleAddCategoria}>
+              <form onSubmit={handleSubmitCategoria}>
                 <div className="mb-3">
                   <label className="form-label">Nombre de la Categoría</label>
                   <input
+                    name="nombre"
                     type="text"
                     className="form-control"
-                    defaultValue={selectedCategoria?.nombre || ""}
+                    value={formNombre}
+                    onChange={(e) => setFormNombre(e.target.value)}
                     required
                   />
                 </div>
                 <div className="mb-3">
                   <label className="form-label">Descripción</label>
                   <textarea
+                    name="descripcion"
                     className="form-control"
                     rows={3}
-                    defaultValue={selectedCategoria?.descripcion || ""}
+                    value={formDescripcion}
+                    onChange={(e) => setFormDescripcion(e.target.value)}
                     required
                   ></textarea>
                 </div>
@@ -503,7 +737,8 @@ export default function GestionLotes() {
                   <input
                     type="text"
                     className="form-control"
-                    defaultValue={selectedLote?.nombre || ""}
+                    value={formLoteNombre}
+                    onChange={(e) => setFormLoteNombre(e.target.value)}
                     required
                   />
                 </div>
@@ -511,7 +746,8 @@ export default function GestionLotes() {
                   <label className="form-label">Producto</label>
                   <select
                     className="form-select"
-                    defaultValue={selectedLote?.productoId || ""}
+                    value={formLoteProductoId}
+                    onChange={(e) => setFormLoteProductoId(e.target.value)}
                     required
                   >
                     <option value="">Seleccione un producto</option>
@@ -528,7 +764,10 @@ export default function GestionLotes() {
                     type="number"
                     className="form-control"
                     min="0"
-                    defaultValue={selectedLote?.cantidad ?? ""}
+                    value={formLoteCantidad}
+                    onChange={(e) =>
+                      setFormLoteCantidad(Number(e.target.value))
+                    }
                     required
                   />
                 </div>
@@ -537,10 +776,8 @@ export default function GestionLotes() {
                   <input
                     type="date"
                     className="form-control"
-                    defaultValue={
-                      selectedLote?.fechaRegistro ||
-                      new Date().toISOString().slice(0, 10)
-                    }
+                    value={formLoteFecha}
+                    onChange={(e) => setFormLoteFecha(e.target.value)}
                     required
                   />
                 </div>
@@ -586,6 +823,58 @@ export default function GestionLotes() {
                 ></button>
               </div>
               <div className="modal-body">{errorMessage}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Confirmación de Eliminación */}
+      {showConfirmModal && (
+        <div className="modal show d-block" tabIndex={-1}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header bg-warning text-dark">
+                <h5 className="modal-title">⚠️ Confirmar Eliminación</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setShowConfirmModal(false)}
+                ></button>
+              </div>
+              <div className="modal-body">{confirmMessage}</div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setShowConfirmModal(false);
+                    setDeleteType(null);
+                    setDeleteId(null);
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  onClick={async () => {
+                    try {
+                      if (deleteType === "categoria" && deleteId) {
+                        await handleDeleteCategoria(deleteId);
+                      } else if (deleteType === "lote" && deleteId) {
+                        await handleDeleteLote(deleteId);
+                      }
+                    } catch (error) {
+                      console.error("Error executing delete:", error);
+                    }
+                    setShowConfirmModal(false);
+                    setDeleteType(null);
+                    setDeleteId(null);
+                  }}
+                >
+                  Eliminar
+                </button>
+              </div>
             </div>
           </div>
         </div>
