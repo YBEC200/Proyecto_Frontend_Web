@@ -52,6 +52,14 @@
   background-color: #e0a800;
 }
 
+.btn-action-details {
+  background-color: #17a2b8;
+}
+
+.btn-action-details:hover {
+  background-color: #138496;
+}
+
 .table th,
 .table td {
   text-align: center;

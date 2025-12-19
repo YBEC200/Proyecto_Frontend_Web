@@ -35,8 +35,9 @@ export default function VerLotes({
   productoNombre,
   onBack,
 }: VerLotesProps) {
+  // ...existing code...
   const [lotes, setLotes] = useState<Lote[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [mensaje, setMensaje] = useState("");
   const [mensajeTipo, setMensajeTipo] = useState<"success" | "error" | "">("");
 
@@ -158,11 +159,19 @@ export default function VerLotes({
   };
 
   // Construir y ejecutar request al backend con parámetros
-  const fetchLotes = async () => {
+  const fetchLotes = async (signal?: AbortSignal) => {
+    // no hacer nada si no hay producto seleccionado
+    if (!productoId) {
+      setLotes([]);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
+    setMensaje(""); // limpiar mensaje anterior
     try {
       const params = new URLSearchParams();
-      if (productoId) params.set("product_id", productoId);
+      params.set("product_id", productoId);
       if (searchTerm) params.set("lote", searchTerm);
       if (cantidadRange.min) params.set("min_cantidad", cantidadRange.min);
       if (cantidadRange.max) params.set("max_cantidad", cantidadRange.max);
@@ -171,31 +180,67 @@ export default function VerLotes({
       const token = localStorage.getItem("token");
       const url = `http://127.0.0.1:8000/api/lotes?${params.toString()}`;
 
+      console.debug("fetchLotes ->", { productoId, url });
+
       const response = await fetch(url, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
+        signal,
       });
 
       if (!response.ok) {
-        setMensaje("Error al cargar los lotes");
-        setMensajeTipo("error");
-        setLotes([]);
-        setLoading(false);
-        return;
+        if (response.status === 404) {
+          setLotes([]);
+          setMensaje("No se encontraron lotes.");
+          setMensajeTipo("");
+        } else {
+          setMensaje("Error al cargar los lotes");
+          setMensajeTipo("error");
+          setLotes([]);
+        }
+        return; // retorna sin poner false aquí
       }
 
       const data = await response.json();
+      console.debug("fetchLotes result:", data);
       setLotes(Array.isArray(data) ? data : []);
-    } catch (error) {
+      setMensaje(""); // limpiar mensajes si fue exitoso
+      setMensajeTipo("");
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (error: any) {
+      if (error?.name === "AbortError") {
+        console.log("Petición cancelada");
+        return;
+      }
       console.error("Error fetching lotes:", error);
       setMensaje("Error de conexión al cargar los lotes");
       setMensajeTipo("error");
       setLotes([]);
+    } finally {
+      setLoading(false); // ← AQUÍ siempre se pone false, una sola vez
     }
-    setLoading(false);
   };
+
+  // UseEffect único: solo se ejecuta cuando hay productoId o cambian filtros
+  useEffect(() => {
+    if (!productoId) {
+      setLotes([]);
+      return;
+    }
+    const controller = new AbortController();
+    fetchLotes(controller.signal);
+    return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    productoId,
+    searchTerm,
+    cantidadRange.min,
+    cantidadRange.max,
+    estadoFilter,
+  ]);
 
   // Handler para Enter en inputs: aplica filtro correspondiente
   const handleKeyDownApply = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -221,17 +266,6 @@ export default function VerLotes({
     setCantidadRange({ min: "", max: "" });
     setEstadoFilter("");
   };
-
-  useEffect(() => {
-    fetchLotes();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    productoId,
-    searchTerm,
-    cantidadRange.min,
-    cantidadRange.max,
-    estadoFilter,
-  ]);
 
   return (
     <div className="page-content">
@@ -379,200 +413,205 @@ export default function VerLotes({
             </div>
           </div>
 
-          <div className="table-responsive">
-            <table className="table">
-              <thead className="table-light">
-                <tr>
-                  <th>Lote ID</th>
-                  <th>Fecha Registro</th>
-                  <th>Cantidad</th>
-                  <th>Estado</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {lotes.map((lote) => (
-                  <tr key={lote.Id}>
-                    <td>{lote.Lote}</td>
-                    <td>{formatFecha(lote.Fecha_Registro)}</td>
-                    <td>{lote.Cantidad}</td>
-                    <td>
-                      <span className={badgeClass(lote.Estado)}>
-                        {lote.Estado}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="acciones-lote">
-                        <button
-                          className="btn-action-edit"
-                          title="Editar lote"
-                          onClick={() => handleEditLote(lote)}
-                        >
-                          <i className="bx bx-edit"></i>
-                        </button>
-                        <button
-                          className="btn-action-delete"
-                          title="Eliminar lote"
-                          onClick={() => handleConfirmDeleteLote(lote)}
-                        >
-                          <i className="bx bx-trash"></i>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            {loading && (
-              <div style={{ textAlign: "center", padding: "2em" }}>
-                <div className="spinner-border text-primary" role="status">
-                  <span className="visually-hidden">Cargando...</span>
-                </div>
-                <div
-                  style={{
-                    marginTop: "1em",
-                    color: "#0d6efd",
-                    fontWeight: "bold",
-                  }}
-                >
-                  Cargando lotes, por favor espera...
-                </div>
+          {/* SPINNER AQUÍ - FUERA de table-responsive */}
+          {loading && (
+            <div style={{ textAlign: "center", padding: "2em" }}>
+              <div className="spinner-border text-primary" role="status">
+                <span className="visually-hidden">Cargando...</span>
               </div>
-            )}
-
-            {!loading && lotes.length === 0 && (
               <div
                 style={{
                   marginTop: "1em",
                   color: "#0d6efd",
                   fontWeight: "bold",
-                  textAlign: "center",
                 }}
               >
-                No hay lotes para este producto
+                Cargando lotes, por favor espera...
               </div>
-            )}
-            {/* Modal Editar Lote */}
-            {showEditModalLote && selectedLote && (
-              <div className="modal show d-block" tabIndex={-1}>
-                <div className="modal-dialog modal-dialog-centered modal-md">
-                  <div className="modal-content">
-                    <div className="modal-header bg-primary text-white">
-                      <h5 className="modal-title">Editar Lote</h5>
-                      <button
-                        type="button"
-                        className="btn-close"
-                        onClick={() => setShowEditModalLote(false)}
-                      ></button>
-                    </div>
-                    <form onSubmit={handleUpdateLote}>
-                      <div className="modal-body">
-                        <div className="mb-3">
-                          <label className="form-label">Lote</label>
-                          <input
-                            name="Lote"
-                            type="text"
-                            className="form-control"
-                            defaultValue={selectedLote.Lote}
-                            required
-                          />
-                        </div>
+            </div>
+          )}
 
-                        <div className="mb-3">
-                          <label className="form-label">Cantidad</label>
-                          <input
-                            name="Cantidad"
-                            type="number"
-                            className="form-control"
-                            defaultValue={selectedLote.Cantidad}
-                            required
-                          />
-                        </div>
-
-                        <div className="mb-3">
-                          <label className="form-label">Estado</label>
-                          <select
-                            name="Estado"
-                            className="form-select"
-                            defaultValue={selectedLote.Estado || "Activo"}
-                            required
+          {/* TABLA SOLO SI NO ESTÁ CARGANDO */}
+          {!loading && (
+            <div className="table-responsive">
+              <table className="table">
+                <thead className="table-light">
+                  <tr>
+                    <th>Lote ID</th>
+                    <th>Fecha Registro</th>
+                    <th>Cantidad</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lotes.map((lote) => (
+                    <tr key={lote.Id}>
+                      <td>{lote.Lote}</td>
+                      <td>{formatFecha(lote.Fecha_Registro)}</td>
+                      <td>{lote.Cantidad}</td>
+                      <td>
+                        <span className={badgeClass(lote.Estado)}>
+                          {lote.Estado}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="acciones-lote">
+                          <button
+                            className="btn-action-edit"
+                            title="Editar lote"
+                            onClick={() => handleEditLote(lote)}
                           >
-                            <option>Activo</option>
-                            <option>Abastecido</option>
-                            <option>Agotado</option>
-                            <option>Inactivo</option>
-                          </select>
+                            <i className="bx bx-edit"></i>
+                          </button>
+                          <button
+                            className="btn-action-delete"
+                            title="Eliminar lote"
+                            onClick={() => handleConfirmDeleteLote(lote)}
+                          >
+                            <i className="bx bx-trash"></i>
+                          </button>
                         </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {lotes.length === 0 && (
+                <div
+                  style={{
+                    marginTop: "1em",
+                    color: "#0d6efd",
+                    fontWeight: "bold",
+                    textAlign: "center",
+                  }}
+                >
+                  No hay lotes para este producto
+                </div>
+              )}
+
+              {/* Modal Editar Lote */}
+              {showEditModalLote && selectedLote && (
+                <div className="modal show d-block" tabIndex={-1}>
+                  <div className="modal-dialog modal-dialog-centered modal-md">
+                    <div className="modal-content">
+                      <div className="modal-header bg-primary text-white">
+                        <h5 className="modal-title">Editar Lote</h5>
+                        <button
+                          type="button"
+                          className="btn-close"
+                          onClick={() => setShowEditModalLote(false)}
+                        ></button>
+                      </div>
+                      <form onSubmit={handleUpdateLote}>
+                        <div className="modal-body">
+                          <div className="mb-3">
+                            <label className="form-label">Lote</label>
+                            <input
+                              name="Lote"
+                              type="text"
+                              className="form-control"
+                              defaultValue={selectedLote.Lote}
+                              required
+                            />
+                          </div>
+
+                          <div className="mb-3">
+                            <label className="form-label">Cantidad</label>
+                            <input
+                              name="Cantidad"
+                              type="number"
+                              className="form-control"
+                              defaultValue={selectedLote.Cantidad}
+                              required
+                            />
+                          </div>
+
+                          <div className="mb-3">
+                            <label className="form-label">Estado</label>
+                            <select
+                              name="Estado"
+                              className="form-select"
+                              defaultValue={selectedLote.Estado || "Activo"}
+                              required
+                            >
+                              <option>Activo</option>
+                              <option>Abastecido</option>
+                              <option>Agotado</option>
+                              <option>Inactivo</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div className="modal-footer">
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            onClick={() => setShowEditModalLote(false)}
+                          >
+                            Cancelar
+                          </button>
+                          <button type="submit" className="btn btn-primary">
+                            Guardar cambios
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Modal Confirmación Eliminar Lote */}
+              {showDeleteModalLote && deleteTargetLote && (
+                <div className="modal show d-block" tabIndex={-1}>
+                  <div className="modal-dialog modal-dialog-centered modal-md">
+                    <div className="modal-content">
+                      <div className="modal-header bg-danger text-white">
+                        <h5 className="modal-title">Confirmar eliminación</h5>
+                        <button
+                          type="button"
+                          className="btn-close"
+                          onClick={() => {
+                            setShowDeleteModalLote(false);
+                            setDeleteTargetLote(null);
+                          }}
+                        ></button>
+                      </div>
+                      <div className="modal-body">
+                        <p>
+                          ¿Estás seguro de eliminar el lote{" "}
+                          <strong>{deleteTargetLote.Lote}</strong>? Esta acción
+                          no se puede deshacer.
+                        </p>
                       </div>
                       <div className="modal-footer">
                         <button
                           type="button"
                           className="btn btn-secondary"
-                          onClick={() => setShowEditModalLote(false)}
+                          onClick={() => {
+                            setShowDeleteModalLote(false);
+                            setDeleteTargetLote(null);
+                          }}
                         >
                           Cancelar
                         </button>
-                        <button type="submit" className="btn btn-primary">
-                          Guardar cambios
+                        <button
+                          type="button"
+                          className="btn btn-danger"
+                          onClick={async () => {
+                            if (!deleteTargetLote) return;
+                            await handleDeleteLote(deleteTargetLote.Id);
+                          }}
+                        >
+                          Eliminar
                         </button>
                       </div>
-                    </form>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Modal Confirmación Eliminar Lote */}
-            {showDeleteModalLote && deleteTargetLote && (
-              <div className="modal show d-block" tabIndex={-1}>
-                <div className="modal-dialog modal-dialog-centered modal-md">
-                  <div className="modal-content">
-                    <div className="modal-header bg-danger text-white">
-                      <h5 className="modal-title">Confirmar eliminación</h5>
-                      <button
-                        type="button"
-                        className="btn-close"
-                        onClick={() => {
-                          setShowDeleteModalLote(false);
-                          setDeleteTargetLote(null);
-                        }}
-                      ></button>
-                    </div>
-                    <div className="modal-body">
-                      <p>
-                        ¿Estás seguro de eliminar el lote{" "}
-                        <strong>{deleteTargetLote.Lote}</strong>? Esta acción no
-                        se puede deshacer.
-                      </p>
-                    </div>
-                    <div className="modal-footer">
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        onClick={() => {
-                          setShowDeleteModalLote(false);
-                          setDeleteTargetLote(null);
-                        }}
-                      >
-                        Cancelar
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-danger"
-                        onClick={async () => {
-                          if (!deleteTargetLote) return;
-                          await handleDeleteLote(deleteTargetLote.Id);
-                        }}
-                      >
-                        Eliminar
-                      </button>
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

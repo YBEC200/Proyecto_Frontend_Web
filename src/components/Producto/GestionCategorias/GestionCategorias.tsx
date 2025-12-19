@@ -434,21 +434,25 @@ export default function GestionCategorias() {
               <div className="col-lg-6 mb-4">
                 <div className="card radius-10">
                   <div className="card-header">
-                    <div className="d-flex align-items-center justify-content-between">
-                      <h6 className="mb-0">Gestión de Categorías</h6>
-                      <button
-                        className="btn btn-primary btn-sm"
-                        data-bs-toggle="modal"
-                        data-bs-target="#categoriaModal"
-                        onClick={() => {
-                          setIsEditing(false);
-                          setSelectedCategoria(null);
-                          setEditFormNombre("");
-                          setEditFormDescripcion("");
-                        }}
-                      >
-                        <i className="bx bx-plus"></i> Nueva Categoría
-                      </button>
+                    <div className="d-flex align-items-center justify-content-between w-100">
+                      <div>
+                        <h6 className="mb-0">Gestión de Categorías</h6>
+                      </div>
+                      <div className="d-flex gap-2 align-items-center">
+                        <button
+                          className="btn btn-primary btn-sm"
+                          data-bs-toggle="modal"
+                          data-bs-target="#categoriaModal"
+                          onClick={() => {
+                            setIsEditing(false);
+                            setSelectedCategoria(null);
+                            setEditFormNombre("");
+                            setEditFormDescripcion("");
+                          }}
+                        >
+                          <i className="bx bx-plus"></i> Nueva Categoría
+                        </button>
+                      </div>
                     </div>
                   </div>
                   <div className="card-body">

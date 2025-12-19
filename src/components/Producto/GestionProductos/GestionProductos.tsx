@@ -59,7 +59,7 @@ export default function GestionProductos() {
   const [categorias, setCategorias] = useState<
     { id: string; nombre: string }[]
   >([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   // Estado para mostrar lotes
   const [showLotes, setShowLotes] = useState(false);
   const [selectedProductoParaLotes, setSelectedProductoParaLotes] =
@@ -69,57 +69,6 @@ export default function GestionProductos() {
   // Obtener nombre de categoría por ID
   const getCategoryName = (idCategoria?: string) =>
     categorias.find((c) => c.id === idCategoria)?.nombre || idCategoria || "";
-
-  const fetchLotesForProduct = async (productoId: string) => {
-    const token = localStorage.getItem("token");
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 segundos de timeout
-
-      const response = await fetch(
-        `http://127.0.0.1:8000/api/lotes?product_id=${productoId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          signal: controller.signal,
-        }
-      );
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) return null;
-      const lotes = await response.json();
-
-      // Calcular cantidad de lotes y fecha del más reciente
-      const cantidad = Array.isArray(lotes) ? lotes.length : 0;
-      let ultimaFecha: string | null = null;
-
-      if (Array.isArray(lotes) && lotes.length > 0) {
-        // Encontrar el lote con la fecha más reciente
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const lotesConFecha = lotes.filter((l: any) => l.Fecha_Registro);
-        if (lotesConFecha.length > 0) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ultimaFecha = lotesConFecha.reduce((max: any, lote: any) => {
-            return new Date(lote.Fecha_Registro) > new Date(max.Fecha_Registro)
-              ? lote
-              : max;
-          }).Fecha_Registro;
-        }
-      }
-
-      return { cantidad, ultimaFecha };
-    } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") {
-        console.warn(`Timeout fetching lotes for product ${productoId}`);
-      } else {
-        console.error(`Error fetching lotes for product ${productoId}:`, error);
-      }
-      return null;
-    }
-  };
 
   // Fetch productos desde la API
   const fetchProductos = async () => {
@@ -134,9 +83,6 @@ export default function GestionProductos() {
     if (statusFilter) params.append("estado", statusFilter);
 
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos de timeout
-
       const response = await fetch(
         `http://127.0.0.1:8000/api/productos?${params.toString()}`,
         {
@@ -144,53 +90,32 @@ export default function GestionProductos() {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-          signal: controller.signal,
         }
       );
 
-      clearTimeout(timeoutId);
-
       if (!response.ok) {
         setProductos([]);
-        setLoading(false);
         return;
       }
 
       const data = await response.json();
-
-      // Normalizar campos esperados en el frontend
+      // Normalizar campos esperados en el frontend (NO solicitar lotes aquí)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const normalized = (data || []).map((p: any) => ({
         ...p,
-        lotes: Number(p.lotes ?? 0),
+        // si el backend ya devuelve 'lotes' úsalo; si no, dejamos 0 por defecto
+        lotes:
+          typeof p.lotes !== "undefined"
+            ? Number(p.lotes)
+            : Number(p.lotes ?? 0),
         fecha_registro: p.fecha_registro ?? p.fechaRegistro ?? "",
         ultimo_abastecimiento:
           p.ultimo_abastecimiento ?? p.ultimoAbastecimiento ?? null,
       }));
 
-      // Obtener lotes para cada producto y actualizar datos
-      const productosConLotes = await Promise.all(
-        normalized.map(async (producto: Producto) => {
-          const lotesData = await fetchLotesForProduct(producto.id);
-          if (lotesData) {
-            return {
-              ...producto,
-              lotes: lotesData.cantidad,
-              ultimo_abastecimiento:
-                lotesData.ultimaFecha || producto.ultimo_abastecimiento,
-            };
-          }
-          return producto;
-        })
-      );
-
-      setProductos(productosConLotes);
+      setProductos(normalized);
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") {
-        console.warn("Timeout fetching productos");
-      } else {
-        console.error("Error fetching productos:", error);
-      }
+      console.error("Error fetching productos:", error);
       setProductos([]);
     } finally {
       setLoading(false);
@@ -200,44 +125,28 @@ export default function GestionProductos() {
   // Fetch categorías desde la API
   const fetchCategorias = async () => {
     const token = localStorage.getItem("token");
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 segundos de timeout
+    const response = await fetch(`http://127.0.0.1:8000/api/categorias`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
 
-      const response = await fetch(`http://127.0.0.1:8000/api/categorias`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        setCategorias([]);
-        return;
-      }
-
-      const data = await response.json();
-
-      // Normalizar: convertir 'Id' a 'id' para consistencia
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const categoriasNormalizadas = data.map((cat: any) => ({
-        id: cat.Id,
-        nombre: cat.Nombre,
-        descripcion: cat.Descripcion,
-      }));
-
-      setCategorias(categoriasNormalizadas);
-    } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") {
-        console.warn("Timeout fetching categorías");
-      } else {
-        console.error("Error fetching categorías:", error);
-      }
+    if (!response.ok) {
       setCategorias([]);
+      return;
     }
+
+    const data = await response.json();
+    // Normalizar: convertir 'Id' a 'id' para consistencia
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const categoriasNormalizadas = data.map((cat: any) => ({
+      id: cat.Id,
+      nombre: cat.Nombre,
+      descripcion: cat.Descripcion,
+    }));
+
+    setCategorias(categoriasNormalizadas);
   };
 
   // Aplicar filtros
@@ -603,6 +512,8 @@ export default function GestionProductos() {
                     </div>
                   </div>
                 )}
+
+                {/* Tabla: sólo mostrar cuando NO está cargando */}
                 {!loading && productos.length === 0 && (
                   <div
                     style={{
@@ -615,75 +526,79 @@ export default function GestionProductos() {
                     No hay productos que encajen con los filtros
                   </div>
                 )}
-                {/* Tabla */}
-                <table className="table">
-                  <thead className="table-light">
-                    <tr>
-                      <th>ID</th>
-                      <th>Nombre</th>
-                      <th>Marca</th>
-                      <th>Precio</th>
-                      <th>Estado</th>
-                      <th>Lotes</th>
-                      <th>Categoría</th>
-                      <th>Último Abastecimiento</th>
-                      <th>Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {productos.map((producto) => (
-                      <tr key={producto.id}>
-                        <td>{producto.id}</td>
-                        <td>{producto.nombre}</td>
-                        <td>{producto.marca}</td>
-                        <td>S/ {formatPrice(producto.costo_unit)}</td>
-                        <td>
-                          <span
-                            className={`badge badge-${producto.estado?.toLowerCase()}`}
-                          >
-                            {producto.estado}
-                          </span>
-                        </td>
-                        <td>{producto.lotes ?? 0}</td>
-                        <td>{getCategoryName(producto.id_categoria)}</td>
-                        <td>
-                          {formatFecha(
-                            producto.ultimo_abastecimiento ??
-                              producto.fecha_registro
-                          )}
-                        </td>
-                        <td>
-                          <div className="d-flex justify-content-center gap-2">
-                            <button
-                              className="btn-action-edit"
-                              onClick={() => handleEdit(producto)}
-                              title="Editar producto"
-                            >
-                              <i className="bx bx-edit"></i>
-                            </button>
-                            <button
-                              className="btn-action-edit"
-                              onClick={() => handleViewLotes(producto)}
-                              title="Ver lotes"
-                            >
-                              <i className="bx bx-list-ul"></i>
-                            </button>
-                            <button
-                              className="btn-action-delete"
-                              onClick={() => {
-                                setDeleteTarget(producto);
-                                setShowDeleteModal(true);
-                              }}
-                              title="Eliminar producto"
-                            >
-                              <i className="bx bx-trash"></i>
-                            </button>
-                          </div>
-                        </td>
+
+                {!loading && (
+                  /* Tabla */
+                  <table className="table">
+                    <thead className="table-light">
+                      <tr>
+                        <th>ID</th>
+                        <th>Nombre</th>
+                        <th>Marca</th>
+                        <th>Precio</th>
+                        <th>Estado</th>
+                        <th>Lotes</th>
+                        <th>Categoría</th>
+                        <th>Último Abastecimiento</th>
+                        <th>Acciones</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {productos.map((producto) => (
+                        <tr key={producto.id}>
+                          <td>{producto.id}</td>
+                          <td>{producto.nombre}</td>
+                          <td>{producto.marca}</td>
+                          <td>S/ {formatPrice(producto.costo_unit)}</td>
+                          <td>
+                            <span
+                              className={`badge badge-${producto.estado?.toLowerCase()}`}
+                            >
+                              {producto.estado}
+                            </span>
+                          </td>
+                          <td>{producto.lotes ?? 0}</td>
+                          <td>{getCategoryName(producto.id_categoria)}</td>
+                          <td>
+                            {formatFecha(
+                              producto.ultimo_abastecimiento ??
+                                producto.fecha_registro
+                            )}
+                          </td>
+                          <td>
+                            <div className="d-flex justify-content-center gap-2">
+                              <button
+                                className="btn-action-details"
+                                onClick={() => handleViewLotes(producto)}
+                                title="Ver lotes"
+                              >
+                                <i className="bx bx-list-ul"></i>
+                              </button>
+                              <button
+                                className="btn-action-edit"
+                                onClick={() => handleEdit(producto)}
+                                title="Editar producto"
+                              >
+                                <i className="bx bx-edit"></i>
+                              </button>
+
+                              <button
+                                className="btn-action-delete"
+                                onClick={() => {
+                                  setDeleteTarget(producto);
+                                  setShowDeleteModal(true);
+                                }}
+                                title="Eliminar producto"
+                              >
+                                <i className="bx bx-trash"></i>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
             </div>
 

@@ -10,7 +10,7 @@ import Usuarios from "./components/Usuarios/Usuarios";
 import AsignarPedidos from "./components/Pedidos/AsignarPedidos/AsignarPedidos";
 import GestionPedidos from "./components/Pedidos/GestionPedidos/GestionPedidos";
 import GestionProductos from "./components/Producto/GestionProductos/GestionProductos";
-import GestionCategorias from "./components/Producto/GestionLotes/GestionCategorias";
+import GestionCategorias from "./components/Producto/GestionCategorias/GestionCategorias";
 import AgregarProducto from "./components/Producto/AgregarProducto/AgregarProducto";
 import Sidebar from "./components/Layout/Sidebar";
 import Perfil from "./components/Usuarios/Perfil/Perfil";

@@ -6,6 +6,7 @@ import "./AsignarPedidos.css";
 interface DetalleRow {
   id: string;
   productoId: string;
+  productoName?: string;
   cantidad: number;
   precioUnit: number;
   subtotal: number;
@@ -31,26 +32,39 @@ interface UsuarioAPI {
 }
 
 const sampleComprobantes = [
-  { id: "c1", nombre: "Boleta" },
-  { id: "c2", nombre: "Factura" },
+  { id: "Boleta", nombre: "Boleta" },
+  { id: "Factura", nombre: "Factura" },
 ];
 
 export default function AsignarPedidos() {
   // Estados
-  const [ventaCreada, setVentaCreada] = useState(false);
   const [idDireccion, setIdDireccion] = useState<string | null>(null);
   const [rows, setRows] = useState<DetalleRow[]>([
     {
       id: "r1",
       productoId: "",
+      productoName: "",
       cantidad: 1,
       precioUnit: 0,
       subtotal: 0,
     },
   ]);
   const [total, setTotal] = useState(0);
-
   const [productos, setProductos] = useState<ProductoAPI[]>([]);
+
+  const [selectedComprobante, setSelectedComprobante] = useState<string>("");
+  const [ruc, setRuc] = useState<string>("");
+  const [productoSuggestions, setProductoSuggestions] = useState<
+    Record<string, ProductoAPI[]>
+  >({});
+
+  const [selectedMetodoPago, setSelectedMetodoPago] = useState<string>("");
+  const [selectedEstado, setSelectedEstado] = useState<string>("Pendiente");
+  const [tipoEntrega, setTipoEntrega] = useState<string>("Envío");
+  const [ciudad, setCiudad] = useState<string>("");
+  const [calle, setCalle] = useState<string>("");
+  const [referencia, setReferencia] = useState<string>("");
+
   const [lotesByProduct, setLotesByProduct] = useState<
     Record<number, LoteAPI[]>
   >({});
@@ -154,6 +168,7 @@ export default function AsignarPedidos() {
           ? {
               ...row,
               productoId: productoId,
+              productoName: prod ? String(prod.nombre) : "",
               precioUnit: prod
                 ? Number(prod.costo_unit ?? prod.costo_unit ?? 0)
                 : 0,
@@ -181,6 +196,30 @@ export default function AsignarPedidos() {
     );
   }
 
+  function handleProductoInputChange(rowId: string, text: string) {
+    setRows((r) =>
+      r.map((row) => (row.id === rowId ? { ...row, productoName: text } : row))
+    );
+    if (!text) {
+      setProductoSuggestions((s) => ({ ...s, [rowId]: [] }));
+      return;
+    }
+    const q = text.toLowerCase();
+    const matches = productos
+      .filter((p) => String(p.nombre).toLowerCase().includes(q))
+      .slice(0, 8);
+    setProductoSuggestions((s) => ({ ...s, [rowId]: matches }));
+    const exact = productos.find((p) => String(p.nombre).toLowerCase() === q);
+    if (exact) {
+      updateRowProducto(rowId, String(exact.id));
+    }
+  }
+
+  function selectProductoSuggestion(rowId: string, prod: ProductoAPI) {
+    updateRowProducto(rowId, String(prod.id));
+    setProductoSuggestions((s) => ({ ...s, [rowId]: [] }));
+  }
+
   // Crear venta y enviar al backend
   async function handleCrearVenta(e?: React.FormEvent<HTMLFormElement>) {
     if (e) e.preventDefault();
@@ -190,27 +229,35 @@ export default function AsignarPedidos() {
       return;
     }
 
+    if (tipoEntrega === "Envío" && !ciudad) {
+      alert("Debe ingresar una dirección para envío a domicilio.");
+      return;
+    }
+
     // Validar que todos los productos tengan cantidad mayor a 0
     if (rows.some((r) => !r.productoId || r.cantidad <= 0)) {
       alert("Complete todos los detalles de productos con cantidad válida.");
       return;
     }
 
-    const detalles = rows.map((r) => ({
-      Id_Producto: Number(r.productoId),
-      Cantidad: Number(r.cantidad),
-      Costo: Number(r.precioUnit),
+    // Construir detalles con nombres en snake_case
+    const details = rows.map((r) => ({
+      id_producto: Number(r.productoId),
+      cantidad: Number(r.cantidad),
+      costo: Number(r.precioUnit),
     }));
 
     const payload = {
-      Id_Usuario: Number(selectedUsuario),
-      Id_Metodo_Pago: null,
-      Id_Comprobante: null,
-      Id_Direccion: idDireccion ? idDireccion : null,
-      Fecha: new Date().toISOString().slice(0, 10),
-      Costo_total: Number(total),
-      estado: "pendiente",
-      detalles,
+      id_usuario: Number(selectedUsuario),
+      metodo_pago: selectedMetodoPago || null,
+      comprobante: selectedComprobante || null,
+      id_direccion: tipoEntrega === "Recojo" ? null : idDireccion || null,
+      ciudad: tipoEntrega === "Envío" ? ciudad : null,
+      calle: tipoEntrega === "Envío" ? calle : null,
+      referencia: tipoEntrega === "Envío" ? referencia : null,
+      costo_total: Number(total),
+      estado: selectedEstado,
+      details,
     };
 
     console.log("Payload a enviar:", payload);
@@ -241,7 +288,14 @@ export default function AsignarPedidos() {
         setTotal(0);
         setSelectedUsuario("");
         setIdDireccion(null);
-        setVentaCreada(false);
+        setCiudad("");
+        setCalle("");
+        setReferencia("");
+        setSelectedMetodoPago("");
+        setSelectedComprobante("");
+        setRuc("");
+        setSelectedEstado("Pendiente");
+        setTipoEntrega("Envío");
       } else {
         console.error("Error crear venta:", body);
         alert(body?.message || `Error ${res.status}: ${JSON.stringify(body)}`);
@@ -253,26 +307,28 @@ export default function AsignarPedidos() {
   }
 
   function handleComprobanteChange(id: string) {
+    setSelectedComprobante(id);
     const comp = sampleComprobantes.find((c) => c.id === id);
     const isFactura = comp?.nombre?.toLowerCase() === "factura";
     if (!isFactura) {
-      const rucInput = document.getElementById("rucInput") as HTMLInputElement;
-      if (rucInput) rucInput.value = "";
+      setRuc("");
     }
   }
 
-  // modal dirección (simulado)
+  // modal dirección
   function guardarDireccionSimulada() {
-    const ciudad =
+    const ciudadInput =
       (document.getElementById("ciudadInput") as HTMLInputElement)?.value || "";
-    const calle =
+    const calleInput =
       (document.getElementById("calleInput") as HTMLInputElement)?.value || "";
+    const referenciaInput =
+      (document.getElementById("refInput") as HTMLTextAreaElement)?.value || "";
 
-    if (ciudad) {
+    if (ciudadInput) {
+      setCiudad(ciudadInput);
+      setCalle(calleInput);
+      setReferencia(referenciaInput);
       setIdDireccion("dir-" + Date.now());
-      const direccionTexto = `${ciudad}, ${calle}`;
-      const direccionSpan = document.querySelector(".direccion-guardada");
-      if (direccionSpan) direccionSpan.textContent = direccionTexto;
       const modalElement = document.getElementById("modalDireccion");
       if (modalElement) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -281,6 +337,8 @@ export default function AsignarPedidos() {
         );
         modal?.hide();
       }
+    } else {
+      alert("Ingrese al menos la ciudad.");
     }
   }
 
@@ -307,172 +365,297 @@ export default function AsignarPedidos() {
 
             <div className="card">
               <div className="card-body">
-                {!ventaCreada ? (
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      setVentaCreada(true);
-                      window.scrollTo({ top: 0, behavior: "smooth" });
-                    }}
-                  >
-                    <div className="row mb-3">
-                      <div className="col-md-3">
-                        <label>Fecha Pedido</label>
-                        <input
-                          type="date"
-                          className="form-control"
-                          defaultValue={new Date().toISOString().slice(0, 10)}
-                          required
-                        />
-                      </div>
-                      <div className="col-md-3">
-                        <label>Fecha Envío</label>
-                        <input
-                          type="date"
-                          className="form-control"
-                          defaultValue={new Date().toISOString().slice(0, 10)}
-                          required
-                        />
-                      </div>
-                      <div className="col-md-3">
-                        <label>Usuario</label>
-                        <select
-                          className="form-select"
-                          value={selectedUsuario}
-                          onChange={(e) => setSelectedUsuario(e.target.value)}
-                        >
-                          <option value="">Seleccione</option>
-                          {usuarios.map((u) => (
-                            <option key={u.id} value={u.id}>
-                              {u.nombre}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="col-md-3">
-                        <label>Tipo de Comprobante</label>
-                        <select
-                          className="form-select"
-                          onChange={(e) =>
-                            handleComprobanteChange(e.target.value)
-                          }
-                          defaultValue=""
-                        >
-                          <option value="">Seleccione</option>
-                          {sampleComprobantes.map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {c.nombre}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
+                {/* Unificado: datos generales de venta ANTES y tabla de productos ABAJO */}
+                <form onSubmit={handleCrearVenta}>
+                  <div className="card mb-3">
+                    <div className="card-body">
+                      <div className="row gy-2">
+                        <div className="col-md-4">
+                          <label className="form-label">Usuario</label>
+                          <select
+                            className="form-select"
+                            value={selectedUsuario}
+                            onChange={(e) => setSelectedUsuario(e.target.value)}
+                          >
+                            <option value="">Seleccione</option>
+                            {usuarios.map((u) => (
+                              <option key={u.id} value={u.id}>
+                                {u.nombre}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
 
-                    <div className="text-end">
-                      <button className="btn btn-primary" type="submit">
-                        Crear Venta
-                      </button>
-                    </div>
-                  </form>
-                ) : (
-                  <form onSubmit={handleCrearVenta}>
-                    <table className="table table-bordered" id="tablaDetalles">
-                      <thead>
-                        <tr>
-                          <th>Producto</th>
-                          <th>Cantidad</th>
-                          <th>Precio Unitario</th>
-                          <th>Sub Total</th>
-                          <th>Acción</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {rows.map((row) => (
-                          <tr key={row.id}>
-                            <td style={{ minWidth: 220 }}>
-                              <select
-                                className="form-select"
-                                value={row.productoId}
+                        <div className="col-md-3">
+                          <label className="form-label">Id</label>
+                          <input
+                            className="form-control"
+                            readOnly
+                            value={"auto"}
+                          />
+                        </div>
+
+                        <div className="col-md-3">
+                          <label className="form-label">Fecha</label>
+                          <input
+                            className="form-control"
+                            readOnly
+                            value={new Date().toISOString().slice(0, 10)}
+                          />
+                        </div>
+
+                        <div className="col-md-3">
+                          <label className="form-label">Método de Pago</label>
+                          <select
+                            className="form-select"
+                            value={selectedMetodoPago}
+                            onChange={(e) =>
+                              setSelectedMetodoPago(e.target.value)
+                            }
+                          >
+                            <option value="">Seleccione</option>
+                            <option value="Efectivo">Efectivo</option>
+                            <option value="Tarjeta">Tarjeta</option>
+                            <option value="Deposito">Deposito</option>
+                            <option value="Yape">Yape</option>
+                          </select>
+                        </div>
+
+                        <div className="col-md-3">
+                          <label className="form-label">Comprobante</label>
+                          <select
+                            className="form-select"
+                            value={selectedComprobante}
+                            onChange={(e) =>
+                              handleComprobanteChange(e.target.value)
+                            }
+                          >
+                            <option value="">Seleccione</option>
+                            {sampleComprobantes.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.nombre}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/** Mostrar RUC si se eligió Factura */}
+                        {sampleComprobantes
+                          .find((c) => c.id === selectedComprobante)
+                          ?.nombre?.toLowerCase() === "factura" && (
+                          <div className="col-md-3">
+                            <label className="form-label">RUC Cliente</label>
+                            <input
+                              id="rucInput"
+                              className="form-control"
+                              value={ruc}
+                              onChange={(e) => setRuc(e.target.value)}
+                              placeholder="Ingresa RUC"
+                            />
+                          </div>
+                        )}
+
+                        <div className="col-md-6">
+                          <label className="form-label">Tipo de Entrega</label>
+                          <select
+                            className="form-select"
+                            value={tipoEntrega}
+                            onChange={(e) => {
+                              setTipoEntrega(e.target.value);
+                              if (e.target.value === "Recojo")
+                                setIdDireccion(null);
+                            }}
+                          >
+                            <option value="Envío">Envío a domicilio</option>
+                            <option value="Recojo">Recojo en tienda</option>
+                          </select>
+                        </div>
+
+                        {tipoEntrega === "Envío" && (
+                          <div className="col-md-6">
+                            <label className="form-label">Dirección</label>
+                            <div className="d-flex gap-2">
+                              <input
+                                id="direccionInput"
+                                className="form-control"
+                                placeholder="Agregar o seleccionar dirección"
+                                value={idDireccion ?? ""}
                                 onChange={(e) =>
-                                  updateRowProducto(row.id, e.target.value)
+                                  setIdDireccion(e.target.value || null)
                                 }
+                              />
+                              <button
+                                type="button"
+                                className="btn btn-outline-secondary"
+                                data-bs-toggle="modal"
+                                data-bs-target="#modalDireccion"
                               >
-                                <option value="">Seleccione</option>
-                                {productos.map((p) => (
-                                  <option key={p.id} value={p.id}>
-                                    {p.nombre}
-                                  </option>
-                                ))}
-                              </select>
-                            </td>
-                            <td>
-                              <input
-                                type="number"
-                                min={1}
-                                className="form-control"
-                                value={row.cantidad}
-                                onChange={(e) =>
-                                  updateRowCantidad(
-                                    row.id,
-                                    Number(e.target.value || 1)
-                                  )
-                                }
-                              />
-                            </td>
-                            <td>
-                              <input
-                                type="text"
-                                className="form-control"
-                                readOnly
-                                value={row.precioUnit.toFixed(2)}
-                              />
-                            </td>
-                            <td>
-                              <input
-                                type="text"
-                                className="form-control"
-                                readOnly
-                                value={row.subtotal.toFixed(2)}
-                              />
-                            </td>
-                            <td>
-                              <div className="d-flex gap-2">
-                                <button
-                                  type="button"
-                                  className="btn btn-success btn-sm"
-                                  onClick={addRow}
-                                  title="Agregar fila"
-                                >
-                                  <i className="bx bx-plus"></i>
-                                </button>
-                                <button
-                                  type="button"
-                                  className="btn btn-danger btn-sm"
-                                  onClick={() => removeRow(row.id)}
-                                  disabled={rows.length === 1}
-                                  title="Eliminar fila"
-                                >
-                                  <i className="bx bx-minus"></i>
-                                </button>
-                              </div>
-                            </td>
+                                <i className="bx bx-map"></i>
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="col-md-6">
+                          <label className="form-label">Estado</label>
+                          <select
+                            className="form-select"
+                            value={selectedEstado}
+                            onChange={(e) => setSelectedEstado(e.target.value)}
+                          >
+                            <option value="Pendiente">Pendiente</option>
+                            <option value="Entregado">Entregado</option>
+                            <option value="Cancelado">Cancelado</option>
+                          </select>
+                        </div>
+
+                        <div className="col-12 mt-2">
+                          <label className="form-label">Costo total (S/)</label>
+                          <input
+                            className="form-control"
+                            readOnly
+                            value={total.toFixed(2)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tabla de productos */}
+                  <div className="card">
+                    <div className="card-body">
+                      <table
+                        className="table table-bordered"
+                        id="tablaDetalles"
+                      >
+                        <thead>
+                          <tr>
+                            <th>Producto</th>
+                            <th>Cantidad</th>
+                            <th>Precio Unitario</th>
+                            <th>Sub Total</th>
+                            <th>Acción</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {rows.map((row) => (
+                            <tr key={row.id}>
+                              <td style={{ minWidth: 220 }}>
+                                <div style={{ position: "relative" }}>
+                                  <input
+                                    type="text"
+                                    className="form-control"
+                                    value={row.productoName ?? ""}
+                                    onChange={(e) =>
+                                      handleProductoInputChange(
+                                        row.id,
+                                        e.target.value
+                                      )
+                                    }
+                                    placeholder="Buscar producto..."
+                                  />
+                                  {productoSuggestions[row.id] &&
+                                    productoSuggestions[row.id].length > 0 && (
+                                      <ul
+                                        className="list-group"
+                                        style={{
+                                          position: "absolute",
+                                          zIndex: 9999,
+                                          width: "100%",
+                                          maxHeight: 220,
+                                          overflowY: "auto",
+                                        }}
+                                      >
+                                        {productoSuggestions[row.id].map(
+                                          (p) => (
+                                            <li
+                                              key={p.id}
+                                              className="list-group-item list-group-item-action"
+                                              style={{ cursor: "pointer" }}
+                                              onClick={() =>
+                                                selectProductoSuggestion(
+                                                  row.id,
+                                                  p
+                                                )
+                                              }
+                                            >
+                                              {p.nombre}
+                                            </li>
+                                          )
+                                        )}
+                                      </ul>
+                                    )}
+                                </div>
+                              </td>
+                              <td>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  className="form-control"
+                                  value={row.cantidad}
+                                  onChange={(e) =>
+                                    updateRowCantidad(
+                                      row.id,
+                                      Number(e.target.value || 1)
+                                    )
+                                  }
+                                />
+                              </td>
+                              <td>
+                                <input
+                                  type="text"
+                                  className="form-control"
+                                  readOnly
+                                  value={row.precioUnit.toFixed(2)}
+                                />
+                              </td>
+                              <td>
+                                <input
+                                  type="text"
+                                  className="form-control"
+                                  readOnly
+                                  value={row.subtotal.toFixed(2)}
+                                />
+                              </td>
+                              <td>
+                                <div className="d-flex gap-2">
+                                  <button
+                                    type="button"
+                                    className="btn btn-success btn-sm"
+                                    onClick={addRow}
+                                    title="Agregar fila"
+                                  >
+                                    <i className="bx bx-plus"></i>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn btn-danger btn-sm"
+                                    onClick={() => removeRow(row.id)}
+                                    disabled={rows.length === 1}
+                                    title="Eliminar fila"
+                                  >
+                                    <i className="bx bx-minus"></i>
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
 
-                    <div className="text-end mb-3">
-                      <strong>Total (S/):</strong>{" "}
-                      <span id="totalVenta">{total.toFixed(2)}</span>
-                    </div>
+                      <div className="text-end mb-3">
+                        <strong>Total (S/):</strong>{" "}
+                        <span id="totalVenta">{total.toFixed(2)}</span>
+                      </div>
 
-                    <div className="text-end">
-                      <button type="submit" className="btn btn-primary">
-                        Guardar Venta
-                      </button>
+                      <div className="text-end">
+                        <button type="submit" className="btn btn-primary">
+                          Guardar Venta
+                        </button>
+                      </div>
                     </div>
-                  </form>
-                )}
+                  </div>
+                </form>
               </div>
             </div>
 
