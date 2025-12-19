@@ -1,0 +1,79 @@
+@import "./GestionProductos.css";
+
+/* VerLotes: reglas mínimas y overrides; Reactualiza y reutiliza las reglas globales en GestionProductos.css */
+
+/* Cabecera de card compartida y consistente entre componentes */
+.card-header {
+  min-height: 64px; /* tamaño específico para homogeneizar */
+}
+
+.card-header .i {
+  align-items: end;
+}
+/* Mantener espacio y tamaño de acciones coherente con GestionProductos */
+.acciones-lote {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  align-items: center;
+}
+
+.btn-action-edit,
+.btn-action-delete {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  padding: 0;
+}
+
+/* Badges: usar como alias ligero de .badge definido en GestionProductos.css */
+.badge-estado {
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.375rem;
+  display: inline-block;
+  min-width: 80px;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+@media (max-width: 768px) {
+  .acciones-lote {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .btn-action-edit,
+  .btn-action-delete {
+    width: 32px;
+    height: 32px;
+  }
+
+  .badge-estado {
+    font-size: 0.75rem;
+    padding: 0.375rem 0.5rem;
+    min-width: 70px;
+  }
+}
+
+/* Animación ligera para filas */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+tbody tr {
+  animation: slideIn 0.28s ease-out;
+}
+tbody tr:hover {
+  background-color: #f8f9fa;
+  transition: background-color 0.2s ease;
+}

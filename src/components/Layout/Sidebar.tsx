@@ -204,13 +204,13 @@ export default function Sidebar() {
             </li>
             <li>
               <Link
-                to="/productos/lotes"
+                to="/productos/categorias"
                 className={`d-flex align-items-center ${
-                  isActive("/productos/lotes") ? "active-menu" : ""
+                  isActive("/productos/categorias") ? "active-menu" : ""
                 }`}
               >
                 <i className="bx bx-plus-circle"></i>
-                <span>Gestion de Lotes</span>
+                <span>Categorias y Lotes</span>
               </Link>
             </li>
             <li>

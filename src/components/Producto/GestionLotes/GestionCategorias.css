@@ -1,3 +1,7 @@
+.card-header {
+  min-height: 70px !important; /* tamaño específico para homogeneizar */
+}
+
 .custom-divider {
   display: block;
   border-left: 1px solid #ddd;

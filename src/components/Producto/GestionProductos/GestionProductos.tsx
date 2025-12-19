@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import Nav from "../../Layout/Nav";
 import Sidebar from "../../Layout/Sidebar";
+import VerLotes from "./VerLotes";
 import "./GestionProductos.css";
+import "./VerLotes.css";
 
 interface Producto {
   id: string;
@@ -19,7 +21,6 @@ interface Producto {
 function formatFecha(fecha: string) {
   if (!fecha) return "";
   const date = new Date(fecha);
-  // Ejemplo: 2025-11-13 07:00:42
   return `${date.getFullYear()}-${(date.getMonth() + 1)
     .toString()
     .padStart(2, "0")}-${date.getDate().toString().padStart(2, "0")} ${date
@@ -59,10 +60,66 @@ export default function GestionProductos() {
     { id: string; nombre: string }[]
   >([]);
   const [loading, setLoading] = useState(false);
+  // Estado para mostrar lotes
+  const [showLotes, setShowLotes] = useState(false);
+  const [selectedProductoParaLotes, setSelectedProductoParaLotes] =
+    useState<Producto | null>(null);
+  const [refreshProductos, setRefreshProductos] = useState(false);
 
   // Obtener nombre de categoría por ID
   const getCategoryName = (idCategoria?: string) =>
     categorias.find((c) => c.id === idCategoria)?.nombre || idCategoria || "";
+
+  const fetchLotesForProduct = async (productoId: string) => {
+    const token = localStorage.getItem("token");
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 segundos de timeout
+
+      const response = await fetch(
+        `http://127.0.0.1:8000/api/lotes?product_id=${productoId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          signal: controller.signal,
+        }
+      );
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) return null;
+      const lotes = await response.json();
+
+      // Calcular cantidad de lotes y fecha del más reciente
+      const cantidad = Array.isArray(lotes) ? lotes.length : 0;
+      let ultimaFecha: string | null = null;
+
+      if (Array.isArray(lotes) && lotes.length > 0) {
+        // Encontrar el lote con la fecha más reciente
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const lotesConFecha = lotes.filter((l: any) => l.Fecha_Registro);
+        if (lotesConFecha.length > 0) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ultimaFecha = lotesConFecha.reduce((max: any, lote: any) => {
+            return new Date(lote.Fecha_Registro) > new Date(max.Fecha_Registro)
+              ? lote
+              : max;
+          }).Fecha_Registro;
+        }
+      }
+
+      return { cantidad, ultimaFecha };
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        console.warn(`Timeout fetching lotes for product ${productoId}`);
+      } else {
+        console.error(`Error fetching lotes for product ${productoId}:`, error);
+      }
+      return null;
+    }
+  };
 
   // Fetch productos desde la API
   const fetchProductos = async () => {
@@ -77,6 +134,9 @@ export default function GestionProductos() {
     if (statusFilter) params.append("estado", statusFilter);
 
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos de timeout
+
       const response = await fetch(
         `http://127.0.0.1:8000/api/productos?${params.toString()}`,
         {
@@ -84,8 +144,18 @@ export default function GestionProductos() {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
+          signal: controller.signal,
         }
       );
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        setProductos([]);
+        setLoading(false);
+        return;
+      }
+
       const data = await response.json();
 
       // Normalizar campos esperados en el frontend
@@ -98,28 +168,74 @@ export default function GestionProductos() {
           p.ultimo_abastecimiento ?? p.ultimoAbastecimiento ?? null,
       }));
 
-      setProductos(normalized);
-      /* eslint-disable @typescript-eslint/no-unused-vars */
+      // Obtener lotes para cada producto y actualizar datos
+      const productosConLotes = await Promise.all(
+        normalized.map(async (producto: Producto) => {
+          const lotesData = await fetchLotesForProduct(producto.id);
+          if (lotesData) {
+            return {
+              ...producto,
+              lotes: lotesData.cantidad,
+              ultimo_abastecimiento:
+                lotesData.ultimaFecha || producto.ultimo_abastecimiento,
+            };
+          }
+          return producto;
+        })
+      );
+
+      setProductos(productosConLotes);
     } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        console.warn("Timeout fetching productos");
+      } else {
+        console.error("Error fetching productos:", error);
+      }
       setProductos([]);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   // Fetch categorías desde la API
   const fetchCategorias = async () => {
     const token = localStorage.getItem("token");
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 segundos de timeout
+
       const response = await fetch(`http://127.0.0.1:8000/api/categorias`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        setCategorias([]);
+        return;
+      }
+
       const data = await response.json();
-      setCategorias(data);
-      /* eslint-disable @typescript-eslint/no-unused-vars */
+
+      // Normalizar: convertir 'Id' a 'id' para consistencia
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const categoriasNormalizadas = data.map((cat: any) => ({
+        id: cat.Id,
+        nombre: cat.Nombre,
+        descripcion: cat.Descripcion,
+      }));
+
+      setCategorias(categoriasNormalizadas);
     } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        console.warn("Timeout fetching categorías");
+      } else {
+        console.error("Error fetching categorías:", error);
+      }
       setCategorias([]);
     }
   };
@@ -139,6 +255,16 @@ export default function GestionProductos() {
     // categoryFilter y statusFilter se mantienen como antes (si quieres, puedes hacerlos pendientes igual)
   };
 
+  const clearFilters = () => {
+    setSearchInput("");
+    setMinInput("");
+    setMaxInput("");
+    setCategoryFilter("");
+    setStatusFilter("");
+    setSearchTerm("");
+    setPriceRange({ min: "", max: "" });
+  };
+
   // Aplicar filtros al presionar Enter en los inputs
   const handleKeyDownApply = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
@@ -151,6 +277,11 @@ export default function GestionProductos() {
   const handleEdit = (producto: Producto) => {
     setSelectedProduct(producto);
     setShowEditModal(true);
+  };
+
+  const handleViewLotes = (producto: Producto) => {
+    setSelectedProductoParaLotes(producto);
+    setShowLotes(true);
   };
 
   const handleUpdate = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -276,6 +407,38 @@ export default function GestionProductos() {
   useEffect(() => {
     fetchCategorias();
   }, []);
+
+  useEffect(() => {
+    if (refreshProductos) {
+      fetchProductos();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshProductos]);
+
+  if (showLotes && selectedProductoParaLotes) {
+    return (
+      <div className="dashboard-layout">
+        <Sidebar />
+        <div className="main-area">
+          <Nav />
+          <div className="page-wrapper">
+            <VerLotes
+              productoId={selectedProductoParaLotes.id}
+              productoNombre={selectedProductoParaLotes.nombre}
+              onBack={() => {
+                setShowLotes(false);
+                setSelectedProductoParaLotes(null);
+                // Disparar recarga de productos
+                setRefreshProductos((prev) => !prev);
+              }}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Recargar productos cuando cambia refreshProductos
 
   return (
     <div className="dashboard-layout">
@@ -411,11 +574,48 @@ export default function GestionProductos() {
                         <option value="Agotado">Agotado</option>
                       </select>
                     </div>
+                    {/* Botón limpiar filtros */}
+                    <div className="filtro-item">
+                      <button
+                        className="btn btn-outline-secondary"
+                        onClick={clearFilters}
+                        title="Limpiar filtros"
+                      >
+                        <i className="bx bx-x"></i> Limpiar
+                      </button>
+                    </div>
                   </div>
                 </div>
 
+                {loading && (
+                  <div style={{ textAlign: "center", padding: "2em" }}>
+                    <div className="spinner-border text-primary" role="status">
+                      <span className="visually-hidden">Cargando...</span>
+                    </div>
+                    <div
+                      style={{
+                        marginTop: "1em",
+                        color: "#0d6efd",
+                        fontWeight: "bold",
+                      }}
+                    >
+                      Cargando productos, por favor espera...
+                    </div>
+                  </div>
+                )}
+                {!loading && productos.length === 0 && (
+                  <div
+                    style={{
+                      marginTop: "1em",
+                      color: "#0d6efd",
+                      fontWeight: "bold",
+                      textAlign: "center",
+                    }}
+                  >
+                    No hay productos que encajen con los filtros
+                  </div>
+                )}
                 {/* Tabla */}
-
                 <table className="table">
                   <thead className="table-light">
                     <tr>
@@ -457,8 +657,16 @@ export default function GestionProductos() {
                             <button
                               className="btn-action-edit"
                               onClick={() => handleEdit(producto)}
+                              title="Editar producto"
                             >
                               <i className="bx bx-edit"></i>
+                            </button>
+                            <button
+                              className="btn-action-edit"
+                              onClick={() => handleViewLotes(producto)}
+                              title="Ver lotes"
+                            >
+                              <i className="bx bx-list-ul"></i>
                             </button>
                             <button
                               className="btn-action-delete"
@@ -466,6 +674,7 @@ export default function GestionProductos() {
                                 setDeleteTarget(producto);
                                 setShowDeleteModal(true);
                               }}
+                              title="Eliminar producto"
                             >
                               <i className="bx bx-trash"></i>
                             </button>
@@ -475,34 +684,6 @@ export default function GestionProductos() {
                     ))}
                   </tbody>
                 </table>
-                {loading && (
-                  <div style={{ textAlign: "center", padding: "2em" }}>
-                    <div className="spinner-border text-primary" role="status">
-                      <span className="visually-hidden">Cargando...</span>
-                    </div>
-                    <div
-                      style={{
-                        marginTop: "1em",
-                        color: "#0d6efd",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      Cargando productos, por favor espera...
-                    </div>
-                  </div>
-                )}
-                {!loading && productos.length === 0 && (
-                  <div
-                    style={{
-                      marginTop: "1em",
-                      color: "#0d6efd",
-                      fontWeight: "bold",
-                      textAlign: "center",
-                    }}
-                  >
-                    No hay productos que encajen con los filtros
-                  </div>
-                )}
               </div>
             </div>
 
@@ -524,7 +705,7 @@ export default function GestionProductos() {
                         <div className="mb-3">
                           <label className="form-label">Nombre</label>
                           <input
-                            name="nombre" // <-- AQUI: name
+                            name="nombre"
                             type="text"
                             className="form-control"
                             defaultValue={selectedProduct?.nombre || ""}
@@ -535,7 +716,7 @@ export default function GestionProductos() {
                         <div className="mb-3">
                           <label className="form-label">Marca</label>
                           <input
-                            name="marca" // <-- AQUI
+                            name="marca"
                             type="text"
                             className="form-control"
                             defaultValue={selectedProduct?.marca || ""}
@@ -545,7 +726,7 @@ export default function GestionProductos() {
                         <div className="mb-3">
                           <label className="form-label">Precio</label>
                           <input
-                            name="precio" // <-- AQUI
+                            name="precio"
                             type="number"
                             step="0.01"
                             className="form-control"
@@ -557,7 +738,7 @@ export default function GestionProductos() {
                         <div className="mb-3">
                           <label className="form-label">Estado</label>
                           <select
-                            name="estado" // <-- AQUI
+                            name="estado"
                             className="form-select"
                             defaultValue={
                               selectedProduct?.estado || "Abastecido"
