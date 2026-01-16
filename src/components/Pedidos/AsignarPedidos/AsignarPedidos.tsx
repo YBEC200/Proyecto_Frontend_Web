@@ -71,6 +71,11 @@ export default function AsignarPedidos() {
   const [usuarios, setUsuarios] = useState<UsuarioAPI[]>([]);
   const [selectedUsuario, setSelectedUsuario] = useState<string>("");
 
+  // Estados para modales de éxito y error
+  const [showModalExito, setShowModalExito] = useState(false);
+  const [showModalError, setShowModalError] = useState(false);
+  const [mensajeError, setMensajeError] = useState("");
+
   useEffect(() => {
     const t = rows.reduce((s, r) => s + r.subtotal, 0);
     setTotal(parseFloat(t.toFixed(2)));
@@ -99,7 +104,7 @@ export default function AsignarPedidos() {
               id: Number(p.id ?? p.Id ?? p.id_producto),
               nombre: p.nombre ?? p.Nombre,
               costo_unit: Number(p.costo_unit ?? p.Costo_unit ?? 0),
-            }))
+            })),
           );
         }
         if (uRes.ok) {
@@ -109,7 +114,7 @@ export default function AsignarPedidos() {
             (uData || []).map((u: any) => ({
               id: Number(u.id ?? u.Id ?? u.IdUsuario),
               nombre: u.nombre ?? (u.Nombre || u.correo),
-            }))
+            })),
           );
         }
       } catch (err) {
@@ -131,7 +136,7 @@ export default function AsignarPedidos() {
             Authorization: token ? `Bearer ${token}` : "",
             "Content-Type": "application/json",
           },
-        }
+        },
       );
       if (!res.ok) return;
       const data = await res.json();
@@ -175,11 +180,11 @@ export default function AsignarPedidos() {
               subtotal: Number(
                 (
                   (prod ? Number(prod.costo_unit ?? 0) : 0) * row.cantidad
-                ).toFixed(2)
+                ).toFixed(2),
               ),
             }
-          : row
-      )
+          : row,
+      ),
     );
   }
   function updateRowCantidad(id: string, cantidad: number) {
@@ -191,14 +196,14 @@ export default function AsignarPedidos() {
               cantidad,
               subtotal: Number((row.precioUnit * cantidad).toFixed(2)),
             }
-          : row
-      )
+          : row,
+      ),
     );
   }
 
   function handleProductoInputChange(rowId: string, text: string) {
     setRows((r) =>
-      r.map((row) => (row.id === rowId ? { ...row, productoName: text } : row))
+      r.map((row) => (row.id === rowId ? { ...row, productoName: text } : row)),
     );
     if (!text) {
       setProductoSuggestions((s) => ({ ...s, [rowId]: [] }));
@@ -225,18 +230,23 @@ export default function AsignarPedidos() {
     if (e) e.preventDefault();
 
     if (!selectedUsuario) {
-      alert("Seleccione un usuario.");
+      setMensajeError("Seleccione un usuario.");
+      setShowModalError(true);
       return;
     }
 
     if (tipoEntrega === "Envío" && !ciudad) {
-      alert("Debe ingresar una dirección para envío a domicilio.");
+      setMensajeError("Debe ingresar una dirección para envío a domicilio.");
+      setShowModalError(true);
       return;
     }
 
     // Validar que todos los productos tengan cantidad mayor a 0
     if (rows.some((r) => !r.productoId || r.cantidad <= 0)) {
-      alert("Complete todos los detalles de productos con cantidad válida.");
+      setMensajeError(
+        "Complete todos los detalles de productos con cantidad válida.",
+      );
+      setShowModalError(true);
       return;
     }
 
@@ -274,7 +284,7 @@ export default function AsignarPedidos() {
       });
       const body = await res.json().catch(() => null);
       if (res.ok) {
-        alert("Venta creada correctamente.");
+        setShowModalExito(true);
         // Reset básico
         setRows([
           {
@@ -297,12 +307,15 @@ export default function AsignarPedidos() {
         setSelectedEstado("Pendiente");
         setTipoEntrega("Envío");
       } else {
+        const errorMsg = body?.message || `Error ${res.status}`;
+        setMensajeError(errorMsg);
+        setShowModalError(true);
         console.error("Error crear venta:", body);
-        alert(body?.message || `Error ${res.status}: ${JSON.stringify(body)}`);
       }
     } catch (err) {
       console.error("Fetch error crear venta:", err);
-      alert("Error de conexión al crear la venta.");
+      setMensajeError("Error de conexión al crear la venta.");
+      setShowModalError(true);
     }
   }
 
@@ -333,7 +346,7 @@ export default function AsignarPedidos() {
       if (modalElement) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const modal = (window as any).bootstrap?.Modal.getInstance(
-          modalElement
+          modalElement,
         );
         modal?.hide();
       }
@@ -549,7 +562,7 @@ export default function AsignarPedidos() {
                                     onChange={(e) =>
                                       handleProductoInputChange(
                                         row.id,
-                                        e.target.value
+                                        e.target.value,
                                       )
                                     }
                                     placeholder="Buscar producto..."
@@ -575,13 +588,13 @@ export default function AsignarPedidos() {
                                               onClick={() =>
                                                 selectProductoSuggestion(
                                                   row.id,
-                                                  p
+                                                  p,
                                                 )
                                               }
                                             >
                                               {p.nombre}
                                             </li>
-                                          )
+                                          ),
                                         )}
                                       </ul>
                                     )}
@@ -596,7 +609,7 @@ export default function AsignarPedidos() {
                                   onChange={(e) =>
                                     updateRowCantidad(
                                       row.id,
-                                      Number(e.target.value || 1)
+                                      Number(e.target.value || 1),
                                     )
                                   }
                                 />
@@ -659,55 +672,177 @@ export default function AsignarPedidos() {
               </div>
             </div>
 
-            {/* Modal Dirección (simulado) */}
-            {/* Modal Dirección (simulado) */}
+            {/* Modal Dirección (rediseñado) */}
             <div
               className="modal fade"
               id="modalDireccion"
               tabIndex={-1}
               aria-hidden="true"
             >
-              <div className="modal-dialog">
-                <div className="modal-content">
-                  <div className="modal-header">
-                    <h5 className="modal-title">Agregar Dirección</h5>
+              <div className="modal-dialog modal-dialog-centered">
+                <div className="modal-content border-0 shadow-lg">
+                  <div className="modal-header bg-primary text-white border-0">
+                    <div className="d-flex align-items-center gap-2">
+                      <i className="bx bx-map-alt fs-5"></i>
+                      <h5 className="modal-title mb-0">
+                        Agregar Dirección de Envío
+                      </h5>
+                    </div>
                     <button
                       type="button"
-                      className="btn-close"
+                      className="btn-close btn-close-white"
                       data-bs-dismiss="modal"
                       aria-label="Cerrar"
                     ></button>
                   </div>
-                  <div className="modal-body">
+                  <div className="modal-body p-4">
                     <div className="mb-3">
-                      <label>Ciudad</label>
-                      <input id="ciudadInput" className="form-control" />
+                      <label className="form-label fw-bold text-dark">
+                        Ciudad *
+                      </label>
+                      <input
+                        id="ciudadInput"
+                        className="form-control form-control-lg"
+                        placeholder="Ej: Lima, Arequipa..."
+                        style={{ borderRadius: "8px" }}
+                      />
+                      <small className="text-muted">Campo obligatorio</small>
                     </div>
                     <div className="mb-3">
-                      <label>Calle</label>
-                      <input id="calleInput" className="form-control" />
+                      <label className="form-label fw-bold text-dark">
+                        Calle / Avenida
+                      </label>
+                      <input
+                        id="calleInput"
+                        className="form-control form-control-lg"
+                        placeholder="Ej: Avenida Principal 123"
+                        style={{ borderRadius: "8px" }}
+                      />
                     </div>
                     <div className="mb-3">
-                      <label>Referencia</label>
+                      <label className="form-label fw-bold text-dark">
+                        Referencia
+                      </label>
                       <textarea
                         id="refInput"
                         className="form-control"
-                        rows={2}
+                        placeholder="Ej: Frente a la plaza, cerca del supermercado..."
+                        rows={3}
+                        style={{ borderRadius: "8px" }}
                       ></textarea>
+                      <small className="text-muted">
+                        Información adicional para localizar más fácilmente
+                      </small>
                     </div>
                   </div>
-                  <div className="modal-footer">
+                  <div className="modal-footer bg-light border-top">
                     <button
                       type="button"
-                      className="btn btn-primary"
+                      className="btn btn-secondary"
+                      data-bs-dismiss="modal"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-lg px-4"
                       onClick={guardarDireccionSimulada}
                     >
-                      Guardar Dirección
+                      <i className="bx bx-check me-2"></i>Guardar Dirección
                     </button>
                   </div>
                 </div>
               </div>
             </div>
+
+            {/* Modal Éxito */}
+            {showModalExito && (
+              <div
+                className="modal show d-block"
+                tabIndex={-1}
+                style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+              >
+                <div className="modal-dialog modal-dialog-centered">
+                  <div className="modal-content border-0 shadow-lg">
+                    <div className="modal-body text-center p-5">
+                      <div
+                        style={{
+                          width: "80px",
+                          height: "80px",
+                          borderRadius: "50%",
+                          backgroundColor: "#d4edda",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          margin: "0 auto 1.5rem",
+                        }}
+                      >
+                        <i
+                          className="bx bx-check"
+                          style={{
+                            fontSize: "3rem",
+                            color: "#28a745",
+                            fontWeight: "bold",
+                          }}
+                        ></i>
+                      </div>
+                      <h4 className="mb-3 fw-bold text-success">
+                        ¡Venta Creada Exitosamente!
+                      </h4>
+                      <p className="text-muted mb-4">
+                        La venta ha sido registrada correctamente en el sistema.
+                        Puede crear una nueva venta o volver al listado.
+                      </p>
+                    </div>
+                    <div className="modal-footer bg-light border-top justify-content-center gap-2">
+                      <button
+                        type="button"
+                        className="btn btn-success px-4"
+                        onClick={() => setShowModalExito(false)}
+                      >
+                        <i className="bx bx-plus me-2"></i>Crear Otra Venta
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Modal Error */}
+            {showModalError && (
+              <div
+                className="modal show d-block"
+                tabIndex={-1}
+                style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+              >
+                <div className="modal-dialog modal-dialog-centered">
+                  <div className="modal-content border-0 shadow-lg">
+                    <div className="modal-header bg-danger text-white border-0">
+                      <h5 className="modal-title d-flex align-items-center gap-2">
+                        <i className="bx bx-error-circle"></i>Error
+                      </h5>
+                      <button
+                        type="button"
+                        className="btn-close btn-close-white"
+                        onClick={() => setShowModalError(false)}
+                      ></button>
+                    </div>
+                    <div className="modal-body p-4">
+                      <p className="text-dark mb-0">{mensajeError}</p>
+                    </div>
+                    <div className="modal-footer bg-light border-top">
+                      <button
+                        type="button"
+                        className="btn btn-danger"
+                        onClick={() => setShowModalError(false)}
+                      >
+                        <i className="bx bx-x me-2"></i>Cerrar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

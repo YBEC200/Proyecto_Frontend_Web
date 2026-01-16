@@ -154,7 +154,7 @@ export default function VerLotes({
     const key = estado.toLowerCase();
     if (key === "activo" || key === "abastecido")
       return "badge badge-abastecido";
-    if (key === "agotado") return "badge badge-agotado";
+    if (key === "inactivo" || key === "agotado") return "badge badge-agotado";
     return "badge";
   };
 
@@ -200,19 +200,17 @@ export default function VerLotes({
           setMensajeTipo("error");
           setLotes([]);
         }
-        return; // retorna sin poner false aquí
+        return;
       }
 
       const data = await response.json();
       console.debug("fetchLotes result:", data);
       setLotes(Array.isArray(data) ? data : []);
-      setMensaje(""); // limpiar mensajes si fue exitoso
+      setMensaje("");
       setMensajeTipo("");
-
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       if (error?.name === "AbortError") {
-        console.log("Petición cancelada");
         return;
       }
       console.error("Error fetching lotes:", error);
@@ -220,7 +218,10 @@ export default function VerLotes({
       setMensajeTipo("error");
       setLotes([]);
     } finally {
-      setLoading(false); // ← AQUÍ siempre se pone false, una sola vez
+      // Sólo actualizar loading si la petición NO fue abortada
+      if (!signal || !signal.aborted) {
+        setLoading(false);
+      }
     }
   };
 

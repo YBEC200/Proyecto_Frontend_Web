@@ -60,6 +60,7 @@ export default function GestionProductos() {
     { id: string; nombre: string }[]
   >([]);
   const [loading, setLoading] = useState(true);
+  const [categoriasLoaded, setCategoriasLoaded] = useState(false); // Control de carga en cola
   // Estado para mostrar lotes
   const [showLotes, setShowLotes] = useState(false);
   const [selectedProductoParaLotes, setSelectedProductoParaLotes] =
@@ -90,7 +91,7 @@ export default function GestionProductos() {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       if (!response.ok) {
@@ -124,29 +125,34 @@ export default function GestionProductos() {
 
   // Fetch categorías desde la API
   const fetchCategorias = async () => {
-    const token = localStorage.getItem("token");
-    const response = await fetch(`http://127.0.0.1:8000/api/categorias`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-    });
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`http://127.0.0.1:8000/api/categorias`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
 
-    if (!response.ok) {
+      if (!response.ok) {
+        setCategorias([]);
+        return;
+      }
+
+      const data = await response.json();
+      // Normalizar: convertir 'Id' a 'id' para consistencia
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const categoriasNormalizadas = data.map((cat: any) => ({
+        id: cat.Id,
+        nombre: cat.Nombre,
+        descripcion: cat.Descripcion,
+      }));
+
+      setCategorias(categoriasNormalizadas);
+    } catch (error) {
+      console.error("Error fetching categorias:", error);
       setCategorias([]);
-      return;
     }
-
-    const data = await response.json();
-    // Normalizar: convertir 'Id' a 'id' para consistencia
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const categoriasNormalizadas = data.map((cat: any) => ({
-      id: cat.Id,
-      nombre: cat.Nombre,
-      descripcion: cat.Descripcion,
-    }));
-
-    setCategorias(categoriasNormalizadas);
   };
 
   // Aplicar filtros
@@ -225,7 +231,7 @@ export default function GestionProductos() {
             estado,
             id_categoria,
           }),
-        }
+        },
       );
 
       const body = await res.json().catch(() => null);
@@ -302,20 +308,29 @@ export default function GestionProductos() {
     }
   };
 
+  // Cargar categorías primero (solo una vez)
   useEffect(() => {
-    fetchProductos();
+    const loadCategorias = async () => {
+      await fetchCategorias();
+      setCategoriasLoaded(true); // Marca que las categorías están cargadas
+    };
+    loadCategorias();
+  }, []);
+
+  // Cargar productos SOLO cuando las categorías estén listas
+  useEffect(() => {
+    if (categoriasLoaded) {
+      fetchProductos();
+    }
     // eslint-disable-next-line
   }, [
+    categoriasLoaded, // Depende de que las categorías estén cargadas
     searchTerm,
     priceRange.min,
     priceRange.max,
     categoryFilter,
     statusFilter,
   ]);
-
-  useEffect(() => {
-    fetchCategorias();
-  }, []);
 
   useEffect(() => {
     if (refreshProductos) {
@@ -562,7 +577,7 @@ export default function GestionProductos() {
                           <td>
                             {formatFecha(
                               producto.ultimo_abastecimiento ??
-                                producto.fecha_registro
+                                producto.fecha_registro,
                             )}
                           </td>
                           <td>
