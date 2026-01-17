@@ -61,9 +61,9 @@ export default function AsignarPedidos() {
   const [selectedMetodoPago, setSelectedMetodoPago] = useState<string>("");
   const [selectedEstado, setSelectedEstado] = useState<string>("Pendiente");
   const [tipoEntrega, setTipoEntrega] = useState<string>("Envío");
-  const [ciudad, setCiudad] = useState<string>("");
-  const [calle, setCalle] = useState<string>("");
-  const [referencia, setReferencia] = useState<string>("");
+  const [, setCiudad] = useState<string>("");
+  const [, setCalle] = useState<string>("");
+  const [, setReferencia] = useState<string>("");
 
   const [lotesByProduct, setLotesByProduct] = useState<
     Record<number, LoteAPI[]>
@@ -72,9 +72,18 @@ export default function AsignarPedidos() {
   const [selectedUsuario, setSelectedUsuario] = useState<string>("");
 
   // Estados para modales de éxito y error
-  const [showModalExito, setShowModalExito] = useState(false);
+  const [showModalSuccess, setShowModalSuccess] = useState(false);
   const [showModalError, setShowModalError] = useState(false);
-  const [mensajeError, setMensajeError] = useState("");
+  const [showModalDireccion, setShowModalDireccion] = useState(false);
+  const [showModalDireccionExito, setShowModalDireccionExito] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [successData, setSuccessData] = useState<Record<string, unknown>>({});
+  const [errorMessage, setErrorMessage] = useState("");
+  const [errorDetails, setErrorDetails] = useState<Record<string, string>>({});
+  const [direccionExitoData, setDireccionExitoData] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+  }, [showModalSuccess, showModalError]);
 
   useEffect(() => {
     const t = rows.reduce((s, r) => s + r.subtotal, 0);
@@ -92,8 +101,8 @@ export default function AsignarPedidos() {
     (async () => {
       try {
         const [pRes, uRes] = await Promise.all([
-          fetch("http://127.0.0.1:8000/api/productos", { headers }),
-          fetch("http://127.0.0.1:8000/api/usuarios", { headers }),
+          fetch("https://proyecto-backend-web-1.onrender.com/api/productos", { headers }),
+          fetch("https://proyecto-backend-web-1.onrender.com/api/usuarios", { headers }),
         ]);
         if (pRes.ok) {
           const pData = await pRes.json();
@@ -104,7 +113,7 @@ export default function AsignarPedidos() {
               id: Number(p.id ?? p.Id ?? p.id_producto),
               nombre: p.nombre ?? p.Nombre,
               costo_unit: Number(p.costo_unit ?? p.Costo_unit ?? 0),
-            })),
+            }))
           );
         }
         if (uRes.ok) {
@@ -114,7 +123,7 @@ export default function AsignarPedidos() {
             (uData || []).map((u: any) => ({
               id: Number(u.id ?? u.Id ?? u.IdUsuario),
               nombre: u.nombre ?? (u.Nombre || u.correo),
-            })),
+            }))
           );
         }
       } catch (err) {
@@ -130,13 +139,13 @@ export default function AsignarPedidos() {
     const token = localStorage.getItem("token");
     try {
       const res = await fetch(
-        `http://127.0.0.1:8000/api/lotes?product_id=${productId}`,
+        `https://proyecto-backend-web-1.onrender.com/api/lotes?product_id=${productId}`,
         {
           headers: {
             Authorization: token ? `Bearer ${token}` : "",
             "Content-Type": "application/json",
           },
-        },
+        }
       );
       if (!res.ok) return;
       const data = await res.json();
@@ -180,11 +189,11 @@ export default function AsignarPedidos() {
               subtotal: Number(
                 (
                   (prod ? Number(prod.costo_unit ?? 0) : 0) * row.cantidad
-                ).toFixed(2),
+                ).toFixed(2)
               ),
             }
-          : row,
-      ),
+          : row
+      )
     );
   }
   function updateRowCantidad(id: string, cantidad: number) {
@@ -196,14 +205,14 @@ export default function AsignarPedidos() {
               cantidad,
               subtotal: Number((row.precioUnit * cantidad).toFixed(2)),
             }
-          : row,
-      ),
+          : row
+      )
     );
   }
 
   function handleProductoInputChange(rowId: string, text: string) {
     setRows((r) =>
-      r.map((row) => (row.id === rowId ? { ...row, productoName: text } : row)),
+      r.map((row) => (row.id === rowId ? { ...row, productoName: text } : row))
     );
     if (!text) {
       setProductoSuggestions((s) => ({ ...s, [rowId]: [] }));
@@ -225,28 +234,61 @@ export default function AsignarPedidos() {
     setProductoSuggestions((s) => ({ ...s, [rowId]: [] }));
   }
 
+  // Obtener detalles de lotes para un producto
+  async function obtenerDetallesLotes(productoId: number): Promise<{
+    totalDisponible: number;
+    lotes: Array<{ nombre: string; cantidad: number; estado: string }>;
+  }> {
+    const token = localStorage.getItem("token");
+    try {
+      const res = await fetch(
+        `https://proyecto-backend-web-1.onrender.com/api/lotes?product_id=${productoId}&estado=Activo`,
+        {
+          headers: {
+            Authorization: token ? `Bearer ${token}` : "",
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      if (!res.ok) {
+        return { totalDisponible: 0, lotes: [] };
+      }
+      const lotes = await res.json();
+      const totalDisponible = (lotes as Array<{ Cantidad: number }>).reduce(
+        (sum, lote) => sum + (lote.Cantidad || 0),
+        0
+      );
+      const lotesFormato = (lotes as Array<{ Lote: string; Cantidad: number; Estado: string }>).map(
+        (lote) => ({
+          nombre: lote.Lote,
+          cantidad: lote.Cantidad,
+          estado: lote.Estado,
+        })
+      );
+      return { totalDisponible, lotes: lotesFormato };
+    } catch (err) {
+      console.error("Error obteniendo lotes:", err);
+      return { totalDisponible: 0, lotes: [] };
+    }
+  }
+
   // Crear venta y enviar al backend
   async function handleCrearVenta(e?: React.FormEvent<HTMLFormElement>) {
     if (e) e.preventDefault();
 
     if (!selectedUsuario) {
-      setMensajeError("Seleccione un usuario.");
-      setShowModalError(true);
+      alert("Seleccione un usuario.");
       return;
     }
 
-    if (tipoEntrega === "Envío" && !ciudad) {
-      setMensajeError("Debe ingresar una dirección para envío a domicilio.");
-      setShowModalError(true);
+    if (tipoEntrega === "Envío" && !idDireccion) {
+      alert("Debe guardar una dirección para envío a domicilio.");
       return;
     }
 
     // Validar que todos los productos tengan cantidad mayor a 0
     if (rows.some((r) => !r.productoId || r.cantidad <= 0)) {
-      setMensajeError(
-        "Complete todos los detalles de productos con cantidad válida.",
-      );
-      setShowModalError(true);
+      alert("Complete todos los detalles de productos con cantidad válida.");
       return;
     }
 
@@ -261,10 +303,8 @@ export default function AsignarPedidos() {
       id_usuario: Number(selectedUsuario),
       metodo_pago: selectedMetodoPago || null,
       comprobante: selectedComprobante || null,
-      id_direccion: tipoEntrega === "Recojo" ? null : idDireccion || null,
-      ciudad: tipoEntrega === "Envío" ? ciudad : null,
-      calle: tipoEntrega === "Envío" ? calle : null,
-      referencia: tipoEntrega === "Envío" ? referencia : null,
+      id_direccion: tipoEntrega === "Recojo" ? null : Number(idDireccion),
+      tipo_entrega: tipoEntrega,
       costo_total: Number(total),
       estado: selectedEstado,
       details,
@@ -274,7 +314,7 @@ export default function AsignarPedidos() {
 
     const token = localStorage.getItem("token");
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/ventas", {
+      const res = await fetch("https://proyecto-backend-web-1.onrender.com/api/ventas", {
         method: "POST",
         headers: {
           Authorization: token ? `Bearer ${token}` : "",
@@ -284,38 +324,152 @@ export default function AsignarPedidos() {
       });
       const body = await res.json().catch(() => null);
       if (res.ok) {
-        setShowModalExito(true);
-        // Reset básico
-        setRows([
-          {
-            id: "r" + Date.now(),
-            productoId: "",
-            cantidad: 1,
-            precioUnit: 0,
-            subtotal: 0,
-          },
-        ]);
-        setTotal(0);
-        setSelectedUsuario("");
-        setIdDireccion(null);
-        setCiudad("");
-        setCalle("");
-        setReferencia("");
-        setSelectedMetodoPago("");
-        setSelectedComprobante("");
-        setRuc("");
-        setSelectedEstado("Pendiente");
-        setTipoEntrega("Envío");
+        // Guardar datos de la venta exitosa
+        const ventaData = {
+          usuario: usuarios.find((u) => String(u.id) === selectedUsuario)
+            ?.nombre,
+          metodo_pago: selectedMetodoPago,
+          comprobante: selectedComprobante,
+          cantidad_items: rows.length,
+          total: total,
+          estado: selectedEstado,
+          fecha: new Date().toLocaleString("es-PE"),
+        };
+
+        setSuccessData(ventaData);
+        setSuccessMessage("¡Venta creada correctamente!");
+        setShowModalSuccess(true);
+
+        // Cerrar modal después de 4 segundos
+        setTimeout(() => {
+          setShowModalSuccess(false);
+        }, 4000);
+
+        // Reset básico después de un pequeño delay
+        setTimeout(() => {
+          setRows([
+            {
+              id: "r" + Date.now(),
+              productoId: "",
+              cantidad: 1,
+              precioUnit: 0,
+              subtotal: 0,
+            },
+          ]);
+          setTotal(0);
+          setSelectedUsuario("");
+          setIdDireccion(null);
+          setCiudad("");
+          setCalle("");
+          setReferencia("");
+          setSelectedMetodoPago("");
+          setSelectedComprobante("");
+          setRuc("");
+          setSelectedEstado("Pendiente");
+          setTipoEntrega("Envío");
+        }, 500);
       } else {
-        const errorMsg = body?.message || `Error ${res.status}`;
-        setMensajeError(errorMsg);
-        setShowModalError(true);
         console.error("Error crear venta:", body);
+
+        // Manejo de diferentes tipos de errores
+        let message = body?.message || `Error ${res.status}`;
+        const details: Record<string, string> = {};
+
+        // Procesar según código de error y status HTTP
+        if (res.status === 422 && body?.errors) {
+          // Error de validación - Datos inválidos
+          message = "❌ Datos inválidos. Por favor, revisa los campos";
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          Object.entries(body.errors).forEach(([field, msgs]: [string, any]) => {
+            const nombreCampo =
+              field === "id_usuario"
+                ? "👤 Usuario"
+                : field === "metodo_pago"
+                ? "💳 Método de Pago"
+                : field === "comprobante"
+                ? "📄 Comprobante"
+                : field === "id_direccion"
+                ? "📍 Dirección"
+                : field === "costo_total"
+                ? "💰 Costo Total"
+                : field === "estado"
+                ? "📊 Estado"
+                : field === "details" || field.includes("details")
+                ? "📦 Productos"
+                : field;
+            details[nombreCampo] = Array.isArray(msgs)
+              ? msgs[0]
+              : String(msgs);
+          });
+        } else if (body?.code === "INSUFFICIENT_STOCK") {
+          // Error de stock insuficiente
+          message = "⚠️ Stock insuficiente";
+          details["Producto"] = body.product_name || "Desconocido";
+          details["Solicitado"] = String(body.requested) || "0";
+          details["Disponible"] = String(body.available) || "0";
+          details["Diferencia"] = String((body.requested || 0) - (body.available || 0)) || "0";
+          
+          // Obtener detalles de lotes disponibles
+          if (body.product_id) {
+            const lotesData = await obtenerDetallesLotes(body.product_id);
+            if (lotesData.lotes && lotesData.lotes.length > 0) {
+              const lotesFormato = lotesData.lotes
+                .map((l) => `${l.nombre}: ${l.cantidad} unidades`)
+                .join(" | ");
+              details["Lotes Disponibles"] = lotesFormato;
+              details["Total Disponible (Lotes)"] = String(lotesData.totalDisponible);
+            }
+          }
+        } else if (body?.code === "MISSING_ADDRESS") {
+          // Error de dirección faltante
+          message = "📍 Dirección requerida";
+          details["Tipo de Entrega"] =
+            "Envío a domicilio requiere una dirección";
+          details["Acción"] =
+            "Por favor, ingresa una dirección válida en el formulario";
+        } else if (body?.code === "PRODUCT_NOT_FOUND") {
+          // Producto no encontrado
+          message = "🚫 Producto no encontrado";
+          details["Estado"] =
+            "Uno o más productos no existen en el sistema";
+          details["Acción"] =
+            "Revisa que los productos seleccionados sean válidos";
+        } else if (body?.code === "PROCESSING_ERROR") {
+          // Error en el procesamiento
+          message = "⚠️ Error al procesar la venta";
+          details["Tipo de Error"] = "Error interno del servidor";
+          details["Acción"] = "Contacta al administrador si el problema persiste";
+          details["Código de Error"] = body.code;
+        } else if (res.status === 400) {
+          // Errores de solicitud malformada
+          message = "❌ Solicitud inválida";
+          details["Error"] = body?.message || "Verificar los datos enviados";
+        } else if (res.status === 404) {
+          // No encontrado
+          message = "🚫 Recurso no encontrado";
+          details["Error"] = body?.message || "Verifica que todos los datos sean válidos";
+        } else if (res.status === 409) {
+          // Conflicto (generalmente stock)
+          message = "⚠️ Conflicto en la venta";
+          details["Problema"] = body?.message || "Problema con el stock o datos";
+        } else if (res.status === 500) {
+          // Error del servidor
+          message = "🔴 Error del servidor";
+          details["Tipo"] = "Error interno del servidor";
+          details["Acción"] = "Contacta al administrador";
+        }
+
+        setErrorMessage(message);
+        setErrorDetails(details);
+        setShowModalError(true);
+        console.log("Modal de error mostrado:", { message, details });
       }
     } catch (err) {
       console.error("Fetch error crear venta:", err);
-      setMensajeError("Error de conexión al crear la venta.");
+      setErrorMessage("Error de conexión al crear la venta");
+      setErrorDetails({ Conexión: "Verifique su conexión a internet" });
       setShowModalError(true);
+      console.log("Modal de error mostrado por conexión");
     }
   }
 
@@ -328,8 +482,8 @@ export default function AsignarPedidos() {
     }
   }
 
-  // modal dirección
-  function guardarDireccionSimulada() {
+  // Guardar dirección a través del backend
+  async function guardarDireccionSimulada() {
     const ciudadInput =
       (document.getElementById("ciudadInput") as HTMLInputElement)?.value || "";
     const calleInput =
@@ -337,21 +491,90 @@ export default function AsignarPedidos() {
     const referenciaInput =
       (document.getElementById("refInput") as HTMLTextAreaElement)?.value || "";
 
-    if (ciudadInput) {
-      setCiudad(ciudadInput);
-      setCalle(calleInput);
-      setReferencia(referenciaInput);
-      setIdDireccion("dir-" + Date.now());
-      const modalElement = document.getElementById("modalDireccion");
-      if (modalElement) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const modal = (window as any).bootstrap?.Modal.getInstance(
-          modalElement,
-        );
-        modal?.hide();
-      }
-    } else {
+    if (!ciudadInput) {
       alert("Ingrese al menos la ciudad.");
+      return;
+    }
+
+    const token = localStorage.getItem("token");
+    const payload = {
+      ciudad: ciudadInput,
+      calle: calleInput,
+      referencia: referenciaInput || null,
+    };
+
+    console.log("Enviando dirección:", payload);
+
+    try {
+      const res = await fetch("https://proyecto-backend-web-1.onrender.com/api/directions", {
+        method: "POST",
+        headers: {
+          Authorization: token ? `Bearer ${token}` : "",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      console.log("Respuesta status:", res.status);
+      const body = await res.json().catch(() => null);
+      console.log("Respuesta body:", body);
+
+      if (res.ok) {
+        const direccionId = body.id;
+        setCiudad(ciudadInput);
+        setCalle(calleInput);
+        setReferencia(referenciaInput);
+        setIdDireccion(String(direccionId));
+
+        // Limpiar inputs
+        (document.getElementById("ciudadInput") as HTMLInputElement).value = "";
+        (document.getElementById("calleInput") as HTMLInputElement).value = "";
+        (document.getElementById("refInput") as HTMLTextAreaElement).value = "";
+
+        // Cerrar modal de dirección
+        setShowModalDireccion(false);
+
+        // Mostrar modal de éxito
+        setDireccionExitoData({
+          ciudad: ciudadInput,
+          calle: calleInput,
+          referencia: referenciaInput,
+          id: String(direccionId),
+        });
+        setShowModalDireccionExito(true);
+
+        // Cerrar modal de éxito después de 3 segundos
+        setTimeout(() => {
+          setShowModalDireccionExito(false);
+        }, 3000);
+      } else {
+        console.error("Error guardar dirección:", {
+          status: res.status,
+          statusText: res.statusText,
+          body,
+        });
+
+        let errorMsg =
+          body?.message ||
+          body?.error ||
+          `Error ${res.status}: ${res.statusText}`;
+
+        if (res.status === 404) {
+          errorMsg =
+            "El endpoint de direcciones no existe. Verifica que el backend esté configurado correctamente.";
+        } else if (res.status === 422) {
+          errorMsg =
+            "Datos de validación inválidos: " +
+            JSON.stringify(body?.errors || body);
+        }
+
+        alert(errorMsg);
+      }
+    } catch (err) {
+      console.error("Fetch error guardar dirección:", err);
+      alert(
+        "Error de conexión al guardar la dirección. Verifica que el servidor esté en https://proyecto-backend-web-1.onrender.com"
+      );
     }
   }
 
@@ -500,8 +723,7 @@ export default function AsignarPedidos() {
                               <button
                                 type="button"
                                 className="btn btn-outline-secondary"
-                                data-bs-toggle="modal"
-                                data-bs-target="#modalDireccion"
+                                onClick={() => setShowModalDireccion(true)}
                               >
                                 <i className="bx bx-map"></i>
                               </button>
@@ -562,7 +784,7 @@ export default function AsignarPedidos() {
                                     onChange={(e) =>
                                       handleProductoInputChange(
                                         row.id,
-                                        e.target.value,
+                                        e.target.value
                                       )
                                     }
                                     placeholder="Buscar producto..."
@@ -588,13 +810,13 @@ export default function AsignarPedidos() {
                                               onClick={() =>
                                                 selectProductoSuggestion(
                                                   row.id,
-                                                  p,
+                                                  p
                                                 )
                                               }
                                             >
                                               {p.nombre}
                                             </li>
-                                          ),
+                                          )
                                         )}
                                       </ul>
                                     )}
@@ -609,7 +831,7 @@ export default function AsignarPedidos() {
                                   onChange={(e) =>
                                     updateRowCantidad(
                                       row.id,
-                                      Number(e.target.value || 1),
+                                      Number(e.target.value || 1)
                                     )
                                   }
                                 />
@@ -672,177 +894,289 @@ export default function AsignarPedidos() {
               </div>
             </div>
 
-            {/* Modal Dirección (rediseñado) */}
+            {/* Modal Dirección */}
             <div
-              className="modal fade"
+              className={`modal fade ${showModalDireccion ? "show" : ""}`}
               id="modalDireccion"
               tabIndex={-1}
-              aria-hidden="true"
+              inert={!showModalDireccion}
+              style={{
+                display: showModalDireccion ? "block" : "none",
+                zIndex: 1050,
+              }}
             >
-              <div className="modal-dialog modal-dialog-centered">
-                <div className="modal-content border-0 shadow-lg">
-                  <div className="modal-header bg-primary text-white border-0">
-                    <div className="d-flex align-items-center gap-2">
-                      <i className="bx bx-map-alt fs-5"></i>
-                      <h5 className="modal-title mb-0">
-                        Agregar Dirección de Envío
-                      </h5>
-                    </div>
+              <div className="modal-dialog">
+                <div className="modal-content">
+                  <div className="modal-header">
+                    <h5 className="modal-title">Agregar Dirección</h5>
                     <button
                       type="button"
-                      className="btn-close btn-close-white"
-                      data-bs-dismiss="modal"
+                      className="btn-close"
+                      onClick={() => setShowModalDireccion(false)}
                       aria-label="Cerrar"
                     ></button>
                   </div>
-                  <div className="modal-body p-4">
+                  <div className="modal-body">
                     <div className="mb-3">
-                      <label className="form-label fw-bold text-dark">
-                        Ciudad *
-                      </label>
-                      <input
-                        id="ciudadInput"
-                        className="form-control form-control-lg"
-                        placeholder="Ej: Lima, Arequipa..."
-                        style={{ borderRadius: "8px" }}
-                      />
-                      <small className="text-muted">Campo obligatorio</small>
+                      <label>Ciudad</label>
+                      <input id="ciudadInput" className="form-control" />
                     </div>
                     <div className="mb-3">
-                      <label className="form-label fw-bold text-dark">
-                        Calle / Avenida
-                      </label>
-                      <input
-                        id="calleInput"
-                        className="form-control form-control-lg"
-                        placeholder="Ej: Avenida Principal 123"
-                        style={{ borderRadius: "8px" }}
-                      />
+                      <label>Calle</label>
+                      <input id="calleInput" className="form-control" />
                     </div>
                     <div className="mb-3">
-                      <label className="form-label fw-bold text-dark">
-                        Referencia
-                      </label>
+                      <label>Referencia</label>
                       <textarea
                         id="refInput"
                         className="form-control"
-                        placeholder="Ej: Frente a la plaza, cerca del supermercado..."
-                        rows={3}
-                        style={{ borderRadius: "8px" }}
+                        rows={2}
                       ></textarea>
-                      <small className="text-muted">
-                        Información adicional para localizar más fácilmente
-                      </small>
                     </div>
                   </div>
-                  <div className="modal-footer bg-light border-top">
+                  <div className="modal-footer">
                     <button
                       type="button"
                       className="btn btn-secondary"
-                      data-bs-dismiss="modal"
+                      onClick={() => setShowModalDireccion(false)}
                     >
                       Cancelar
                     </button>
                     <button
                       type="button"
-                      className="btn btn-primary btn-lg px-4"
+                      className="btn btn-primary"
                       onClick={guardarDireccionSimulada}
                     >
-                      <i className="bx bx-check me-2"></i>Guardar Dirección
+                      Guardar Dirección
                     </button>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Modal Éxito */}
-            {showModalExito && (
+            {/* Overlay para modales */}
+            {(showModalSuccess ||
+              showModalError ||
+              showModalDireccion ||
+              showModalDireccionExito) && (
               <div
-                className="modal show d-block"
-                tabIndex={-1}
-                style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
-              >
-                <div className="modal-dialog modal-dialog-centered">
-                  <div className="modal-content border-0 shadow-lg">
-                    <div className="modal-body text-center p-5">
-                      <div
-                        style={{
-                          width: "80px",
-                          height: "80px",
-                          borderRadius: "50%",
-                          backgroundColor: "#d4edda",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          margin: "0 auto 1.5rem",
-                        }}
-                      >
-                        <i
-                          className="bx bx-check"
-                          style={{
-                            fontSize: "3rem",
-                            color: "#28a745",
-                            fontWeight: "bold",
-                          }}
-                        ></i>
-                      </div>
-                      <h4 className="mb-3 fw-bold text-success">
-                        ¡Venta Creada Exitosamente!
-                      </h4>
-                      <p className="text-muted mb-4">
-                        La venta ha sido registrada correctamente en el sistema.
-                        Puede crear una nueva venta o volver al listado.
-                      </p>
-                    </div>
-                    <div className="modal-footer bg-light border-top justify-content-center gap-2">
-                      <button
-                        type="button"
-                        className="btn btn-success px-4"
-                        onClick={() => setShowModalExito(false)}
-                      >
-                        <i className="bx bx-plus me-2"></i>Crear Otra Venta
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
+                className="modal-backdrop fade show"
+                style={{ zIndex: 1040 }}
+                onClick={() => {
+                  if (showModalSuccess) setShowModalSuccess(false);
+                  if (showModalError) setShowModalError(false);
+                  if (showModalDireccion) setShowModalDireccion(false);
+                  if (showModalDireccionExito) setShowModalDireccionExito(false);
+                }}
+              ></div>
             )}
 
-            {/* Modal Error */}
-            {showModalError && (
-              <div
-                className="modal show d-block"
-                tabIndex={-1}
-                style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
-              >
-                <div className="modal-dialog modal-dialog-centered">
-                  <div className="modal-content border-0 shadow-lg">
-                    <div className="modal-header bg-danger text-white border-0">
-                      <h5 className="modal-title d-flex align-items-center gap-2">
-                        <i className="bx bx-error-circle"></i>Error
-                      </h5>
-                      <button
-                        type="button"
-                        className="btn-close btn-close-white"
-                        onClick={() => setShowModalError(false)}
-                      ></button>
+            {/* Modal Éxito - Venta */}
+            <div
+              className={`modal fade ${showModalSuccess ? "show" : ""}`}
+              id="modalSuccess"
+              tabIndex={-1}
+              inert={!showModalSuccess}
+              style={{
+                display: showModalSuccess ? "block" : "none",
+                zIndex: 1050,
+              }}
+            >
+              <div className="modal-dialog modal-dialog-centered">
+                <div className="modal-content border-success shadow-lg">
+                  <div className="modal-header bg-success text-white">
+                    <h5 className="modal-title">
+                      <i className="bx bx-check-circle me-2" style={{ fontSize: "1.5rem" }}></i>
+                      ¡Venta Registrada Exitosamente!
+                    </h5>
+                  </div>
+                  <div className="modal-body">
+                    <div className="alert alert-success-light mb-3">
+                      <p className="mb-0 text-success fw-bold">{successMessage}</p>
                     </div>
-                    <div className="modal-body p-4">
-                      <p className="text-dark mb-0">{mensajeError}</p>
-                    </div>
-                    <div className="modal-footer bg-light border-top">
-                      <button
-                        type="button"
-                        className="btn btn-danger"
-                        onClick={() => setShowModalError(false)}
-                      >
-                        <i className="bx bx-x me-2"></i>Cerrar
-                      </button>
-                    </div>
+
+                    {Object.entries(successData).length > 0 && (
+                      <div className="success-details">
+                        <h6 className="mb-3">Detalles de la venta:</h6>
+                        <table className="table table-sm table-borderless">
+                          <tbody>
+                            {Object.entries(successData).map(([key, value]) => (
+                              <tr key={key}>
+                                <td className="fw-bold" style={{ width: "40%" }}>
+                                  {key === "usuario"
+                                    ? "Cliente"
+                                    : key === "metodo_pago"
+                                    ? "Método Pago"
+                                    : key === "cantidad_items"
+                                    ? "Items"
+                                    : key === "total"
+                                    ? "Total (S/)"
+                                    : key === "estado"
+                                    ? "Estado"
+                                    : key === "fecha"
+                                    ? "Fecha"
+                                    : key === "comprobante"
+                                    ? "Comprobante"
+                                    : key}
+                                  :
+                                </td>
+                                <td className="text-end">
+                                  {key === "total"
+                                    ? `${Number(value).toFixed(2)}`
+                                    : String(value)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                  <div className="modal-footer">
+                    <button
+                      type="button"
+                      className="btn btn-success"
+                      onClick={() => setShowModalSuccess(false)}
+                    >
+                      <i className="bx bx-check me-1"></i>
+                      Aceptar
+                    </button>
                   </div>
                 </div>
               </div>
-            )}
+            </div>
+
+            {/* Modal Error */}
+            <div
+              className={`modal fade ${showModalError ? "show" : ""}`}
+              id="modalError"
+              tabIndex={-1}
+              inert={!showModalError}
+              style={{
+                display: showModalError ? "block" : "none",
+                zIndex: 1050,
+              }}
+            >
+              <div className="modal-dialog modal-dialog-centered modal-lg">
+                <div className="modal-content border-danger shadow-lg">
+                  <div className="modal-header bg-danger text-white">
+                    <h5 className="modal-title">
+                      <i className="bx bx-error-circle me-2" style={{ fontSize: "1.5rem" }}></i>
+                      Error al crear la venta
+                    </h5>
+                  </div>
+                  <div className="modal-body">
+                    <div className="alert alert-danger mb-3">
+                      <p className="mb-0 fw-bold">{errorMessage}</p>
+                    </div>
+                    {Object.entries(errorDetails).length > 0 && (
+                      <div className="error-details">
+                        <h6 className="mb-2">
+                          <i className="bx bx-info-circle me-1"></i>
+                          Detalles del error:
+                        </h6>
+                        <div className="alert alert-danger-light">
+                          <ul className="mb-0">
+                            {Object.entries(errorDetails).map(
+                              ([key, value], idx) => (
+                                <li key={idx} className="mb-1">
+                                  <strong>{key}:</strong> {String(value)}
+                                </li>
+                              )
+                            )}
+                          </ul>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="modal-footer">
+                    <button
+                      type="button"
+                      className="btn btn-danger"
+                      onClick={() => setShowModalError(false)}
+                    >
+                      <i className="bx bx-x me-1"></i>
+                      Cerrar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Éxito - Dirección */}
+            <div
+              className={`modal fade ${showModalDireccionExito ? "show" : ""}`}
+              id="modalDireccionExito"
+              tabIndex={-1}
+              inert={!showModalDireccionExito}
+              style={{
+                display: showModalDireccionExito ? "block" : "none",
+                zIndex: 1050,
+              }}
+            >
+              <div className="modal-dialog modal-dialog-centered">
+                <div className="modal-content border-success shadow-lg">
+                  <div className="modal-header bg-success text-white">
+                    <h5 className="modal-title">
+                      <i className="bx bx-map-pin me-2" style={{ fontSize: "1.5rem" }}></i>
+                      Dirección Guardada
+                    </h5>
+                  </div>
+                  <div className="modal-body">
+                    <div className="alert alert-success-light mb-3">
+                      <p className="mb-0 text-success fw-bold">
+                        ¡Dirección registrada exitosamente!
+                      </p>
+                    </div>
+
+                    {Object.entries(direccionExitoData).length > 0 && (
+                      <div className="direccion-details">
+                        <div className="card bg-light">
+                          <div className="card-body">
+                            <p className="mb-2">
+                              <strong>
+                                <i className="bx bx-building me-2"></i>
+                                Ciudad:
+                              </strong>
+                              <br />
+                              <span>{direccionExitoData.ciudad}</span>
+                            </p>
+                            <p className="mb-2">
+                              <strong>
+                                <i className="bx bx-street-view me-2"></i>
+                                Calle:
+                              </strong>
+                              <br />
+                              <span>{direccionExitoData.calle}</span>
+                            </p>
+                            {direccionExitoData.referencia && (
+                              <p className="mb-0">
+                                <strong>
+                                  <i className="bx bx-note me-2"></i>
+                                  Referencia:
+                                </strong>
+                                <br />
+                                <span>{direccionExitoData.referencia}</span>
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="modal-footer">
+                    <button
+                      type="button"
+                      className="btn btn-success"
+                      onClick={() => setShowModalDireccionExito(false)}
+                    >
+                      <i className="bx bx-check me-1"></i>
+                      Aceptar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

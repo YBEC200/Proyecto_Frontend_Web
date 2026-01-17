@@ -14,7 +14,7 @@ export default function Nav() {
     const token = localStorage.getItem("token");
     if (token) {
       try {
-        await fetch("http://127.0.0.1:8000/api/admin/logout", {
+        await fetch("https://proyecto-backend-web-1.onrender.com/api/admin/logout", {
           method: "POST",
           headers: {
             Authorization: "Bearer " + token,

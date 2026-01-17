@@ -19,9 +19,15 @@ interface Producto {
 }
 
 interface Lote {
-  Id: number;
+  id?: number;
+  Id?: number;
+  nombre?: string;
+  Lote?: string;
+  fecha_registro?: string;
   Fecha_Registro?: string;
+  cantidad?: number;
   Cantidad?: number;
+  estado?: string;
   Estado?: string;
 }
 
@@ -81,6 +87,35 @@ function GestionPedidos() {
   const [selectedVenta, setSelectedVenta] = useState<Venta | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
+  // Función para obtener usuarios y crear un mapa de lookup
+  const fetchUsuarios = async (): Promise<Map<number, string>> => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch("https://proyecto-backend-web-1.onrender.com/api/usuarios", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        return new Map();
+      }
+
+      const data = await response.json();
+
+      // Crear mapa de id -> nombre
+      const usuariosMap = new Map<number, string>();
+      (Array.isArray(data) ? data : []).forEach((user: Usuario) => {
+        usuariosMap.set(user.id, user.nombre);
+      });
+      return usuariosMap;
+    } catch (err) {
+      console.error("Error fetching usuarios:", err);
+      return new Map();
+    }
+  };
+
   // Función para obtener ventas desde la API
   const fetchVentas = async () => {
     setLoading(true);
@@ -95,8 +130,11 @@ function GestionPedidos() {
       if (filterDate.start) params.append("fecha_inicio", filterDate.start);
       if (filterDate.end) params.append("fecha_fin", filterDate.end);
 
+      // Obtener usuarios primero para mapping
+      const usuariosMap = await fetchUsuarios();
+
       const response = await fetch(
-        `http://127.0.0.1:8000/api/ventas?${params.toString()}`,
+        `https://proyecto-backend-web-1.onrender.com/api/ventas?${params.toString()}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -112,7 +150,37 @@ function GestionPedidos() {
       }
 
       const data = await response.json();
-      setVentas(Array.isArray(data) ? data : []);
+      
+      // Normalizar estructura de datos desde el backend
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const normalizedData = (Array.isArray(data) ? data : []).map((item: any) => {
+        const userId = item.id_usuario || item.Id_Usuario;
+        const userName = usuariosMap.get(userId) || 'Sin cliente';
+        
+        return {
+          id: item.id || item.Id,
+          id_usuario: userId,
+          metodo_pago: item.metodo_pago || item.Metodo_Pago,
+          comprobante: item.comprobante || item.Comprobante,
+          id_direccion: item.id_direccion || item.Id_Direccion,
+          fecha: item.fecha || item.Fecha,
+          costo_total: typeof (item.costo_total || item.Costo_total) === 'string' 
+            ? parseFloat(item.costo_total || item.Costo_total) 
+            : (item.costo_total || item.Costo_total),
+          estado: item.estado || item.Estado,
+          tipo_entrega: item.tipo_entrega || item.Tipo_Entrega,
+          // Relaciones
+          user: {
+            id: userId,
+            nombre: userName,
+            correo: item.user?.correo,
+          },
+          direction: item.direction || null,
+          details: item.details || [],
+        };
+      });
+      
+      setVentas(normalizedData);
     } catch (err) {
       console.error("Error fetching ventas:", err);
       setError("Error de conexión al cargar las ventas");
@@ -129,7 +197,7 @@ function GestionPedidos() {
       const token = localStorage.getItem("token");
 
       const response = await fetch(
-        `http://127.0.0.1:8000/api/sells/${ventaId}`,
+        `https://proyecto-backend-web-1.onrender.com/api/ventas/${ventaId}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -144,20 +212,70 @@ function GestionPedidos() {
       }
 
       const data = await response.json();
-      // Normalizar estructura de la API
+      console.log("Datos recibidos del backend:", data);
+      
+      // Normalizar estructura de la API con detalles de venta y lotes
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const normalizedDetails = (data.details || data.Details || []).map((detail: any) => ({
+        id: detail.id || detail.Id,
+        id_venta: detail.id_venta || detail.Id_Venta,
+        id_producto: detail.id_producto || detail.Id_Producto,
+        cantidad: detail.cantidad || detail.Cantidad,
+        costo: typeof (detail.costo || detail.Costo) === 'string'
+          ? parseFloat(detail.costo || detail.Costo)
+          : (detail.costo || detail.Costo),
+        product: detail.product ? {
+          id: detail.product.id || detail.product.Id,
+          nombre: detail.product.nombre || detail.product.Nombre || detail.product.name,
+          costo_unit: detail.product.costo_unit || detail.product.Costo_Unit || detail.product.precio_unit,
+          descripcion: detail.product.descripcion || detail.product.Descripcion || detail.product.description,
+        } : undefined,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        detailLotes: (detail.detailLotes || detail.Detail_Lotes || []).map((dl: any) => ({
+          id: dl.id || dl.Id,
+          id_detalle_venta: dl.id_detalle_venta || dl.Id_Detalle_Venta,
+          id_lote: dl.id_lote || dl.Id_Lote,
+          cantidad: dl.cantidad || dl.Cantidad,
+          lote: dl.lote ? {
+            id: dl.lote.id || dl.lote.Id,
+            nombre: dl.lote.nombre || dl.lote.Lote,
+            fecha_registro: dl.lote.fecha_registro || dl.lote.Fecha_Registro,
+            cantidad: dl.lote.cantidad || dl.lote.Cantidad,
+            estado: dl.lote.estado || dl.lote.Estado,
+          } : undefined,
+        })),
+      }));
+
       const normalized = {
         ...data,
-        id: data.Id,
-        id_usuario: data.Id_Usuario,
-        metodo_pago: data.Metodo_Pago,
-        comprobante: data.Comprobante,
-        id_direccion: data.Id_Direccion,
-        fecha: data.Fecha,
-        costo_total:
-          typeof data.Costo_total === "string"
-            ? parseFloat(data.Costo_total)
-            : data.Costo_total,
+        id: data.id || data.Id,
+        id_usuario: data.id_usuario || data.Id_Usuario,
+        metodo_pago: data.metodo_pago || data.Metodo_Pago,
+        comprobante: data.comprobante || data.Comprobante,
+        id_direccion: data.id_direccion || data.Id_Direccion,
+        fecha: data.fecha || data.Fecha,
+        costo_total: typeof (data.costo_total || data.Costo_total) === "string"
+          ? parseFloat(data.costo_total || data.Costo_total)
+          : (data.costo_total || data.Costo_total),
+        estado: data.estado || data.Estado,
+        tipo_entrega: data.tipo_entrega || data.Tipo_Entrega,
+        user: data.user ? {
+          id: data.user.id || data.user.Id,
+          nombre: data.user.nombre || data.user.Nombre || data.user.name,
+          correo: data.user.correo || data.user.Correo || data.user.email,
+          rol: data.user.rol || data.user.Rol,
+          estado: data.user.estado || data.user.Estado || data.user.status,
+        } : undefined,
+        direction: data.direction ? {
+          id: data.direction.id || data.direction.Id,
+          ciudad: data.direction.ciudad || data.direction.Ciudad || data.direction.city,
+          calle: data.direction.calle || data.direction.Calle || data.direction.street,
+          referencia: data.direction.referencia || data.direction.Referencia || data.direction.reference,
+        } : null,
+        details: normalizedDetails,
       };
+      
+      console.log("Datos normalizados:", normalized);
       setSelectedVenta(normalized);
     } catch (err) {
       console.error("Error fetching venta detail:", err);
@@ -571,11 +689,17 @@ function GestionPedidos() {
                       </p>
                       <p className="mb-1">
                         <strong>Cliente:</strong>{" "}
-                        {selectedVenta.user?.nombre || "Sin cliente"}
+                        {selectedVenta.user?.nombre
+                          ? selectedVenta.user.nombre
+                          : `Usuario ID: ${selectedVenta.id_usuario}`}
                       </p>
                       <p className="mb-1">
                         <strong>Email:</strong>{" "}
                         {selectedVenta.user?.correo || "N/A"}
+                      </p>
+                      <p className="mb-1">
+                        <strong>Rol:</strong>{" "}
+                        {selectedVenta.user?.rol || "N/A"}
                       </p>
                       <p className="mb-1">
                         <strong>Fecha:</strong>{" "}
@@ -654,7 +778,9 @@ function GestionPedidos() {
                               selectedVenta.details.map((detail, idx) => (
                                 <tr key={`${detail.id}-${idx}`}>
                                   <td>
-                                    {detail.product?.nombre || "Producto"}
+                                    {detail.product?.nombre
+                                      ? detail.product.nombre
+                                      : `Producto ID: ${detail.id_producto}`}
                                   </td>
                                   <td className="text-center">
                                     {detail.cantidad}
@@ -682,6 +808,68 @@ function GestionPedidos() {
                       </div>
                     </div>
                   </div>
+
+                  {/* DETALLES DE LOTES */}
+                  {selectedVenta.details &&
+                  selectedVenta.details.some(
+                    (d) => d.detailLotes && d.detailLotes.length > 0,
+                  ) && (
+                    <div className="row mt-4">
+                      <div className="col-md-12">
+                        <h6 className="fw-bold text-muted mb-3">
+                          Detalles de Lotes
+                        </h6>
+                        <div className="table-responsive">
+                          <table className="table table-sm table-bordered">
+                            <thead className="table-light">
+                              <tr>
+                                <th>Producto</th>
+                                <th>Lote</th>
+                                <th className="text-center">Cantidad</th>
+                                <th>Estado Lote</th>
+                                <th>Fecha Registro</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {selectedVenta.details.map((detail, idx) =>
+                                detail.detailLotes && detail.detailLotes.length > 0
+                                  ? detail.detailLotes.map((lote, lotIdx) => (
+                                      <tr key={`${idx}-${lotIdx}`}>
+                                        <td>
+                                          {detail.product?.nombre ||
+                                            "Producto"}
+                                        </td>
+                                        <td>
+                                          <span className="badge bg-info">
+                                            {lote.lote?.nombre || lote.lote?.Lote || "N/A"}
+                                          </span>
+                                        </td>
+                                        <td className="text-center">
+                                          {lote.cantidad} unidades
+                                        </td>
+                                        <td>
+                                          <span
+                                            className={`badge badge-${((lote.lote?.estado || lote.lote?.Estado) || "").toLowerCase()}`}
+                                          >
+                                            {lote.lote?.estado || lote.lote?.Estado || "N/A"}
+                                          </span>
+                                        </td>
+                                        <td>
+                                          {(() => {
+                                            const fecha = lote.lote?.fecha_registro || lote.lote?.Fecha_Registro;
+                                            return fecha ? new Date(fecha).toLocaleDateString("es-PE") : "N/A";
+                                          })()}
+                                        </td>
+                                      </tr>
+                                    ))
+                                  : null,
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="alert alert-warning">

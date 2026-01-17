@@ -42,7 +42,7 @@ function Analisis() {
     const token = localStorage.getItem("token");
     (async () => {
       try {
-        const res = await fetch("http://127.0.0.1:8000/api/categorias", {
+        const res = await fetch("https://proyecto-backend-web-1.onrender.com/api/categorias", {
           headers: { Authorization: token ? `Bearer ${token}` : "" },
         });
         if (!res.ok) return;
@@ -60,7 +60,7 @@ function Analisis() {
 
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/api/lotes?${params.toString()}`,
+        `https://proyecto-backend-web-1.onrender.com/api/lotes?${params.toString()}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -98,7 +98,7 @@ function Analisis() {
 
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/api/productos?${params.toString()}`,
+        `https://proyecto-backend-web-1.onrender.com/api/productos?${params.toString()}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
