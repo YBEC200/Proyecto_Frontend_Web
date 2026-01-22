@@ -54,7 +54,7 @@ export default function GestionCategorias() {
     setLoadingCategorias(true);
     try {
       const token = getToken();
-      const response = await fetch(`http://127.0.0.1:8000/api/categorias`, {
+      const response = await fetch(`https://proyecto-backend-web-1.onrender.com/api/categorias`, {
         headers: {
           Authorization: token ? `Bearer ${token}` : "",
         },
@@ -99,8 +99,8 @@ export default function GestionCategorias() {
       const method = isEditing && selectedCategoria ? "PUT" : "POST";
       const url =
         method === "PUT"
-          ? `http://127.0.0.1:8000/api/categorias/${selectedCategoria?.Id}`
-          : `http://127.0.0.1:8000/api/categorias`;
+          ? `https://proyecto-backend-web-1.onrender.com/api/categorias/${selectedCategoria?.Id}`
+          : `https://proyecto-backend-web-1.onrender.com/api/categorias`;
 
       const response = await fetch(url, {
         method,
@@ -153,7 +153,7 @@ export default function GestionCategorias() {
     const token = getToken();
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/api/categorias/${categoria.Id}`,
+        `https://proyecto-backend-web-1.onrender.com/api/categorias/${categoria.Id}`,
         {
           method: "DELETE",
           headers: {
@@ -185,7 +185,7 @@ export default function GestionCategorias() {
   const fetchProductos = useCallback(async () => {
     try {
       const token = getToken();
-      const response = await fetch(`http://127.0.0.1:8000/api/productos`, {
+      const response = await fetch(`https://proyecto-backend-web-1.onrender.com/api/productos`, {
         headers: {
           Authorization: token ? `Bearer ${token}` : "",
         },
@@ -234,7 +234,7 @@ export default function GestionCategorias() {
     }
 
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/lotes`, {
+      const response = await fetch(`https://proyecto-backend-web-1.onrender.com/api/lotes`, {
         method: "POST",
         headers: {
           Authorization: token ? `Bearer ${token}` : "",

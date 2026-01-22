@@ -85,7 +85,7 @@ export default function GestionProductos() {
 
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/api/productos?${params.toString()}`,
+        `https://proyecto-backend-web-1.onrender.com/api/productos?${params.toString()}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -127,7 +127,7 @@ export default function GestionProductos() {
   const fetchCategorias = async () => {
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(`http://127.0.0.1:8000/api/categorias`, {
+      const response = await fetch(`https://proyecto-backend-web-1.onrender.com/api/categorias`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -217,7 +217,7 @@ export default function GestionProductos() {
 
     try {
       const res = await fetch(
-        `http://127.0.0.1:8000/api/productos/${selectedProduct.id}`,
+        `https://proyecto-backend-web-1.onrender.com/api/productos/${selectedProduct.id}`,
         {
           method: "PUT",
           headers: {
@@ -273,7 +273,7 @@ export default function GestionProductos() {
     setMensajeTipo("");
     const token = localStorage.getItem("token");
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/productos/${id}`, {
+      const res = await fetch(`https://proyecto-backend-web-1.onrender.com/api/productos/${id}`, {
         method: "DELETE",
         headers: {
           Authorization: token ? `Bearer ${token}` : "",

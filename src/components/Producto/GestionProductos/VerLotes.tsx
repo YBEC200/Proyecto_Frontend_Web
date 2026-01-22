@@ -78,7 +78,7 @@ export default function VerLotes({
     const token = localStorage.getItem("token");
     try {
       const res = await fetch(
-        `http://127.0.0.1:8000/api/lotes/${selectedLote.Id}`,
+        `https://proyecto-backend-web-1.onrender.com/api/lotes/${selectedLote.Id}`,
         {
           method: "PUT",
           headers: {
@@ -123,7 +123,7 @@ export default function VerLotes({
     setMensajeTipo("");
     const token = localStorage.getItem("token");
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/lotes/${Id}`, {
+      const res = await fetch(`https://proyecto-backend-web-1.onrender.com/api/lotes/${Id}`, {
         method: "DELETE",
         headers: {
           Authorization: token ? `Bearer ${token}` : "",
@@ -178,7 +178,7 @@ export default function VerLotes({
       if (estadoFilter) params.set("estado", estadoFilter);
 
       const token = localStorage.getItem("token");
-      const url = `http://127.0.0.1:8000/api/lotes?${params.toString()}`;
+      const url = `https://proyecto-backend-web-1.onrender.com/api/lotes?${params.toString()}`;
 
       console.debug("fetchLotes ->", { productoId, url });
 

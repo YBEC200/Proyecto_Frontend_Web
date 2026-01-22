@@ -77,7 +77,7 @@ function Usuarios() {
 
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/api/usuarios?${params.toString()}`,
+        `https://proyecto-backend-web-1.onrender.com/api/usuarios?${params.toString()}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -121,7 +121,7 @@ function Usuarios() {
     const token = localStorage.getItem("token");
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/api/usuarios/${selectedUser.id}`,
+        `https://proyecto-backend-web-1.onrender.com/api/usuarios/${selectedUser.id}`,
         {
           method: "PUT",
           headers: {
@@ -162,7 +162,7 @@ function Usuarios() {
     const token = localStorage.getItem("token");
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/api/usuarios/${selectedUser.id}`,
+        `https://proyecto-backend-web-1.onrender.com/api/usuarios/${selectedUser.id}`,
         {
           method: "DELETE",
           headers: {
