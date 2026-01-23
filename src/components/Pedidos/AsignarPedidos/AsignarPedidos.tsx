@@ -325,17 +325,14 @@ export default function AsignarPedidos() {
 
     const token = localStorage.getItem("token");
     try {
-      const res = await fetch(
-        "https://proyecto-backend-web-1.onrender.com/api/ventas",
-        {
-          method: "POST",
-          headers: {
-            Authorization: token ? `Bearer ${token}` : "",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
+      const res = await fetch("https://proyecto-backend-web-1.onrender.com/api/ventas", {
+        method: "POST",
+        headers: {
+          Authorization: token ? `Bearer ${token}` : "",
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify(payload),
+      });
       const body = await res.json().catch(() => null);
       if (res.ok) {
         // Guardar datos de la venta exitosa
@@ -526,17 +523,14 @@ export default function AsignarPedidos() {
     console.log("Enviando dirección:", payload);
 
     try {
-      const res = await fetch(
-        "https://proyecto-backend-web-1.onrender.com/api/directions",
-        {
-          method: "POST",
-          headers: {
-            Authorization: token ? `Bearer ${token}` : "",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
+      const res = await fetch("https://proyecto-backend-web-1.onrender.com/api/directions", {
+        method: "POST",
+        headers: {
+          Authorization: token ? `Bearer ${token}` : "",
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify(payload),
+      });
 
       console.log("Respuesta status:", res.status);
       const body = await res.json().catch(() => null);
