@@ -100,17 +100,7 @@ export default function Sidebar() {
                 <span>Analisis de Ventas</span>
               </Link>
             </li>
-            <li>
-              <Link
-                to="/dashboard/historial"
-                className={`d-flex align-items-center ${
-                  isActive("/dashboard/historial") ? "active-menu" : ""
-                }`}
-              >
-                <i className="bx bx-list-ul"></i>
-                <span>Lista de Pendientes</span>
-              </Link>
-            </li>
+            {/*
             <li>
               <Link
                 to="/dashboard/notificaciones"
@@ -121,7 +111,7 @@ export default function Sidebar() {
                 <i className="bx bx-bell"></i>
                 <span>Notificaciones y alertas</span>
               </Link>
-            </li>
+            </li>*/}
           </ul>
         </li>
 

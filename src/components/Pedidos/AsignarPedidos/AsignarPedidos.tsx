@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useState } from "react";
 import Nav from "../../Layout/Nav";
 import Sidebar from "../../Layout/Sidebar";
@@ -59,7 +60,13 @@ export default function AsignarPedidos() {
   >({});
 
   const [selectedMetodoPago, setSelectedMetodoPago] = useState<string>("");
-  const [selectedEstado, setSelectedEstado] = useState<string>("Pendiente");
+  // Estado automático: siempre "Entregado"
+  const [selectedEstado] = useState<string>("Entregado");
+  // Fecha automática: fecha actual del equipo
+  const [fecha] = useState<string>(() => {
+    const today = new Date();
+    return today.toISOString().split("T")[0];
+  });
   const [tipoEntrega, setTipoEntrega] = useState<string>("Envío");
   const [, setCiudad] = useState<string>("");
   const [, setCalle] = useState<string>("");
@@ -80,10 +87,11 @@ export default function AsignarPedidos() {
   const [successData, setSuccessData] = useState<Record<string, unknown>>({});
   const [errorMessage, setErrorMessage] = useState("");
   const [errorDetails, setErrorDetails] = useState<Record<string, string>>({});
-  const [direccionExitoData, setDireccionExitoData] = useState<Record<string, string>>({});
+  const [direccionExitoData, setDireccionExitoData] = useState<
+    Record<string, string>
+  >({});
 
-  useEffect(() => {
-  }, [showModalSuccess, showModalError]);
+  useEffect(() => {}, [showModalSuccess, showModalError]);
 
   useEffect(() => {
     const t = rows.reduce((s, r) => s + r.subtotal, 0);
@@ -101,29 +109,31 @@ export default function AsignarPedidos() {
     (async () => {
       try {
         const [pRes, uRes] = await Promise.all([
-          fetch("https://proyecto-backend-web-1.onrender.com/api/productos", { headers }),
-          fetch("https://proyecto-backend-web-1.onrender.com/api/usuarios", { headers }),
+          fetch("https://proyecto-backend-web-1.onrender.com/api/productos", {
+            headers,
+          }),
+          fetch("https://proyecto-backend-web-1.onrender.com/api/usuarios", {
+            headers,
+          }),
         ]);
         if (pRes.ok) {
           const pData = await pRes.json();
           // Normalizar id/nombre
           setProductos(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (pData || []).map((p: any) => ({
               id: Number(p.id ?? p.Id ?? p.id_producto),
               nombre: p.nombre ?? p.Nombre,
               costo_unit: Number(p.costo_unit ?? p.Costo_unit ?? 0),
-            }))
+            })),
           );
         }
         if (uRes.ok) {
           const uData = await uRes.json();
           setUsuarios(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (uData || []).map((u: any) => ({
               id: Number(u.id ?? u.Id ?? u.IdUsuario),
               nombre: u.nombre ?? (u.Nombre || u.correo),
-            }))
+            })),
           );
         }
       } catch (err) {
@@ -145,7 +155,7 @@ export default function AsignarPedidos() {
             Authorization: token ? `Bearer ${token}` : "",
             "Content-Type": "application/json",
           },
-        }
+        },
       );
       if (!res.ok) return;
       const data = await res.json();
@@ -189,11 +199,11 @@ export default function AsignarPedidos() {
               subtotal: Number(
                 (
                   (prod ? Number(prod.costo_unit ?? 0) : 0) * row.cantidad
-                ).toFixed(2)
+                ).toFixed(2),
               ),
             }
-          : row
-      )
+          : row,
+      ),
     );
   }
   function updateRowCantidad(id: string, cantidad: number) {
@@ -205,14 +215,14 @@ export default function AsignarPedidos() {
               cantidad,
               subtotal: Number((row.precioUnit * cantidad).toFixed(2)),
             }
-          : row
-      )
+          : row,
+      ),
     );
   }
 
   function handleProductoInputChange(rowId: string, text: string) {
     setRows((r) =>
-      r.map((row) => (row.id === rowId ? { ...row, productoName: text } : row))
+      r.map((row) => (row.id === rowId ? { ...row, productoName: text } : row)),
     );
     if (!text) {
       setProductoSuggestions((s) => ({ ...s, [rowId]: [] }));
@@ -248,7 +258,7 @@ export default function AsignarPedidos() {
             Authorization: token ? `Bearer ${token}` : "",
             "Content-Type": "application/json",
           },
-        }
+        },
       );
       if (!res.ok) {
         return { totalDisponible: 0, lotes: [] };
@@ -256,15 +266,15 @@ export default function AsignarPedidos() {
       const lotes = await res.json();
       const totalDisponible = (lotes as Array<{ Cantidad: number }>).reduce(
         (sum, lote) => sum + (lote.Cantidad || 0),
-        0
+        0,
       );
-      const lotesFormato = (lotes as Array<{ Lote: string; Cantidad: number; Estado: string }>).map(
-        (lote) => ({
-          nombre: lote.Lote,
-          cantidad: lote.Cantidad,
-          estado: lote.Estado,
-        })
-      );
+      const lotesFormato = (
+        lotes as Array<{ Lote: string; Cantidad: number; Estado: string }>
+      ).map((lote) => ({
+        nombre: lote.Lote,
+        cantidad: lote.Cantidad,
+        estado: lote.Estado,
+      }));
       return { totalDisponible, lotes: lotesFormato };
     } catch (err) {
       console.error("Error obteniendo lotes:", err);
@@ -301,6 +311,7 @@ export default function AsignarPedidos() {
 
     const payload = {
       id_usuario: Number(selectedUsuario),
+      fecha: fecha,
       metodo_pago: selectedMetodoPago || null,
       comprobante: selectedComprobante || null,
       id_direccion: tipoEntrega === "Recojo" ? null : Number(idDireccion),
@@ -314,14 +325,17 @@ export default function AsignarPedidos() {
 
     const token = localStorage.getItem("token");
     try {
-      const res = await fetch("https://proyecto-backend-web-1.onrender.com/api/ventas", {
-        method: "POST",
-        headers: {
-          Authorization: token ? `Bearer ${token}` : "",
-          "Content-Type": "application/json",
+      const res = await fetch(
+        "https://proyecto-backend-web-1.onrender.com/api/ventas",
+        {
+          method: "POST",
+          headers: {
+            Authorization: token ? `Bearer ${token}` : "",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
         },
-        body: JSON.stringify(payload),
-      });
+      );
       const body = await res.json().catch(() => null);
       if (res.ok) {
         // Guardar datos de la venta exitosa
@@ -365,7 +379,7 @@ export default function AsignarPedidos() {
           setSelectedMetodoPago("");
           setSelectedComprobante("");
           setRuc("");
-          setSelectedEstado("Pendiente");
+          // Estado y fecha son automáticos, no se resetean
           setTipoEntrega("Envío");
         }, 500);
       } else {
@@ -379,36 +393,38 @@ export default function AsignarPedidos() {
         if (res.status === 422 && body?.errors) {
           // Error de validación - Datos inválidos
           message = "❌ Datos inválidos. Por favor, revisa los campos";
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          Object.entries(body.errors).forEach(([field, msgs]: [string, any]) => {
-            const nombreCampo =
-              field === "id_usuario"
-                ? "👤 Usuario"
-                : field === "metodo_pago"
-                ? "💳 Método de Pago"
-                : field === "comprobante"
-                ? "📄 Comprobante"
-                : field === "id_direccion"
-                ? "📍 Dirección"
-                : field === "costo_total"
-                ? "💰 Costo Total"
-                : field === "estado"
-                ? "📊 Estado"
-                : field === "details" || field.includes("details")
-                ? "📦 Productos"
-                : field;
-            details[nombreCampo] = Array.isArray(msgs)
-              ? msgs[0]
-              : String(msgs);
-          });
+          Object.entries(body.errors).forEach(
+            ([field, msgs]: [string, any]) => {
+              const nombreCampo =
+                field === "id_usuario"
+                  ? "👤 Usuario"
+                  : field === "metodo_pago"
+                    ? "💳 Método de Pago"
+                    : field === "comprobante"
+                      ? "📄 Comprobante"
+                      : field === "id_direccion"
+                        ? "📍 Dirección"
+                        : field === "costo_total"
+                          ? "💰 Costo Total"
+                          : field === "estado"
+                            ? "📊 Estado"
+                            : field === "details" || field.includes("details")
+                              ? "📦 Productos"
+                              : field;
+              details[nombreCampo] = Array.isArray(msgs)
+                ? msgs[0]
+                : String(msgs);
+            },
+          );
         } else if (body?.code === "INSUFFICIENT_STOCK") {
           // Error de stock insuficiente
           message = "⚠️ Stock insuficiente";
           details["Producto"] = body.product_name || "Desconocido";
           details["Solicitado"] = String(body.requested) || "0";
           details["Disponible"] = String(body.available) || "0";
-          details["Diferencia"] = String((body.requested || 0) - (body.available || 0)) || "0";
-          
+          details["Diferencia"] =
+            String((body.requested || 0) - (body.available || 0)) || "0";
+
           // Obtener detalles de lotes disponibles
           if (body.product_id) {
             const lotesData = await obtenerDetallesLotes(body.product_id);
@@ -417,7 +433,9 @@ export default function AsignarPedidos() {
                 .map((l) => `${l.nombre}: ${l.cantidad} unidades`)
                 .join(" | ");
               details["Lotes Disponibles"] = lotesFormato;
-              details["Total Disponible (Lotes)"] = String(lotesData.totalDisponible);
+              details["Total Disponible (Lotes)"] = String(
+                lotesData.totalDisponible,
+              );
             }
           }
         } else if (body?.code === "MISSING_ADDRESS") {
@@ -430,15 +448,15 @@ export default function AsignarPedidos() {
         } else if (body?.code === "PRODUCT_NOT_FOUND") {
           // Producto no encontrado
           message = "🚫 Producto no encontrado";
-          details["Estado"] =
-            "Uno o más productos no existen en el sistema";
+          details["Estado"] = "Uno o más productos no existen en el sistema";
           details["Acción"] =
             "Revisa que los productos seleccionados sean válidos";
         } else if (body?.code === "PROCESSING_ERROR") {
           // Error en el procesamiento
           message = "⚠️ Error al procesar la venta";
           details["Tipo de Error"] = "Error interno del servidor";
-          details["Acción"] = "Contacta al administrador si el problema persiste";
+          details["Acción"] =
+            "Contacta al administrador si el problema persiste";
           details["Código de Error"] = body.code;
         } else if (res.status === 400) {
           // Errores de solicitud malformada
@@ -447,11 +465,13 @@ export default function AsignarPedidos() {
         } else if (res.status === 404) {
           // No encontrado
           message = "🚫 Recurso no encontrado";
-          details["Error"] = body?.message || "Verifica que todos los datos sean válidos";
+          details["Error"] =
+            body?.message || "Verifica que todos los datos sean válidos";
         } else if (res.status === 409) {
           // Conflicto (generalmente stock)
           message = "⚠️ Conflicto en la venta";
-          details["Problema"] = body?.message || "Problema con el stock o datos";
+          details["Problema"] =
+            body?.message || "Problema con el stock o datos";
         } else if (res.status === 500) {
           // Error del servidor
           message = "🔴 Error del servidor";
@@ -506,14 +526,17 @@ export default function AsignarPedidos() {
     console.log("Enviando dirección:", payload);
 
     try {
-      const res = await fetch("https://proyecto-backend-web-1.onrender.com/api/directions", {
-        method: "POST",
-        headers: {
-          Authorization: token ? `Bearer ${token}` : "",
-          "Content-Type": "application/json",
+      const res = await fetch(
+        "https://proyecto-backend-web-1.onrender.com/api/directions",
+        {
+          method: "POST",
+          headers: {
+            Authorization: token ? `Bearer ${token}` : "",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
         },
-        body: JSON.stringify(payload),
-      });
+      );
 
       console.log("Respuesta status:", res.status);
       const body = await res.json().catch(() => null);
@@ -573,7 +596,7 @@ export default function AsignarPedidos() {
     } catch (err) {
       console.error("Fetch error guardar dirección:", err);
       alert(
-        "Error de conexión al guardar la dirección. Verifica que el servidor esté en https://proyecto-backend-web-1.onrender.com"
+        "Error de conexión al guardar la dirección. Verifica que el servidor esté en https://proyecto-backend-web-1.onrender.com",
       );
     }
   }
@@ -732,16 +755,27 @@ export default function AsignarPedidos() {
                         )}
 
                         <div className="col-md-6">
-                          <label className="form-label">Estado</label>
-                          <select
-                            className="form-select"
-                            value={selectedEstado}
-                            onChange={(e) => setSelectedEstado(e.target.value)}
-                          >
-                            <option value="Pendiente">Pendiente</option>
-                            <option value="Entregado">Entregado</option>
-                            <option value="Cancelado">Cancelado</option>
-                          </select>
+                          <label className="form-label">
+                            Estado
+                            <span className="text-danger">*</span>
+                          </label>
+                          <div className="input-group">
+                            <input
+                              type="text"
+                              className="form-control"
+                              value={selectedEstado}
+                              disabled
+                            />
+                            <span
+                              className="input-group-text bg-success text-white fw-bold"
+                              title="El estado se establece automáticamente como Entregado para POS"
+                            >
+                              Automático
+                            </span>
+                          </div>
+                          <small className="text-muted">
+                            Todos los pedidos se crean como "Entregado" en POS.
+                          </small>
                         </div>
 
                         <div className="col-12 mt-2">
@@ -784,7 +818,7 @@ export default function AsignarPedidos() {
                                     onChange={(e) =>
                                       handleProductoInputChange(
                                         row.id,
-                                        e.target.value
+                                        e.target.value,
                                       )
                                     }
                                     placeholder="Buscar producto..."
@@ -810,13 +844,13 @@ export default function AsignarPedidos() {
                                               onClick={() =>
                                                 selectProductoSuggestion(
                                                   row.id,
-                                                  p
+                                                  p,
                                                 )
                                               }
                                             >
                                               {p.nombre}
                                             </li>
-                                          )
+                                          ),
                                         )}
                                       </ul>
                                     )}
@@ -831,7 +865,7 @@ export default function AsignarPedidos() {
                                   onChange={(e) =>
                                     updateRowCantidad(
                                       row.id,
-                                      Number(e.target.value || 1)
+                                      Number(e.target.value || 1),
                                     )
                                   }
                                 />
@@ -966,7 +1000,8 @@ export default function AsignarPedidos() {
                   if (showModalSuccess) setShowModalSuccess(false);
                   if (showModalError) setShowModalError(false);
                   if (showModalDireccion) setShowModalDireccion(false);
-                  if (showModalDireccionExito) setShowModalDireccionExito(false);
+                  if (showModalDireccionExito)
+                    setShowModalDireccionExito(false);
                 }}
               ></div>
             )}
@@ -986,13 +1021,18 @@ export default function AsignarPedidos() {
                 <div className="modal-content border-success shadow-lg">
                   <div className="modal-header bg-success text-white">
                     <h5 className="modal-title">
-                      <i className="bx bx-check-circle me-2" style={{ fontSize: "1.5rem" }}></i>
+                      <i
+                        className="bx bx-check-circle me-2"
+                        style={{ fontSize: "1.5rem" }}
+                      ></i>
                       ¡Venta Registrada Exitosamente!
                     </h5>
                   </div>
                   <div className="modal-body">
                     <div className="alert alert-success-light mb-3">
-                      <p className="mb-0 text-success fw-bold">{successMessage}</p>
+                      <p className="mb-0 text-success fw-bold">
+                        {successMessage}
+                      </p>
                     </div>
 
                     {Object.entries(successData).length > 0 && (
@@ -1002,22 +1042,25 @@ export default function AsignarPedidos() {
                           <tbody>
                             {Object.entries(successData).map(([key, value]) => (
                               <tr key={key}>
-                                <td className="fw-bold" style={{ width: "40%" }}>
+                                <td
+                                  className="fw-bold"
+                                  style={{ width: "40%" }}
+                                >
                                   {key === "usuario"
                                     ? "Cliente"
                                     : key === "metodo_pago"
-                                    ? "Método Pago"
-                                    : key === "cantidad_items"
-                                    ? "Items"
-                                    : key === "total"
-                                    ? "Total (S/)"
-                                    : key === "estado"
-                                    ? "Estado"
-                                    : key === "fecha"
-                                    ? "Fecha"
-                                    : key === "comprobante"
-                                    ? "Comprobante"
-                                    : key}
+                                      ? "Método Pago"
+                                      : key === "cantidad_items"
+                                        ? "Items"
+                                        : key === "total"
+                                          ? "Total (S/)"
+                                          : key === "estado"
+                                            ? "Estado"
+                                            : key === "fecha"
+                                              ? "Fecha"
+                                              : key === "comprobante"
+                                                ? "Comprobante"
+                                                : key}
                                   :
                                 </td>
                                 <td className="text-end">
@@ -1061,7 +1104,10 @@ export default function AsignarPedidos() {
                 <div className="modal-content border-danger shadow-lg">
                   <div className="modal-header bg-danger text-white">
                     <h5 className="modal-title">
-                      <i className="bx bx-error-circle me-2" style={{ fontSize: "1.5rem" }}></i>
+                      <i
+                        className="bx bx-error-circle me-2"
+                        style={{ fontSize: "1.5rem" }}
+                      ></i>
                       Error al crear la venta
                     </h5>
                   </div>
@@ -1082,7 +1128,7 @@ export default function AsignarPedidos() {
                                 <li key={idx} className="mb-1">
                                   <strong>{key}:</strong> {String(value)}
                                 </li>
-                              )
+                              ),
                             )}
                           </ul>
                         </div>
@@ -1118,7 +1164,10 @@ export default function AsignarPedidos() {
                 <div className="modal-content border-success shadow-lg">
                   <div className="modal-header bg-success text-white">
                     <h5 className="modal-title">
-                      <i className="bx bx-map-pin me-2" style={{ fontSize: "1.5rem" }}></i>
+                      <i
+                        className="bx bx-map-pin me-2"
+                        style={{ fontSize: "1.5rem" }}
+                      ></i>
                       Dirección Guardada
                     </h5>
                   </div>

@@ -66,10 +66,41 @@ export default function GestionProductos() {
   const [selectedProductoParaLotes, setSelectedProductoParaLotes] =
     useState<Producto | null>(null);
   const [refreshProductos, setRefreshProductos] = useState(false);
+  // Estado para productos que pueden ser eliminados
+  const [productosEliminables, setProductosEliminables] = useState<Set<string>>(
+    new Set(),
+  );
 
   // Obtener nombre de categoría por ID
   const getCategoryName = (idCategoria?: string) =>
     categorias.find((c) => c.id === idCategoria)?.nombre || idCategoria || "";
+
+  // Verificar si un producto puede ser eliminado (sin lotes ni ventas)
+  const verificarEliminabilidad = async (productoId: string) => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(
+        `https://proyecto-backend-web-1.onrender.com/api/productos/${productoId}/can-delete`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      if (!res.ok) {
+        return;
+      }
+
+      const data = await res.json();
+      if (data.can_delete) {
+        setProductosEliminables((prev) => new Set([...prev, productoId]));
+      }
+    } catch (error) {
+      console.error("Error verificando eliminabilidad:", error);
+    }
+  };
 
   // Fetch productos desde la API
   const fetchProductos = async () => {
@@ -127,12 +158,15 @@ export default function GestionProductos() {
   const fetchCategorias = async () => {
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(`https://proyecto-backend-web-1.onrender.com/api/categorias`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
+      const response = await fetch(
+        `https://proyecto-backend-web-1.onrender.com/api/categorias`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
         },
-      });
+      );
 
       if (!response.ok) {
         setCategorias([]);
@@ -273,13 +307,16 @@ export default function GestionProductos() {
     setMensajeTipo("");
     const token = localStorage.getItem("token");
     try {
-      const res = await fetch(`https://proyecto-backend-web-1.onrender.com/api/productos/${id}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: token ? `Bearer ${token}` : "",
-          "Content-Type": "application/json",
+      const res = await fetch(
+        `https://proyecto-backend-web-1.onrender.com/api/productos/${id}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: token ? `Bearer ${token}` : "",
+            "Content-Type": "application/json",
+          },
         },
-      });
+      );
       const body = await res.json().catch(() => null);
       if (res.ok) {
         await fetchProductos();
@@ -331,6 +368,16 @@ export default function GestionProductos() {
     categoryFilter,
     statusFilter,
   ]);
+
+  // Verificar eliminabilidad de cada producto cuando se cargan
+  useEffect(() => {
+    if (productos.length > 0) {
+      setProductosEliminables(new Set()); // Limpiar estado anterior
+      productos.forEach((p) => {
+        verificarEliminabilidad(p.id);
+      });
+    }
+  }, [productos]);
 
   useEffect(() => {
     if (refreshProductos) {
@@ -597,16 +644,31 @@ export default function GestionProductos() {
                                 <i className="bx bx-edit"></i>
                               </button>
 
-                              <button
-                                className="btn-action-delete"
-                                onClick={() => {
-                                  setDeleteTarget(producto);
-                                  setShowDeleteModal(true);
-                                }}
-                                title="Eliminar producto"
-                              >
-                                <i className="bx bx-trash"></i>
-                              </button>
+                              {/* Botón eliminar - Solo si puede ser eliminado */}
+                              {productosEliminables.has(producto.id) ? (
+                                <button
+                                  className="btn-action-delete"
+                                  onClick={() => {
+                                    setDeleteTarget(producto);
+                                    setShowDeleteModal(true);
+                                  }}
+                                  title="Eliminar producto"
+                                >
+                                  <i className="bx bx-trash"></i>
+                                </button>
+                              ) : (
+                                <button
+                                  className="btn-action-delete"
+                                  disabled
+                                  title="No se puede eliminar: producto vinculado a lotes o ventas"
+                                  style={{
+                                    opacity: 0.5,
+                                    cursor: "not-allowed",
+                                  }}
+                                >
+                                  <i className="bx bx-trash"></i>
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -717,6 +779,7 @@ export default function GestionProductos() {
                 </div>
               </div>
             )}
+
             {/* Modal Confirmación Eliminar */}
             {showDeleteModal && deleteTarget && (
               <div className="modal show d-block" tabIndex={-1}>

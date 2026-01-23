@@ -23,7 +23,7 @@ Chart.register(
   LineElement,
   ArcElement,
   Tooltip,
-  Legend
+  Legend,
 );
 
 function Analisis() {
@@ -42,9 +42,12 @@ function Analisis() {
     const token = localStorage.getItem("token");
     (async () => {
       try {
-        const res = await fetch("https://proyecto-backend-web-1.onrender.com/api/categorias", {
-          headers: { Authorization: token ? `Bearer ${token}` : "" },
-        });
+        const res = await fetch(
+          "https://proyecto-backend-web-1.onrender.com/api/categorias",
+          {
+            headers: { Authorization: token ? `Bearer ${token}` : "" },
+          },
+        );
         if (!res.ok) return;
         const data = await res.json();
         setCategories(Array.isArray(data) ? data : []);
@@ -66,7 +69,7 @@ function Analisis() {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       if (!response.ok) {
@@ -104,7 +107,7 @@ function Analisis() {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       if (!response.ok) {
@@ -248,9 +251,7 @@ function Analisis() {
                         <p className="mb-0 text-white">Ganancias del Mes</p>
                         <h4 className="my-1 text-white">S/. 8,950</h4>
                       </div>
-                      <div>
-                        <i className="bx bx-dollar text-white fs-3"></i>
-                      </div>
+                      <div></div>
                     </div>
                   </div>
                 </div>

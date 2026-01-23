@@ -91,12 +91,15 @@ function GestionPedidos() {
   const fetchUsuarios = async (): Promise<Map<number, string>> => {
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch("https://proyecto-backend-web-1.onrender.com/api/usuarios", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
+      const response = await fetch(
+        "https://proyecto-backend-web-1.onrender.com/api/usuarios",
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
         },
-      });
+      );
 
       if (!response.ok) {
         return new Map();
@@ -150,36 +153,39 @@ function GestionPedidos() {
       }
 
       const data = await response.json();
-      
+
       // Normalizar estructura de datos desde el backend
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const normalizedData = (Array.isArray(data) ? data : []).map((item: any) => {
-        const userId = item.id_usuario || item.Id_Usuario;
-        const userName = usuariosMap.get(userId) || 'Sin cliente';
-        
-        return {
-          id: item.id || item.Id,
-          id_usuario: userId,
-          metodo_pago: item.metodo_pago || item.Metodo_Pago,
-          comprobante: item.comprobante || item.Comprobante,
-          id_direccion: item.id_direccion || item.Id_Direccion,
-          fecha: item.fecha || item.Fecha,
-          costo_total: typeof (item.costo_total || item.Costo_total) === 'string' 
-            ? parseFloat(item.costo_total || item.Costo_total) 
-            : (item.costo_total || item.Costo_total),
-          estado: item.estado || item.Estado,
-          tipo_entrega: item.tipo_entrega || item.Tipo_Entrega,
-          // Relaciones
-          user: {
-            id: userId,
-            nombre: userName,
-            correo: item.user?.correo,
-          },
-          direction: item.direction || null,
-          details: item.details || [],
-        };
-      });
-      
+      const normalizedData = (Array.isArray(data) ? data : []).map(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (item: any) => {
+          const userId = item.id_usuario || item.Id_Usuario;
+          const userName = usuariosMap.get(userId) || "Sin cliente";
+
+          return {
+            id: item.id || item.Id,
+            id_usuario: userId,
+            metodo_pago: item.metodo_pago || item.Metodo_Pago,
+            comprobante: item.comprobante || item.Comprobante,
+            id_direccion: item.id_direccion || item.Id_Direccion,
+            fecha: item.fecha || item.Fecha,
+            costo_total:
+              typeof (item.costo_total || item.Costo_total) === "string"
+                ? parseFloat(item.costo_total || item.Costo_total)
+                : item.costo_total || item.Costo_total,
+            estado: item.estado || item.Estado,
+            tipo_entrega: item.tipo_entrega || item.Tipo_Entrega,
+            // Relaciones
+            user: {
+              id: userId,
+              nombre: userName,
+              correo: item.user?.correo,
+            },
+            direction: item.direction || null,
+            details: item.details || [],
+          };
+        },
+      );
+
       setVentas(normalizedData);
     } catch (err) {
       console.error("Error fetching ventas:", err);
@@ -212,39 +218,61 @@ function GestionPedidos() {
       }
 
       const data = await response.json();
-      console.log("Datos recibidos del backend:", data);
-      
+
       // Normalizar estructura de la API con detalles de venta y lotes
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const normalizedDetails = (data.details || data.Details || []).map((detail: any) => ({
-        id: detail.id || detail.Id,
-        id_venta: detail.id_venta || detail.Id_Venta,
-        id_producto: detail.id_producto || detail.Id_Producto,
-        cantidad: detail.cantidad || detail.Cantidad,
-        costo: typeof (detail.costo || detail.Costo) === 'string'
-          ? parseFloat(detail.costo || detail.Costo)
-          : (detail.costo || detail.Costo),
-        product: detail.product ? {
-          id: detail.product.id || detail.product.Id,
-          nombre: detail.product.nombre || detail.product.Nombre || detail.product.name,
-          costo_unit: detail.product.costo_unit || detail.product.Costo_Unit || detail.product.precio_unit,
-          descripcion: detail.product.descripcion || detail.product.Descripcion || detail.product.description,
-        } : undefined,
+      const normalizedDetails = (data.details || data.Details || []).map(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        detailLotes: (detail.detailLotes || detail.Detail_Lotes || []).map((dl: any) => ({
-          id: dl.id || dl.Id,
-          id_detalle_venta: dl.id_detalle_venta || dl.Id_Detalle_Venta,
-          id_lote: dl.id_lote || dl.Id_Lote,
-          cantidad: dl.cantidad || dl.Cantidad,
-          lote: dl.lote ? {
-            id: dl.lote.id || dl.lote.Id,
-            nombre: dl.lote.nombre || dl.lote.Lote,
-            fecha_registro: dl.lote.fecha_registro || dl.lote.Fecha_Registro,
-            cantidad: dl.lote.cantidad || dl.lote.Cantidad,
-            estado: dl.lote.estado || dl.lote.Estado,
-          } : undefined,
-        })),
-      }));
+        (detail: any) => ({
+          id: detail.id || detail.Id,
+          id_venta: detail.id_venta || detail.Id_Venta,
+          id_producto: detail.id_producto || detail.Id_Producto,
+          cantidad: detail.cantidad || detail.Cantidad,
+          costo:
+            typeof (detail.costo || detail.Costo) === "string"
+              ? parseFloat(detail.costo || detail.Costo)
+              : detail.costo || detail.Costo,
+          product: detail.product
+            ? {
+                id: detail.product.id || detail.product.Id,
+                nombre:
+                  detail.product.nombre ||
+                  detail.product.Nombre ||
+                  detail.product.name,
+                costo_unit:
+                  detail.product.costo_unit ||
+                  detail.product.Costo_Unit ||
+                  detail.product.precio_unit,
+                descripcion:
+                  detail.product.descripcion ||
+                  detail.product.Descripcion ||
+                  detail.product.description,
+              }
+            : undefined,
+          detailLotes: (
+            detail.detailLotes ||
+            detail.Detail_Lotes ||
+            detail.detail_lotes ||
+            []
+          )
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            .map((dl: any) => ({
+              id: dl.id || dl.Id,
+              id_detalle_venta: dl.id_detalle_venta || dl.Id_Detalle_Venta,
+              id_lote: dl.id_lote || dl.Id_Lote,
+              cantidad: dl.cantidad || dl.Cantidad,
+              lote: dl.lote
+                ? {
+                    id: dl.lote.id || dl.lote.Id,
+                    nombre: dl.lote.nombre || dl.lote.Lote,
+                    fecha_registro:
+                      dl.lote.fecha_registro || dl.lote.Fecha_Registro,
+                    cantidad: dl.lote.cantidad || dl.lote.Cantidad,
+                    estado: dl.lote.estado || dl.lote.Estado,
+                  }
+                : undefined,
+            })),
+        }),
+      );
 
       const normalized = {
         ...data,
@@ -254,28 +282,39 @@ function GestionPedidos() {
         comprobante: data.comprobante || data.Comprobante,
         id_direccion: data.id_direccion || data.Id_Direccion,
         fecha: data.fecha || data.Fecha,
-        costo_total: typeof (data.costo_total || data.Costo_total) === "string"
-          ? parseFloat(data.costo_total || data.Costo_total)
-          : (data.costo_total || data.Costo_total),
+        costo_total:
+          typeof (data.costo_total || data.Costo_total) === "string"
+            ? parseFloat(data.costo_total || data.Costo_total)
+            : data.costo_total || data.Costo_total,
         estado: data.estado || data.Estado,
         tipo_entrega: data.tipo_entrega || data.Tipo_Entrega,
-        user: data.user ? {
-          id: data.user.id || data.user.Id,
-          nombre: data.user.nombre || data.user.Nombre || data.user.name,
-          correo: data.user.correo || data.user.Correo || data.user.email,
-          rol: data.user.rol || data.user.Rol,
-          estado: data.user.estado || data.user.Estado || data.user.status,
-        } : undefined,
-        direction: data.direction ? {
-          id: data.direction.id || data.direction.Id,
-          ciudad: data.direction.ciudad || data.direction.Ciudad || data.direction.city,
-          calle: data.direction.calle || data.direction.Calle || data.direction.street,
-          referencia: data.direction.referencia || data.direction.Referencia || data.direction.reference,
-        } : null,
+        user: data.user
+          ? {
+              id: data.user.id || data.user.Id,
+              nombre: data.user.nombre || data.user.Nombre || data.user.name,
+              correo: data.user.correo || data.user.Correo || data.user.email,
+              rol: data.user.estado || data.user.Rol,
+            }
+          : undefined,
+        direction: data.direction
+          ? {
+              id: data.direction.id || data.direction.Id,
+              ciudad:
+                data.direction.ciudad ||
+                data.direction.Ciudad ||
+                data.direction.city,
+              calle:
+                data.direction.calle ||
+                data.direction.Calle ||
+                data.direction.street,
+              referencia:
+                data.direction.referencia ||
+                data.direction.Referencia ||
+                data.direction.reference,
+            }
+          : null,
         details: normalizedDetails,
       };
-      
-      console.log("Datos normalizados:", normalized);
       setSelectedVenta(normalized);
     } catch (err) {
       console.error("Error fetching venta detail:", err);
@@ -640,256 +679,247 @@ function GestionPedidos() {
       </div>
 
       {/* MODAL DE DETALLES */}
-      <div
-        className={`modal fade ${showDetailModal ? "show" : ""}`}
-        style={{ display: showDetailModal ? "block" : "none" }}
-        tabIndex={-1}
-        aria-labelledby="detalleVentaModal"
-        aria-hidden={!showDetailModal}
-      >
-        <div className="modal-dialog modal-lg">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h5 className="modal-title" id="detalleVentaModal">
-                Detalle de Venta #{selectedVenta?.id}
-              </h5>
-              <button
-                type="button"
-                className="btn-close"
-                onClick={handleCloseDetailModal}
-              ></button>
-            </div>
+      {showDetailModal && (
+        <div className="modal show d-block" tabIndex={-1}>
+          <div className="modal-dialog modal-dialog-centered modal-lg">
+            <div className="modal-content">
+              <div className="modal-header bg-primary text-white">
+                <h5 className="modal-title" id="detalleVentaModal">
+                  Detalle de Venta #{selectedVenta?.id}
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close btn-close-white"
+                  onClick={handleCloseDetailModal}
+                  aria-label="Close"
+                ></button>
+              </div>
 
-            <div className="modal-body">
-              {loadingDetail ? (
-                <div style={{ textAlign: "center", padding: "2em" }}>
-                  <div className="spinner-border text-primary" role="status">
-                    <span className="visually-hidden">Cargando...</span>
-                  </div>
-                  <div
-                    style={{
-                      marginTop: "1em",
-                      color: "#0d6efd",
-                      fontWeight: "bold",
-                    }}
-                  >
-                    Cargando detalles...
-                  </div>
-                </div>
-              ) : selectedVenta ? (
-                <>
-                  {/* INFORMACIÓN GENERAL */}
-                  <div className="row mb-4">
-                    <div className="col-md-6">
-                      <h6 className="fw-bold text-muted mb-2">
-                        Información General
-                      </h6>
-                      <p className="mb-1">
-                        <strong>ID Venta:</strong> #{selectedVenta.id}
-                      </p>
-                      <p className="mb-1">
-                        <strong>Cliente:</strong>{" "}
-                        {selectedVenta.user?.nombre
-                          ? selectedVenta.user.nombre
-                          : `Usuario ID: ${selectedVenta.id_usuario}`}
-                      </p>
-                      <p className="mb-1">
-                        <strong>Email:</strong>{" "}
-                        {selectedVenta.user?.correo || "N/A"}
-                      </p>
-                      <p className="mb-1">
-                        <strong>Rol:</strong>{" "}
-                        {selectedVenta.user?.rol || "N/A"}
-                      </p>
-                      <p className="mb-1">
-                        <strong>Fecha:</strong>{" "}
-                        {formatFecha(selectedVenta.fecha)}
-                      </p>
+              <div className="modal-body">
+                {loadingDetail ? (
+                  <div style={{ textAlign: "center", padding: "2em" }}>
+                    <div className="spinner-border text-primary" role="status">
+                      <span className="visually-hidden">Cargando...</span>
                     </div>
-                    <div className="col-md-6">
-                      <h6 className="fw-bold text-muted mb-2">
-                        Información de Pago
-                      </h6>
-                      <p className="mb-1">
-                        <strong>Método de Pago:</strong>{" "}
-                        {selectedVenta.metodo_pago}
-                      </p>
-                      <p className="mb-1">
-                        <strong>Comprobante:</strong>{" "}
-                        {selectedVenta.comprobante}
-                      </p>
-                      <p className="mb-1">
-                        <strong>Estado:</strong>{" "}
-                        <span
-                          className={`badge badge-${selectedVenta.estado.toLowerCase()}`}
-                        >
-                          {selectedVenta.estado}
-                        </span>
-                      </p>
-                      <p className="mb-1">
-                        <strong>Total:</strong> S/{" "}
-                        {formatPrice(selectedVenta.costo_total)}
-                      </p>
+                    <div
+                      style={{
+                        marginTop: "1em",
+                        color: "#0d6efd",
+                        fontWeight: "bold",
+                      }}
+                    >
+                      Cargando detalles...
                     </div>
                   </div>
-
-                  {/* DIRECCIÓN DE ENTREGA */}
-                  {selectedVenta.direction && (
+                ) : selectedVenta ? (
+                  <>
+                    {/* INFORMACIÓN GENERAL */}
                     <div className="row mb-4">
-                      <div className="col-md-12">
+                      <div className="col-md-6">
                         <h6 className="fw-bold text-muted mb-2">
-                          Dirección de Entrega
+                          Información General
                         </h6>
                         <p className="mb-1">
-                          <strong>Ciudad:</strong>{" "}
-                          {selectedVenta.direction.ciudad || "N/A"}
+                          <strong>ID Venta:</strong> #{selectedVenta.id}
                         </p>
                         <p className="mb-1">
-                          <strong>Calle:</strong>{" "}
-                          {selectedVenta.direction.calle || "N/A"}
+                          <strong>Cliente:</strong>{" "}
+                          {selectedVenta.user?.nombre
+                            ? selectedVenta.user.nombre
+                            : `Usuario ID: ${selectedVenta.id_usuario}`}
                         </p>
                         <p className="mb-1">
-                          <strong>Referencia:</strong>{" "}
-                          {selectedVenta.direction.referencia || "N/A"}
+                          <strong>Email:</strong>{" "}
+                          {selectedVenta.user?.correo || "N/A"}
+                        </p>
+                        <p className="mb-1">
+                          <strong>Rol:</strong>{" "}
+                          {selectedVenta.user?.rol || "N/A"}
+                        </p>
+                        <p className="mb-1">
+                          <strong>Fecha:</strong>{" "}
+                          {formatFecha(selectedVenta.fecha)}
+                        </p>
+                      </div>
+                      <div className="col-md-6">
+                        <h6 className="fw-bold text-muted mb-2">
+                          Información de Pago
+                        </h6>
+                        <p className="mb-1">
+                          <strong>Método de Pago:</strong>{" "}
+                          {selectedVenta.metodo_pago}
+                        </p>
+                        <p className="mb-1">
+                          <strong>Comprobante:</strong>{" "}
+                          {selectedVenta.comprobante}
+                        </p>
+                        <p className="mb-1">
+                          <strong>Estado:</strong>{" "}
+                          <span
+                            className={`badge badge-${selectedVenta.estado.toLowerCase()}`}
+                          >
+                            {selectedVenta.estado}
+                          </span>
+                        </p>
+                        <p className="mb-1">
+                          <strong>Total:</strong> S/{" "}
+                          {formatPrice(selectedVenta.costo_total)}
                         </p>
                       </div>
                     </div>
-                  )}
 
-                  {/* PRODUCTOS */}
-                  <div className="row">
-                    <div className="col-md-12">
-                      <h6 className="fw-bold text-muted mb-3">
-                        Productos Comprados
-                      </h6>
-                      <div className="table-responsive">
-                        <table className="table table-sm table-bordered">
-                          <thead className="table-light">
-                            <tr>
-                              <th>Producto</th>
-                              <th className="text-center">Cantidad</th>
-                              <th className="text-end">Costo Unit.</th>
-                              <th className="text-end">Subtotal</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {selectedVenta.details &&
-                            selectedVenta.details.length > 0 ? (
-                              selectedVenta.details.map((detail, idx) => (
-                                <tr key={`${detail.id}-${idx}`}>
-                                  <td>
-                                    {detail.product?.nombre
-                                      ? detail.product.nombre
-                                      : `Producto ID: ${detail.id_producto}`}
-                                  </td>
-                                  <td className="text-center">
-                                    {detail.cantidad}
-                                  </td>
-                                  <td className="text-end">
-                                    S/ {formatPrice(detail.costo)}
-                                  </td>
-                                  <td className="text-end fw-bold">
-                                    S/{" "}
-                                    {formatPrice(
-                                      detail.costo * detail.cantidad,
-                                    )}
-                                  </td>
-                                </tr>
-                              ))
-                            ) : (
-                              <tr key="sin-productos">
-                                <td colSpan={4} className="text-center">
-                                  Sin productos
-                                </td>
-                              </tr>
-                            )}
-                          </tbody>
-                        </table>
+                    {/* DIRECCIÓN DE ENTREGA */}
+                    {selectedVenta.direction && (
+                      <div className="row mb-4">
+                        <div className="col-md-12">
+                          <h6 className="fw-bold text-muted mb-2">
+                            Dirección de Entrega
+                          </h6>
+                          <p className="mb-1">
+                            <strong>Ciudad:</strong>{" "}
+                            {selectedVenta.direction.ciudad || "N/A"}
+                          </p>
+                          <p className="mb-1">
+                            <strong>Calle:</strong>{" "}
+                            {selectedVenta.direction.calle || "N/A"}
+                          </p>
+                          <p className="mb-1">
+                            <strong>Referencia:</strong>{" "}
+                            {selectedVenta.direction.referencia || "N/A"}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  </div>
+                    )}
 
-                  {/* DETALLES DE LOTES */}
-                  {selectedVenta.details &&
-                  selectedVenta.details.some(
-                    (d) => d.detailLotes && d.detailLotes.length > 0,
-                  ) && (
-                    <div className="row mt-4">
+                    {/* PRODUCTOS + LOTES (TABLA UNIFICADA) */}
+                    <div className="row mt-3">
                       <div className="col-md-12">
                         <h6 className="fw-bold text-muted mb-3">
-                          Detalles de Lotes
+                          Detalle de Productos y Lotes
                         </h6>
+
                         <div className="table-responsive">
                           <table className="table table-sm table-bordered">
                             <thead className="table-light">
                               <tr>
                                 <th>Producto</th>
+                                <th className="text-center">Cant. Venta</th>
+                                <th className="text-end">Costo Unit.</th>
+                                <th className="text-end">Subtotal</th>
                                 <th>Lote</th>
-                                <th className="text-center">Cantidad</th>
-                                <th>Estado Lote</th>
-                                <th>Fecha Registro</th>
+                                <th className="text-center">Cant. Lote</th>
                               </tr>
                             </thead>
+
                             <tbody>
-                              {selectedVenta.details.map((detail, idx) =>
-                                detail.detailLotes && detail.detailLotes.length > 0
-                                  ? detail.detailLotes.map((lote, lotIdx) => (
-                                      <tr key={`${idx}-${lotIdx}`}>
+                              {selectedVenta.details &&
+                              selectedVenta.details.length > 0 ? (
+                                selectedVenta.details.map((detail, idx) => {
+                                  // Si el producto NO tiene lotes asociados
+                                  if (
+                                    !detail.detailLotes ||
+                                    detail.detailLotes.length === 0
+                                  ) {
+                                    return (
+                                      <tr key={`detalle-${idx}`}>
                                         <td>
                                           {detail.product?.nombre ||
-                                            "Producto"}
-                                        </td>
-                                        <td>
-                                          <span className="badge bg-info">
-                                            {lote.lote?.nombre || lote.lote?.Lote || "N/A"}
-                                          </span>
+                                            `Producto ID: ${detail.id_producto}`}
                                         </td>
                                         <td className="text-center">
-                                          {lote.cantidad} unidades
+                                          {detail.cantidad}
                                         </td>
-                                        <td>
-                                          <span
-                                            className={`badge badge-${((lote.lote?.estado || lote.lote?.Estado) || "").toLowerCase()}`}
-                                          >
-                                            {lote.lote?.estado || lote.lote?.Estado || "N/A"}
-                                          </span>
+                                        <td className="text-end">
+                                          S/ {formatPrice(detail.costo)}
                                         </td>
-                                        <td>
-                                          {(() => {
-                                            const fecha = lote.lote?.fecha_registro || lote.lote?.Fecha_Registro;
-                                            return fecha ? new Date(fecha).toLocaleDateString("es-PE") : "N/A";
-                                          })()}
+                                        <td className="text-end fw-bold">
+                                          S/{" "}
+                                          {formatPrice(
+                                            detail.costo * detail.cantidad,
+                                          )}
+                                        </td>
+                                        <td
+                                          colSpan={4}
+                                          className="text-center text-muted"
+                                        >
+                                          Sin lotes asociados
                                         </td>
                                       </tr>
-                                    ))
-                                  : null,
+                                    );
+                                  }
+
+                                  // Si el producto TIENE uno o varios lotes
+                                  return detail.detailLotes.map(
+                                    (lote, lotIdx) => (
+                                      <tr key={`detalle-${idx}-lote-${lotIdx}`}>
+                                        <td>
+                                          {detail.product?.nombre ||
+                                            `Producto ID: ${detail.id_producto}`}
+                                        </td>
+
+                                        <td className="text-center">
+                                          {detail.cantidad}
+                                        </td>
+
+                                        <td className="text-end">
+                                          S/ {formatPrice(detail.costo)}
+                                        </td>
+
+                                        <td className="text-end fw-bold">
+                                          S/{" "}
+                                          {formatPrice(
+                                            detail.costo * detail.cantidad,
+                                          )}
+                                        </td>
+
+                                        <td>
+                                          <span className="badge bg-info">
+                                            {lote.lote?.nombre ||
+                                              lote.lote?.Lote ||
+                                              "N/A"}
+                                          </span>
+                                        </td>
+
+                                        <td className="text-center">
+                                          {lote.cantidad} Unidades
+                                        </td>
+                                      </tr>
+                                    ),
+                                  );
+                                })
+                              ) : (
+                                <tr>
+                                  <td colSpan={8} className="text-center">
+                                    Sin productos registrados
+                                  </td>
+                                </tr>
                               )}
                             </tbody>
                           </table>
                         </div>
                       </div>
                     </div>
-                  )}
-                </>
-              ) : (
-                <div className="alert alert-warning">
-                  No se pudieron cargar los detalles
-                </div>
-              )}
-            </div>
+                  </>
+                ) : (
+                  <div className="alert alert-warning">
+                    No se pudieron cargar los detalles
+                  </div>
+                )}
+              </div>
 
-            <div className="modal-footer">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={handleCloseDetailModal}
-              >
-                Cerrar
-              </button>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={handleCloseDetailModal}
+                >
+                  Cerrar
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Backdrop para el modal */}
       {showDetailModal && (
