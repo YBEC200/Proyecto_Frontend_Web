@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import Nav from "../../Layout/Nav";
 import Sidebar from "../../Layout/Sidebar";
 import "./Analisis.css";
-import { Bar, Doughnut } from "react-chartjs-2";
+import { Bar, Doughnut, Line } from "react-chartjs-2";
 import {
   Chart,
   CategoryScale,
@@ -30,25 +30,32 @@ function Analisis() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [productos, setProductos] = useState<any[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [lotes, setLotes] = useState<any[]>([]);
+  const [lotes, setLotes] = useState<any>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
   const [categories, setCategories] = useState<
     { Id: number; Nombre: string }[]
   >([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [ventas, setVentas] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loadingProductos, setLoadingProductos] = useState(false);
+  const [loadingClientes, setLoadingClientes] = useState(false);
+  const [loadingPagos, setLoadingPagos] = useState(false);
+  const [loadingProductosComprados, setLoadingProductosComprados] =
+    useState(false);
+  const [loadingVentasPorMes, setLoadingVentasPorMes] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [ventasPorMesData, setVentasPorMesData] = useState<any>(null);
+  const [selectedYear, setSelectedYear] = useState<number>(
+    new Date().getFullYear(),
+  );
 
   useEffect(() => {
     const token = localStorage.getItem("token");
     (async () => {
       try {
-        const res = await fetch(
-          "https://proyecto-backend-web-1.onrender.com/api/categorias",
-          {
-            headers: { Authorization: token ? `Bearer ${token}` : "" },
-          },
-        );
+        const res = await fetch("http://127.0.0.1:8000/api/categorias", {
+          headers: { Authorization: token ? `Bearer ${token}` : "" },
+        });
         if (!res.ok) return;
         const data = await res.json();
         setCategories(Array.isArray(data) ? data : []);
@@ -58,42 +65,50 @@ function Analisis() {
     })();
   }, []);
 
-  const fetchLotes = useCallback(async () => {
-    const token = localStorage.getItem("token");
-
+  // Obtener lotes activos por categoría (reemplaza obtenerDatosLotesTotales)
+  const fetchLotesActivosPorCategoria = useCallback(async () => {
+    setLoadingProductos(true);
     try {
+      const token = localStorage.getItem("token");
+      const params = new URLSearchParams();
+      if (selectedCategoryId) {
+        params.append("category_id", selectedCategoryId);
+      }
+
       const response = await fetch(
-        `https://proyecto-backend-web-1.onrender.com/api/lotes`,
+        `http://127.0.0.1:8000/api/estadisticas/lotes-activos-por-categoria?${params.toString()}`,
         {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: token ? `Bearer ${token}` : "",
             "Content-Type": "application/json",
           },
         },
       );
 
       if (!response.ok) {
-        console.error("Error response:", response.status);
-        setLotes([]);
-        setLoading(false);
+        setLotes(null);
+        setLoadingProductos(false);
         return;
       }
 
       const data = await response.json();
-      setLotes(Array.isArray(data) ? data : []);
-      const lotesArray = Array.isArray(data) ? data : [];
-
-      setLotes(lotesArray);
-    } catch (error) {
-      console.error("Error fetching lotes:", error);
-      setLotes([]);
+      // Convertir data a números para evitar concatenación en reduce
+      const normalizedData = {
+        ...data,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        data: (data?.data || []).map((val: any) => Number(val) || 0),
+      };
+      setLotes(normalizedData);
+    } catch (err) {
+      console.error("Error fetching lotes activos:", err);
+      setLotes(null);
     } finally {
-      setLoading(false);
+      setLoadingProductos(false);
     }
-  }, []);
+  }, [selectedCategoryId]);
 
   const fetchProductos = useCallback(async () => {
-    setLoading(true);
+    setLoadingProductos(true);
     const token = localStorage.getItem("token");
     const params = new URLSearchParams();
 
@@ -104,7 +119,7 @@ function Analisis() {
 
     try {
       const response = await fetch(
-        `https://proyecto-backend-web-1.onrender.com/api/productos?${params.toString()}`,
+        `http://127.0.0.1:8000/api/productos?${params.toString()}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -115,8 +130,8 @@ function Analisis() {
 
       if (!response.ok) {
         setProductos([]);
-        setLotes([]);
-        setLoading(false);
+        setLotes(null);
+        setLoadingProductos(false);
         return;
       }
 
@@ -134,34 +149,35 @@ function Analisis() {
       setProductos(normalized);
 
       if (normalized.length > 0) {
-        await fetchLotes();
+        await fetchLotesActivosPorCategoria();
       } else {
-        setLoading(false);
+        setLoadingProductos(false);
       }
     } catch (error) {
       console.error("Error fetching productos:", error);
       setProductos([]);
-      setLotes([]);
-      setLoading(false);
+      setLotes(null);
+      setLoadingProductos(false);
     }
-  }, [selectedCategoryId, fetchLotes]);
+  }, [selectedCategoryId, fetchLotesActivosPorCategoria]);
 
   // Obtener ventas (para gráficos de clientes y tipo de pago)
   const fetchVentas = useCallback(async () => {
+    setLoadingClientes(true);
+    setLoadingPagos(true);
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(
-        `https://proyecto-backend-web-1.onrender.com/api/ventas`,
-        {
-          headers: {
-            Authorization: token ? `Bearer ${token}` : "",
-            "Content-Type": "application/json",
-          },
+      const response = await fetch(`http://127.0.0.1:8000/api/ventas`, {
+        headers: {
+          Authorization: token ? `Bearer ${token}` : "",
+          "Content-Type": "application/json",
         },
-      );
+      });
 
       if (!response.ok) {
         setVentas([]);
+        setLoadingClientes(false);
+        setLoadingPagos(false);
         return;
       }
 
@@ -186,52 +202,98 @@ function Analisis() {
     } catch (err) {
       console.error("Error fetching ventas:", err);
       setVentas([]);
+    } finally {
+      setLoadingClientes(false);
+      setLoadingPagos(false);
     }
   }, []);
 
+  // Obtener categorías más vendidas (reemplaza obtenerProductosComprados)
+  const fetchCategoriasMasVendidas = useCallback(async () => {
+    setLoadingProductosComprados(true);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(
+        `http://127.0.0.1:8000/api/estadisticas/categorias-mas-vendidas`,
+        {
+          headers: {
+            Authorization: token ? `Bearer ${token}` : "",
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      if (!response.ok) {
+        setLoadingProductosComprados(false);
+        return;
+      }
+
+      const data = await response.json();
+      setProductosComprados(data);
+    } catch (err) {
+      console.error("Error fetching categorías:", err);
+    } finally {
+      setLoadingProductosComprados(false);
+    }
+  }, []);
+
+  // Obtener ventas por mes
+  const fetchVentasPorMes = useCallback(async (year: number) => {
+    setLoadingVentasPorMes(true);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(
+        `http://127.0.0.1:8000/api/estadisticas/ventasPorMesYTipoEntrega?year=${year}`,
+        {
+          headers: {
+            Authorization: token ? `Bearer ${token}` : "",
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      if (!response.ok) {
+        setVentasPorMesData(null);
+        setLoadingVentasPorMes(false);
+        return;
+      }
+
+      const data = await response.json();
+      setVentasPorMesData(data);
+    } catch (err) {
+      console.error("Error fetching ventas por mes:", err);
+      setVentasPorMesData(null);
+    } finally {
+      setLoadingVentasPorMes(false);
+    }
+  }, []);
+
+  // Estado para datos de productos comprados
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [productosComprados, setProductosComprados] = useState<any>(null);
+
   useEffect(() => {
     fetchVentas();
-  }, [fetchVentas]);
+    fetchCategoriasMasVendidas();
+    fetchVentasPorMes(selectedYear);
+  }, [
+    fetchVentas,
+    fetchCategoriasMasVendidas,
+    fetchVentasPorMes,
+    selectedYear,
+  ]);
 
-  // Función para contar lotes ACTIVOS por producto
-  const obtenerDatosLotesTotales = () => {
-    const productosMap = new Map();
+  useEffect(() => {
+    fetchLotesActivosPorCategoria();
+  }, [fetchLotesActivosPorCategoria]);
 
-    // Primero, crear entrada para cada producto
-    productos.forEach((producto) => {
-      const productoId = producto.id;
-      productosMap.set(productoId, {
-        id: productoId,
-        nombre: producto.nombre || "Sin nombre",
-        totalLotes: 0,
-      });
-    });
-
-    // Contar solo lotes ACTIVOS por producto
-    lotes.forEach((lote) => {
-      // Filtrar solo lotes con estado "Activo"
-      if (lote.Estado === "Activo" || lote.Estado === "activo") {
-        const productoId = lote.Id_Producto;
-
-        if (productosMap.has(productoId)) {
-          const producto = productosMap.get(productoId);
-          producto.totalLotes += 1;
-        }
-      }
-    });
-
-    const resultado = Array.from(productosMap.values());
-    return resultado;
-  };
-
-  const datosLotesTotales = obtenerDatosLotesTotales();
-
+  // Datos para gráfico de lotes activos (desde API)
   const lotesPorProducto = {
-    labels: datosLotesTotales.map((p) => p.nombre),
+    labels: lotes?.labels || [],
     datasets: [
       {
-        label: "Lotes Activos",
-        data: datosLotesTotales.map((p) => p.totalLotes),
+        label: "Unidades Disponibles",
+        data: lotes?.data || [],
         backgroundColor: "#0d6efd",
         borderColor: "#0d6efd",
         borderWidth: 1,
@@ -250,7 +312,7 @@ function Analisis() {
     scales: {
       y: {
         beginAtZero: true,
-        max: Math.max(...datosLotesTotales.map((p) => p.totalLotes), 10),
+        max: Math.max(...(lotes?.data || [10]), 10),
       },
     },
   };
@@ -285,10 +347,11 @@ function Analisis() {
   };
 
   const clientesChartOptions = {
+    indexAxis: "y" as const,
     responsive: true,
     maintainAspectRatio: true,
     plugins: { legend: { display: false } },
-    scales: { y: { beginAtZero: true } },
+    scales: { x: { beginAtZero: true } },
   };
 
   // --- Datos para gráfico: Tipos de pago ---
@@ -324,6 +387,122 @@ function Analisis() {
       },
     ],
   };
+
+  const pagoChartOptions = {
+    responsive: true,
+    maintainAspectRatio: true,
+    plugins: {
+      legend: {
+        position: "top" as const,
+      },
+      tooltip: {
+        callbacks: {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          label: function (context: any) {
+            const total = context.dataset.data.reduce(
+              (sum: number, val: number) => sum + val,
+              0,
+            );
+            const percentage = ((context.parsed / total) * 100).toFixed(2);
+            return `${context.label}: ${context.parsed} (${percentage}%)`;
+          },
+        },
+      },
+    },
+  };
+
+  // Datos para gráfico de categorías más vendidas (desde API)
+  const coloresProductos = [
+    "#0d6efd",
+    "#198754",
+    "#ffc107",
+    "#dc3545",
+    "#6c757d",
+    "#6610f2",
+    "#20c997",
+    "#fd7e14",
+    "#0dcaf0",
+    "#6f42c1",
+  ];
+
+  const productosCompradosData = {
+    labels: productosComprados?.labels || [],
+    datasets: [
+      {
+        data: productosComprados?.data || [],
+        backgroundColor: coloresProductos.slice(
+          0,
+          productosComprados?.labels?.length || 0,
+        ),
+      },
+    ],
+  };
+
+  const doughnutOptions = {
+    responsive: true,
+    maintainAspectRatio: true,
+    plugins: {
+      legend: {
+        position: "top" as const,
+      },
+      tooltip: {
+        callbacks: {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          label: function (context: any) {
+            const total = context.dataset.data.reduce(
+              (sum: number, val: number) => sum + val,
+              0,
+            );
+            const percentage = ((context.parsed / total) * 100).toFixed(2);
+            return `${context.label}: ${context.parsed} (${percentage}%)`;
+          },
+        },
+      },
+    },
+  };
+
+  // Datos para gráfico de ventas por mes (desde API)
+  const ventasChartData = {
+    labels: ventasPorMesData?.labels || [],
+    datasets: ventasPorMesData?.datasets || [],
+  };
+
+  const ventasChartOptions = {
+    responsive: true,
+    maintainAspectRatio: true,
+    plugins: {
+      legend: {
+        position: "top" as const,
+      },
+      tooltip: {
+        mode: "index" as const,
+        intersect: false,
+        backgroundColor: "rgba(0, 0, 0, 0.8)",
+        titleColor: "#fff",
+        bodyColor: "#fff",
+        borderColor: "#ddd",
+        borderWidth: 1,
+        callbacks: {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          label: function (context: any) {
+            return `${context.dataset.label}: S/. ${context.parsed.y.toFixed(2)}`;
+          },
+        },
+      },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        ticks: {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          callback: function (value: any) {
+            return "S/. " + value.toFixed(0);
+          },
+        },
+      },
+    },
+  };
+
   useEffect(() => {
     fetchProductos();
   }, [fetchProductos]);
@@ -399,31 +578,43 @@ function Analisis() {
               </div>
             </div>
 
-            <div className="row mt-3">
+            <div className="row mt-4">
               <div className="col-12">
-                <div className="card radius-10">
-                  <div className="card-header">
-                    <h6 className="mb-0">
-                      Bienvenido al Sistema de Administración de la Corporacion
-                      Digital Technology
+                <div className="card radius-10 border-0 shadow-sm">
+                  <div className="card-header bg-light border-bottom">
+                    <h6 className="mb-0 fw-bold text-dark">
+                      📊 Análisis Detallado de la Operación
                     </h6>
                   </div>
-                  <div className="card-body">
-                    <div className="row mt-3">
+                  <div className="card-body p-4">
+                    {/* DIAGRAMA 1: LOTES POR PRODUCTO */}
+                    <div className="row mt-0">
                       <div className="col-12">
-                        <div className="card radius-10">
-                          <div className="card-header">
-                            <h6 className="mb-0">
-                              Análisis de Lotes por Producto
-                            </h6>
+                        <div className="card radius-10 border-0 shadow-sm">
+                          <div className="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
+                            <div>
+                              <h6 className="mb-0 fw-bold text-dark">
+                                📦 Inventario: Lotes Activos por Producto
+                              </h6>
+                              {lotes?.labels && lotes.labels.length > 0 && (
+                                <small className="text-muted d-block mt-1">
+                                  Total:{" "}
+                                  {lotes.data.reduce(
+                                    (sum: number, val: number) => sum + val,
+                                    0,
+                                  )}{" "}
+                                  unidades en {lotes.labels.length} productos
+                                </small>
+                              )}
+                            </div>
                           </div>
-                          <div className="card-body">
+                          <div className="card-body p-4">
                             <div className="row mb-4">
                               <div className="col-12">
-                                <label className="form-label">
-                                  Filtrar por Categoría
+                                <label className="form-label fw-bold text-dark mb-2">
+                                  🔍 Filtrar por Categoría
                                 </label>
-                                <div className="d-flex gap-2 flex-wrap">
+                                <div className="d-flex gap-2 flex-wrap align-items-center">
                                   <button
                                     className={`btn ${
                                       selectedCategoryId === ""
@@ -452,7 +643,7 @@ function Analisis() {
                                 </div>
                               </div>
                             </div>
-                            {loading ? (
+                            {loadingProductos ? (
                               <div
                                 style={{ textAlign: "center", padding: "2em" }}
                               >
@@ -483,82 +674,20 @@ function Analisis() {
                                     color: "#666",
                                   }}
                                 >
-                                  Productos: {productos.length} | Lotes:{" "}
-                                  {lotes.length}
+                                  Productos: {productos.length}
                                 </div>
-                                {datosLotesTotales.length > 0 ? (
-                                  <>
-                                    <div
-                                      style={{
-                                        height: "400px",
-                                        maxHeight: "500px",
-                                      }}
-                                    >
-                                      <Bar
-                                        data={lotesPorProducto}
-                                        options={chartOptions}
-                                      />
-                                    </div>
-
-                                    <div className="row mt-4">
-                                      <div className="col-md-8">
-                                        <div className="card radius-10">
-                                          <div className="card-header">
-                                            <h6 className="mb-0">
-                                              Clientes con más compras
-                                            </h6>
-                                          </div>
-                                          <div className="card-body">
-                                            {datosClientesTop.length > 0 ? (
-                                              <div style={{ height: "300px" }}>
-                                                <Bar
-                                                  data={clientesChartData}
-                                                  options={clientesChartOptions}
-                                                />
-                                              </div>
-                                            ) : (
-                                              <div
-                                                style={{
-                                                  textAlign: "center",
-                                                  color: "#999",
-                                                }}
-                                              >
-                                                No hay datos de clientes
-                                              </div>
-                                            )}
-                                          </div>
-                                        </div>
-                                      </div>
-
-                                      <div className="col-md-4">
-                                        <div className="card radius-10">
-                                          <div className="card-header">
-                                            <h6 className="mb-0">
-                                              Métodos de Pago
-                                            </h6>
-                                          </div>
-                                          <div className="card-body">
-                                            {datosTiposPago.length > 0 ? (
-                                              <div style={{ height: "300px" }}>
-                                                <Doughnut
-                                                  data={tiposPagoData}
-                                                />
-                                              </div>
-                                            ) : (
-                                              <div
-                                                style={{
-                                                  textAlign: "center",
-                                                  color: "#999",
-                                                }}
-                                              >
-                                                No hay datos de pago
-                                              </div>
-                                            )}
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </>
+                                {lotes?.labels && lotes.labels.length > 0 ? (
+                                  <div
+                                    style={{
+                                      height: "100%",
+                                      maxHeight: "100%",
+                                    }}
+                                  >
+                                    <Bar
+                                      data={lotesPorProducto}
+                                      options={chartOptions}
+                                    />
+                                  </div>
                                 ) : (
                                   <div
                                     style={{
@@ -566,7 +695,7 @@ function Analisis() {
                                       color: "#999",
                                     }}
                                   >
-                                    No hay lotes para mostrar
+                                    No hay lotes activos para mostrar
                                   </div>
                                 )}
                               </>
@@ -582,6 +711,550 @@ function Analisis() {
                                 No hay productos que encajen con los filtros
                               </div>
                             )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      {/* FILA 2: CLIENTES Y CATEGORÍAS (COL-6 CADA UNO) */}
+                      <div className="row mt-3">
+                        {/* DIAGRAMA 2: CLIENTES CON MÁS COMPRAS */}
+                        <div className="col-md-6">
+                          <div className="card radius-10 border-0 shadow-sm h-100">
+                            <div className="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
+                              <div>
+                                <h6 className="mb-0 fw-bold text-dark">
+                                  👥 Clientes Top
+                                </h6>
+                                {datosClientesTop.length > 0 && (
+                                  <small className="text-muted d-block mt-1">
+                                    Ranking por número de compras
+                                  </small>
+                                )}
+                              </div>
+                            </div>
+                            <div className="card-body p-4">
+                              {loadingClientes ? (
+                                <div
+                                  style={{
+                                    textAlign: "center",
+                                    padding: "2em",
+                                  }}
+                                >
+                                  <div
+                                    className="spinner-border text-primary"
+                                    role="status"
+                                  >
+                                    <span className="visually-hidden">
+                                      Cargando...
+                                    </span>
+                                  </div>
+                                  <div
+                                    style={{
+                                      marginTop: "1em",
+                                      color: "#0d6efd",
+                                      fontWeight: "bold",
+                                    }}
+                                  >
+                                    Cargando datos de clientes...
+                                  </div>
+                                </div>
+                              ) : datosClientesTop.length > 0 ? (
+                                <>
+                                  <div
+                                    style={{
+                                      height: "280px",
+                                      marginBottom: "1em",
+                                    }}
+                                  >
+                                    <Bar
+                                      data={clientesChartData}
+                                      options={clientesChartOptions}
+                                    />
+                                  </div>
+                                  <div className="row mt-3 text-center border-top pt-3">
+                                    <div className="col-6">
+                                      <p className="text-muted mb-1 small">
+                                        Total Clientes
+                                      </p>
+                                      <h5 className="mb-0 text-primary">
+                                        {datosClientesTop.length}
+                                      </h5>
+                                    </div>
+                                    <div className="col-6">
+                                      <p className="text-muted mb-1 small">
+                                        Mayor Comprador
+                                      </p>
+                                      <h5 className="mb-0 text-success">
+                                        {
+                                          datosClientesTop[0]?.nombre?.split(
+                                            " ",
+                                          )[0]
+                                        }
+                                      </h5>
+                                    </div>
+                                  </div>
+                                </>
+                              ) : (
+                                <div
+                                  style={{
+                                    textAlign: "center",
+                                    color: "#999",
+                                    padding: "2em",
+                                  }}
+                                >
+                                  No hay datos de clientes
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* DIAGRAMA 3: CATEGORÍAS MÁS VENDIDAS */}
+                        <div className="col-md-6">
+                          <div className="card radius-10 border-0 shadow-sm h-100">
+                            <div className="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
+                              <div>
+                                <h6 className="mb-0 fw-bold text-dark">
+                                  🏆 Categorías Líderes
+                                </h6>
+                                {productosComprados?.labels &&
+                                  productosComprados.labels.length > 0 && (
+                                    <small className="text-muted d-block mt-1">
+                                      Distribución de ventas
+                                    </small>
+                                  )}
+                              </div>
+                            </div>
+                            <div className="card-body p-4">
+                              {loadingProductosComprados ? (
+                                <div
+                                  style={{
+                                    textAlign: "center",
+                                    padding: "2em",
+                                  }}
+                                >
+                                  <div
+                                    className="spinner-border text-primary"
+                                    role="status"
+                                  >
+                                    <span className="visually-hidden">
+                                      Cargando...
+                                    </span>
+                                  </div>
+                                  <div
+                                    style={{
+                                      marginTop: "1em",
+                                      color: "#0d6efd",
+                                      fontWeight: "bold",
+                                    }}
+                                  >
+                                    Cargando categorías...
+                                  </div>
+                                </div>
+                              ) : productosComprados?.labels &&
+                                productosComprados.labels.length > 0 ? (
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: "1.5em",
+                                  }}
+                                >
+                                  <div style={{ height: "280px" }}>
+                                    <Doughnut
+                                      data={productosCompradosData}
+                                      options={doughnutOptions}
+                                    />
+                                  </div>
+                                  <div
+                                    style={{
+                                      overflowY: "auto",
+                                      maxHeight: "220px",
+                                      paddingRight: "0.5em",
+                                    }}
+                                  >
+                                    <div
+                                      style={{
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        gap: "0.6em",
+                                      }}
+                                    >
+                                      {productosComprados.labels.map(
+                                        (label: string, index: number) => {
+                                          const total =
+                                            productosComprados.data.reduce(
+                                              (sum: number, val: number) =>
+                                                sum + val,
+                                              0,
+                                            );
+                                          const percentage = (
+                                            (productosComprados.data[index] /
+                                              total) *
+                                            100
+                                          ).toFixed(2);
+                                          const color =
+                                            coloresProductos[index] || "#999";
+
+                                          return (
+                                            <div
+                                              key={index}
+                                              style={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: "0.8em",
+                                                padding: "0.5em",
+                                                backgroundColor: "#f8f9fa",
+                                                borderRadius: "0.375rem",
+                                              }}
+                                            >
+                                              <div
+                                                style={{
+                                                  width: "12px",
+                                                  height: "12px",
+                                                  backgroundColor: color,
+                                                  borderRadius: "2px",
+                                                  flexShrink: 0,
+                                                }}
+                                              ></div>
+                                              <div
+                                                style={{
+                                                  fontSize: "0.85em",
+                                                  flex: 1,
+                                                }}
+                                              >
+                                                <div
+                                                  style={{
+                                                    fontWeight: "500",
+                                                    color: "#333",
+                                                    whiteSpace: "nowrap",
+                                                    overflow: "hidden",
+                                                    textOverflow: "ellipsis",
+                                                  }}
+                                                >
+                                                  {label}
+                                                </div>
+                                              </div>
+                                              <div
+                                                style={{
+                                                  color: color,
+                                                  fontSize: "0.8em",
+                                                  fontWeight: "600",
+                                                  whiteSpace: "nowrap",
+                                                }}
+                                              >
+                                                {percentage}%
+                                              </div>
+                                            </div>
+                                          );
+                                        },
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div
+                                  style={{
+                                    textAlign: "center",
+                                    color: "#999",
+                                    padding: "2em",
+                                  }}
+                                >
+                                  No hay datos de categorías
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* FILA 3: MÉTODOS DE PAGO Y VENTAS POR MES (COL-6 CADA UNO) */}
+                      <div className="row mt-4">
+                        {/* DIAGRAMA 4: MÉTODOS DE PAGO */}
+                        <div className="col-md-6">
+                          <div className="card radius-10 border-0 shadow-sm h-100">
+                            <div className="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
+                              <div>
+                                <h6 className="mb-0 fw-bold text-dark">
+                                  💳 Métodos de Pago
+                                </h6>
+                                {datosTiposPago.length > 0 && (
+                                  <small className="text-muted d-block mt-1">
+                                    Preferencias de pago
+                                  </small>
+                                )}
+                              </div>
+                            </div>
+                            <div className="card-body p-4">
+                              {loadingPagos ? (
+                                <div
+                                  style={{
+                                    textAlign: "center",
+                                    padding: "2em",
+                                  }}
+                                >
+                                  <div
+                                    className="spinner-border text-primary"
+                                    role="status"
+                                  >
+                                    <span className="visually-hidden">
+                                      Cargando...
+                                    </span>
+                                  </div>
+                                  <div
+                                    style={{
+                                      marginTop: "1em",
+                                      color: "#0d6efd",
+                                      fontWeight: "bold",
+                                    }}
+                                  >
+                                    Cargando datos de pagos...
+                                  </div>
+                                </div>
+                              ) : datosTiposPago.length > 0 ? (
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: "1.5em",
+                                  }}
+                                >
+                                  <div style={{ height: "280px" }}>
+                                    <Doughnut
+                                      data={tiposPagoData}
+                                      options={pagoChartOptions}
+                                    />
+                                  </div>
+                                  <div
+                                    style={{
+                                      overflowY: "auto",
+                                      maxHeight: "220px",
+                                      paddingRight: "0.5em",
+                                    }}
+                                  >
+                                    <div
+                                      style={{
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        gap: "0.6em",
+                                      }}
+                                    >
+                                      {datosTiposPago.map(
+                                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                        (item: any, index: number) => {
+                                          const total = datosTiposPago.reduce(
+                                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                            (sum: number, val: any) =>
+                                              sum + val.count,
+                                            0,
+                                          );
+                                          const percentage = (
+                                            (item.count / total) *
+                                            100
+                                          ).toFixed(2);
+                                          const color =
+                                            coloresTipoPago[index] || "#999";
+
+                                          return (
+                                            <div
+                                              key={index}
+                                              style={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: "0.8em",
+                                                padding: "0.5em",
+                                                backgroundColor: "#f8f9fa",
+                                                borderRadius: "0.375rem",
+                                              }}
+                                            >
+                                              <div
+                                                style={{
+                                                  width: "12px",
+                                                  height: "12px",
+                                                  backgroundColor: color,
+                                                  borderRadius: "2px",
+                                                  flexShrink: 0,
+                                                }}
+                                              ></div>
+                                              <div
+                                                style={{
+                                                  fontSize: "0.85em",
+                                                  flex: 1,
+                                                }}
+                                              >
+                                                <div
+                                                  style={{
+                                                    fontWeight: "500",
+                                                    color: "#333",
+                                                    whiteSpace: "nowrap",
+                                                    overflow: "hidden",
+                                                    textOverflow: "ellipsis",
+                                                  }}
+                                                >
+                                                  {item.metodo}
+                                                </div>
+                                              </div>
+                                              <div
+                                                style={{
+                                                  color: color,
+                                                  fontSize: "0.8em",
+                                                  fontWeight: "600",
+                                                  whiteSpace: "nowrap",
+                                                }}
+                                              >
+                                                {percentage}%
+                                              </div>
+                                            </div>
+                                          );
+                                        },
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div
+                                  style={{
+                                    textAlign: "center",
+                                    color: "#999",
+                                    padding: "2em",
+                                  }}
+                                >
+                                  No hay datos de pago
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* DIAGRAMA 5: VENTAS POR MES */}
+                        <div className="col-md-6">
+                          <div className="card radius-10 border-0 shadow-sm h-100">
+                            <div className="card-header bg-white border-bottom">
+                              <div className="d-flex justify-content-between align-items-center gap-3">
+                                <div className="flex-grow-1">
+                                  <h6 className="mb-0 fw-bold text-dark">
+                                    📈 Ventas por Mes
+                                  </h6>
+                                  <small className="text-muted d-block mt-1">
+                                    Tendencia de ingresos
+                                  </small>
+                                </div>
+                                <select
+                                  className="form-select form-select-sm"
+                                  style={{
+                                    width: "110px",
+                                    borderRadius: "0.375rem",
+                                    flexShrink: 0,
+                                  }}
+                                  value={selectedYear}
+                                  onChange={(e) =>
+                                    setSelectedYear(Number(e.target.value))
+                                  }
+                                >
+                                  {[2022, 2023, 2024, 2025, 2026].map(
+                                    (year) => (
+                                      <option key={year} value={year}>
+                                        {year}
+                                      </option>
+                                    ),
+                                  )}
+                                </select>
+                              </div>
+                            </div>
+                            <div className="card-body p-4">
+                              {loadingVentasPorMes ? (
+                                <div
+                                  style={{
+                                    textAlign: "center",
+                                    padding: "2em",
+                                  }}
+                                >
+                                  <div
+                                    className="spinner-border text-primary"
+                                    role="status"
+                                  >
+                                    <span className="visually-hidden">
+                                      Cargando...
+                                    </span>
+                                  </div>
+                                  <div
+                                    style={{
+                                      marginTop: "1em",
+                                      color: "#0d6efd",
+                                      fontWeight: "bold",
+                                    }}
+                                  >
+                                    Cargando ventas...
+                                  </div>
+                                </div>
+                              ) : ventasPorMesData?.labels &&
+                                ventasPorMesData.labels.length > 0 ? (
+                                <>
+                                  <div
+                                    style={{
+                                      height: "280px",
+                                      marginBottom: "1em",
+                                    }}
+                                  >
+                                    <Line
+                                      data={ventasChartData}
+                                      options={ventasChartOptions}
+                                    />
+                                  </div>
+                                  <div className="row mt-3 text-center border-top pt-3">
+                                    <div className="col-4">
+                                      <p className="text-muted mb-1 small">
+                                        Promedio
+                                      </p>
+                                      <h6 className="mb-0 text-info">
+                                        S/.{" "}
+                                        {(
+                                          ventasPorMesData?.data?.reduce(
+                                            (sum: number, val: number) =>
+                                              sum + val,
+                                            0,
+                                          ) /
+                                          (ventasPorMesData?.data?.length || 1)
+                                        ).toFixed(0)}
+                                      </h6>
+                                    </div>
+                                    <div className="col-4">
+                                      <p className="text-muted mb-1 small">
+                                        Máximo
+                                      </p>
+                                      <h6 className="mb-0 text-success">
+                                        S/.{" "}
+                                        {Math.max(
+                                          ...(ventasPorMesData?.data || [0]),
+                                        )}
+                                      </h6>
+                                    </div>
+                                    <div className="col-4">
+                                      <p className="text-muted mb-1 small">
+                                        Mínimo
+                                      </p>
+                                      <h6 className="mb-0 text-warning">
+                                        S/.{" "}
+                                        {Math.min(
+                                          ...(ventasPorMesData?.data || [0]),
+                                        )}
+                                      </h6>
+                                    </div>
+                                  </div>
+                                </>
+                              ) : (
+                                <div
+                                  style={{
+                                    textAlign: "center",
+                                    color: "#999",
+                                    padding: "2em",
+                                  }}
+                                >
+                                  No hay datos de ventas para este período
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>

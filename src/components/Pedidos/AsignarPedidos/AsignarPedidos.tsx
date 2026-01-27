@@ -64,11 +64,18 @@ export default function AsignarPedidos() {
   // Estado dinámico según tipo de entrega
   // Recojo = Entregado, Envío = Pendiente
   const [selectedEstado, setSelectedEstado] = useState<string>("Pendiente");
-  // Fecha automática: fecha actual del equipo
-  const [fecha] = useState<string>(() => {
-    const today = new Date();
-    return today.toISOString().split("T")[0];
-  });
+  // Función para obtener fecha y hora actual en formato datetime
+  const getFechaActual = (): string => {
+    const now = new Date();
+    // Formato: YYYY-MM-DD HH:mm:ss
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    const hours = String(now.getHours()).padStart(2, "0");
+    const minutes = String(now.getMinutes()).padStart(2, "0");
+    const seconds = String(now.getSeconds()).padStart(2, "0");
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  };
   const [tipoEntrega, setTipoEntrega] = useState<string>("Envío a Domicilio");
   const [, setCiudad] = useState<string>("");
   const [, setCalle] = useState<string>("");
@@ -388,16 +395,20 @@ export default function AsignarPedidos() {
       costo: Number(r.precioUnit),
     }));
 
+    // Determinar el estado correcto según tipo de entrega
+    const estadoFinal =
+      tipoEntrega === "Recojo en Tienda" ? "Entregado" : "Pendiente";
+
     const payload = {
       id_usuario: Number(selectedUsuario),
-      fecha: fecha,
+      fecha: getFechaActual(),
       metodo_pago: selectedMetodoPago || null,
       comprobante: selectedComprobante || null,
       id_direccion:
         tipoEntrega === "Recojo en Tienda" ? null : Number(idDireccion),
       tipo_entrega: tipoEntrega,
       costo_total: Number(total),
-      estado: selectedEstado,
+      estado: estadoFinal,
       details,
     };
 
@@ -741,11 +752,11 @@ export default function AsignarPedidos() {
                         </div>
 
                         <div className="col-md-3">
-                          <label className="form-label">Fecha</label>
+                          <label className="form-label">Fecha y Hora</label>
                           <input
                             className="form-control"
                             readOnly
-                            value={new Date().toISOString().slice(0, 10)}
+                            value={getFechaActual()}
                           />
                         </div>
 
