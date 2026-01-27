@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import Nav from "../../Layout/Nav";
 import Sidebar from "../../Layout/Sidebar";
 import "./GestionPedidos.css";
+import { QRCodeCanvas } from "qrcode.react";
 
 interface Usuario {
   id: number;
@@ -65,6 +66,8 @@ interface Venta {
   fecha: string;
   costo_total: number;
   estado: "Cancelado" | "Entregado" | "Pendiente";
+  tipo_entrega?: string;
+  qr_token?: string;
   user?: Usuario;
   direction?: Direccion | null;
   details?: DetailVenta[];
@@ -86,6 +89,13 @@ function GestionPedidos() {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedVenta, setSelectedVenta] = useState<Venta | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+
+  // Estados para modal de cancelación
+  const [showModalCancelar, setShowModalCancelar] = useState(false);
+  const [ventaACancelar, setVentaACancelar] = useState<Venta | null>(null);
+  const [textoCancelacion, setTextoCancelacion] = useState("");
+  const [cancelacionEnProceso, setCancelacionEnProceso] = useState(false);
+  const [errorCancelacion, setErrorCancelacion] = useState("");
 
   // Función para obtener usuarios y crear un mapa de lookup
   const fetchUsuarios = async (): Promise<Map<number, string>> => {
@@ -288,6 +298,7 @@ function GestionPedidos() {
             : data.costo_total || data.Costo_total,
         estado: data.estado || data.Estado,
         tipo_entrega: data.tipo_entrega || data.Tipo_Entrega,
+        qr_token: data.qr_token || data.QR_Token,
         user: data.user
           ? {
               id: data.user.id || data.user.Id,
@@ -316,6 +327,7 @@ function GestionPedidos() {
         details: normalizedDetails,
       };
       setSelectedVenta(normalized);
+      console.log("Selected Venta Details:", normalizedDetails);
     } catch (err) {
       console.error("Error fetching venta detail:", err);
       setError("Error de conexión al cargar los detalles");
@@ -334,6 +346,77 @@ function GestionPedidos() {
   const handleCloseDetailModal = () => {
     setShowDetailModal(false);
     setSelectedVenta(null);
+  };
+
+  // Función para abrir modal de cancelación
+  const handleAbrirModalCancelar = (venta: Venta) => {
+    setVentaACancelar(venta);
+    setTextoCancelacion("");
+    setErrorCancelacion("");
+    setShowModalCancelar(true);
+  };
+
+  // Función para cerrar modal de cancelación
+  const handleCerrarModalCancelar = () => {
+    setShowModalCancelar(false);
+    setVentaACancelar(null);
+    setTextoCancelacion("");
+    setErrorCancelacion("");
+    setCancelacionEnProceso(false);
+  };
+
+  // Función para cancelar la venta
+  const handleConfirmarCancelacion = async () => {
+    const textoRequerido =
+      "Soy conciente que al cancelar una venta puedo comprometer datos de la empresa";
+
+    if (textoCancelacion.trim() !== textoRequerido) {
+      setErrorCancelacion(
+        "El texto ingresado no coincide. Por favor verifica y vuelve a intentar.",
+      );
+      return;
+    }
+
+    if (!ventaACancelar) return;
+
+    setCancelacionEnProceso(true);
+    setErrorCancelacion("");
+
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(
+        `https://proyecto-backend-web-1.onrender.com/api/ventas/${ventaACancelar.id}`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            estado: "Cancelado",
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        setErrorCancelacion("Error al cancelar la venta. Intenta de nuevo.");
+        setCancelacionEnProceso(false);
+        return;
+      }
+
+      // Actualizar la lista de ventas
+      setVentas((prev) =>
+        prev.map((v) =>
+          v.id === ventaACancelar.id ? { ...v, estado: "Cancelado" } : v,
+        ),
+      );
+
+      handleCerrarModalCancelar();
+    } catch (err) {
+      console.error("Error cancelando venta:", err);
+      setErrorCancelacion("Error de conexión. Intenta de nuevo.");
+      setCancelacionEnProceso(false);
+    }
   };
 
   // Funciones de filtrado
@@ -626,6 +709,7 @@ function GestionPedidos() {
                           <th>ID Venta</th>
                           <th>Cliente</th>
                           <th>Fecha</th>
+                          <th>Tipo Entrega</th>
                           <th>Método Pago</th>
                           <th>Total (S/)</th>
                           <th>Estado</th>
@@ -644,6 +728,15 @@ function GestionPedidos() {
                               </span>
                             </td>
                             <td>{formatFecha(venta.fecha)}</td>
+                            <td>
+                              <span
+                                className={`badge ${venta.tipo_entrega === "Envío a Domicilio" ? "bg-info text-dark" : "bg-secondary text-white"}`}
+                              >
+                                {venta.tipo_entrega === "Envío a Domicilio"
+                                  ? "Envío a Domicilio"
+                                  : "Recojo en Tienda"}
+                              </span>
+                            </td>
                             <td>{venta.metodo_pago}</td>
                             <td>
                               <strong>
@@ -665,6 +758,17 @@ function GestionPedidos() {
                               >
                                 <i className="bx bx-show"></i> Detalle
                               </button>
+                              {venta.estado !== "Cancelado" && (
+                                <button
+                                  className="btn btn-sm btn-danger ms-2"
+                                  onClick={() =>
+                                    handleAbrirModalCancelar(venta)
+                                  }
+                                  title="Cancelar venta"
+                                >
+                                  <i className="bx bx-x-circle"></i> Cancelar
+                                </button>
+                              )}
                             </td>
                           </tr>
                         ))}
@@ -713,59 +817,93 @@ function GestionPedidos() {
                   </div>
                 ) : selectedVenta ? (
                   <>
-                    {/* INFORMACIÓN GENERAL */}
-                    <div className="row mb-4">
-                      <div className="col-md-6">
-                        <h6 className="fw-bold text-muted mb-2">
-                          Información General
-                        </h6>
-                        <p className="mb-1">
-                          <strong>ID Venta:</strong> #{selectedVenta.id}
-                        </p>
-                        <p className="mb-1">
-                          <strong>Cliente:</strong>{" "}
-                          {selectedVenta.user?.nombre
-                            ? selectedVenta.user.nombre
-                            : `Usuario ID: ${selectedVenta.id_usuario}`}
-                        </p>
-                        <p className="mb-1">
-                          <strong>Email:</strong>{" "}
-                          {selectedVenta.user?.correo || "N/A"}
-                        </p>
-                        <p className="mb-1">
-                          <strong>Rol:</strong>{" "}
-                          {selectedVenta.user?.rol || "N/A"}
-                        </p>
-                        <p className="mb-1">
-                          <strong>Fecha:</strong>{" "}
-                          {formatFecha(selectedVenta.fecha)}
-                        </p>
+                    {/* INFORMACIÓN GENERAL + QR LADO A LADO */}
+                    <div className="row mb-4 align-items-center">
+                      {/* COLUMNA IZQUIERDA: Datos */}
+                      <div className="col-md-7">
+                        <div className="row mb-3">
+                          <div className="col-12">
+                            <h6 className="fw-bold text-muted mb-2">
+                              Información General
+                            </h6>
+                            <p className="mb-1">
+                              <strong>ID Venta:</strong> #{selectedVenta.id}
+                            </p>
+                            <p className="mb-1">
+                              <strong>Cliente:</strong>{" "}
+                              {selectedVenta.user?.nombre
+                                ? selectedVenta.user.nombre
+                                : `Usuario ID: ${selectedVenta.id_usuario}`}
+                            </p>
+                            <p className="mb-1">
+                              <strong>Email:</strong>{" "}
+                              {selectedVenta.user?.correo || "N/A"}
+                            </p>
+                            <p className="mb-1">
+                              <strong>Rol:</strong>{" "}
+                              {selectedVenta.user?.rol || "N/A"}
+                            </p>
+                            <p className="mb-1">
+                              <strong>Fecha:</strong>{" "}
+                              {formatFecha(selectedVenta.fecha)}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="row">
+                          <div className="col-12">
+                            <h6 className="fw-bold text-muted mb-2">
+                              Información de Pago
+                            </h6>
+                            <p className="mb-1">
+                              <strong>Método de Pago:</strong>{" "}
+                              {selectedVenta.metodo_pago}
+                            </p>
+                            <p className="mb-1">
+                              <strong>Comprobante:</strong>{" "}
+                              {selectedVenta.comprobante}
+                            </p>
+                            <p className="mb-1">
+                              <strong>Estado:</strong>{" "}
+                              <span
+                                className={`badge badge-${selectedVenta.estado.toLowerCase()}`}
+                              >
+                                {selectedVenta.estado}
+                              </span>
+                            </p>
+                            <p className="mb-1">
+                              <strong>Total:</strong> S/{" "}
+                              {formatPrice(selectedVenta.costo_total)}
+                            </p>
+                          </div>
+                        </div>
                       </div>
-                      <div className="col-md-6">
-                        <h6 className="fw-bold text-muted mb-2">
-                          Información de Pago
-                        </h6>
-                        <p className="mb-1">
-                          <strong>Método de Pago:</strong>{" "}
-                          {selectedVenta.metodo_pago}
-                        </p>
-                        <p className="mb-1">
-                          <strong>Comprobante:</strong>{" "}
-                          {selectedVenta.comprobante}
-                        </p>
-                        <p className="mb-1">
-                          <strong>Estado:</strong>{" "}
-                          <span
-                            className={`badge badge-${selectedVenta.estado.toLowerCase()}`}
-                          >
-                            {selectedVenta.estado}
-                          </span>
-                        </p>
-                        <p className="mb-1">
-                          <strong>Total:</strong> S/{" "}
-                          {formatPrice(selectedVenta.costo_total)}
-                        </p>
-                      </div>
+
+                      {/* COLUMNA DERECHA: QR CENTRADO */}
+                      {selectedVenta.estado === "Pendiente" &&
+                        selectedVenta.qr_token &&
+                        selectedVenta.tipo_entrega === "Envío a Domicilio" && (
+                          <div className="col-md-5 d-flex flex-column align-items-center justify-content-center">
+                            <div className="text-center">
+                              <h6 className="fw-bold text-muted mb-3">
+                                📦 QR de Validación
+                              </h6>
+                              <div className="p-3 bg-light rounded border">
+                                <QRCodeCanvas
+                                  value={selectedVenta.qr_token}
+                                  size={180}
+                                  bgColor="#ffffff"
+                                  fgColor="#000000"
+                                  level="H"
+                                  includeMargin={true}
+                                />
+                              </div>
+                              <p className="text-muted small mt-2">
+                                Escanear al entregar
+                              </p>
+                            </div>
+                          </div>
+                        )}
                     </div>
 
                     {/* DIRECCIÓN DE ENTREGA */}
@@ -773,25 +911,27 @@ function GestionPedidos() {
                       <div className="row mb-4">
                         <div className="col-md-12">
                           <h6 className="fw-bold text-muted mb-2">
-                            Dirección de Entrega
+                            📍 Dirección de Entrega
                           </h6>
-                          <p className="mb-1">
-                            <strong>Ciudad:</strong>{" "}
-                            {selectedVenta.direction.ciudad || "N/A"}
-                          </p>
-                          <p className="mb-1">
-                            <strong>Calle:</strong>{" "}
-                            {selectedVenta.direction.calle || "N/A"}
-                          </p>
-                          <p className="mb-1">
-                            <strong>Referencia:</strong>{" "}
-                            {selectedVenta.direction.referencia || "N/A"}
-                          </p>
+                          <div className="card bg-light">
+                            <div className="card-body">
+                              <p className="mb-2">
+                                <strong>Ciudad:</strong>{" "}
+                                {selectedVenta.direction.ciudad || "N/A"}
+                              </p>
+                              <p className="mb-2">
+                                <strong>Calle:</strong>{" "}
+                                {selectedVenta.direction.calle || "N/A"}
+                              </p>
+                              <p className="mb-0">
+                                <strong>Referencia:</strong>{" "}
+                                {selectedVenta.direction.referencia || "N/A"}
+                              </p>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     )}
-
-                    {/* PRODUCTOS + LOTES (TABLA UNIFICADA) */}
                     <div className="row mt-3">
                       <div className="col-md-12">
                         <h6 className="fw-bold text-muted mb-3">
@@ -881,7 +1021,7 @@ function GestionPedidos() {
                                         </td>
 
                                         <td className="text-center">
-                                          {lote.cantidad} Unidades
+                                          {lote.cantidad} Unid.
                                         </td>
                                       </tr>
                                     ),
@@ -926,6 +1066,152 @@ function GestionPedidos() {
         <div
           className="modal-backdrop fade show"
           onClick={handleCloseDetailModal}
+        ></div>
+      )}
+
+      {/* MODAL DE CANCELACIÓN DE VENTA */}
+      {showModalCancelar && (
+        <div className="modal show d-block" tabIndex={-1}>
+          <div className="modal-dialog modal-dialog-centered modal-md">
+            <div className="modal-content border-danger shadow-lg">
+              <div className="modal-header bg-danger text-white">
+                <h5 className="modal-title">
+                  <i
+                    className="bx bx-error-circle me-2"
+                    style={{ fontSize: "1.5rem" }}
+                  ></i>
+                  Cancelar Venta #{ventaACancelar?.id}
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close btn-close-white"
+                  onClick={handleCerrarModalCancelar}
+                  aria-label="Close"
+                ></button>
+              </div>
+
+              <div className="modal-body">
+                <div className="alert alert-danger-light mb-4">
+                  <p className="text-danger fw-bold mb-2">
+                    <i className="bx bx-warning me-1"></i>
+                    ⚠️ Acción irreversible
+                  </p>
+                  <p className="mb-0 text-danger small">
+                    Al cancelar esta venta, se marcará como cancelada y se
+                    comprenderán datos importantes de la empresa. Esta acción no
+                    se puede deshacer.
+                  </p>
+                </div>
+
+                <div className="mb-4">
+                  <h6 className="fw-bold text-muted mb-2">
+                    Información de la venta:
+                  </h6>
+                  <div className="card bg-light">
+                    <div className="card-body">
+                      <p className="mb-2">
+                        <strong>ID Venta:</strong> #{ventaACancelar?.id}
+                      </p>
+                      <p className="mb-2">
+                        <strong>Cliente:</strong>{" "}
+                        {ventaACancelar?.user?.nombre || "Sin cliente"}
+                      </p>
+                      <p className="mb-2">
+                        <strong>Total:</strong> S/{" "}
+                        {(ventaACancelar?.costo_total ?? 0).toFixed(2)}
+                      </p>
+                      <p className="mb-0">
+                        <strong>Estado actual:</strong>{" "}
+                        <span className="badge bg-warning text-dark">
+                          {ventaACancelar?.estado}
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label fw-bold text-danger">
+                    Confirmación de cancelación:
+                  </label>
+                  <p className="small text-muted mb-2">
+                    Escribe el siguiente texto para confirmar que entiendes las
+                    implicaciones:
+                  </p>
+                  <div className="card border-danger bg-white mb-2">
+                    <div className="card-body p-2">
+                      <code
+                        className="text-danger"
+                        style={{ wordBreak: "break-word" }}
+                      >
+                        Soy conciente que al cancelar una venta puedo
+                        comprometer datos de la empresa
+                      </code>
+                    </div>
+                  </div>
+                  <textarea
+                    className={`form-control ${errorCancelacion ? "is-invalid" : ""}`}
+                    rows={2}
+                    placeholder="Pega el texto aquí para confirmar..."
+                    value={textoCancelacion}
+                    onChange={(e) => {
+                      setTextoCancelacion(e.target.value);
+                      setErrorCancelacion("");
+                    }}
+                    disabled={cancelacionEnProceso}
+                  ></textarea>
+                  {errorCancelacion && (
+                    <div className="invalid-feedback d-block mt-2">
+                      <i className="bx bx-x-circle me-1"></i>
+                      {errorCancelacion}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={handleCerrarModalCancelar}
+                  disabled={cancelacionEnProceso}
+                >
+                  <i className="bx bx-x me-1"></i>
+                  No, mantener venta
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  onClick={handleConfirmarCancelacion}
+                  disabled={cancelacionEnProceso}
+                >
+                  {cancelacionEnProceso ? (
+                    <>
+                      <span
+                        className="spinner-border spinner-border-sm me-2"
+                        role="status"
+                        aria-hidden="true"
+                      ></span>
+                      Cancelando...
+                    </>
+                  ) : (
+                    <>
+                      <i className="bx bx-check me-1"></i>
+                      Sí, cancelar venta
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Backdrop para modal de cancelación */}
+      {showModalCancelar && (
+        <div
+          className="modal-backdrop fade show"
+          onClick={handleCerrarModalCancelar}
         ></div>
       )}
     </div>

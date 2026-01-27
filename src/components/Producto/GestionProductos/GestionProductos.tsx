@@ -52,8 +52,11 @@ export default function GestionProductos() {
   const [selectedProduct, setSelectedProduct] = useState<Producto | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Producto | null>(null);
-  const [mensaje, setMensaje] = useState("");
-  const [mensajeTipo, setMensajeTipo] = useState<"success" | "error" | "">("");
+  // Modals para mensajes de éxito/error
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
   // Datos de productos y categorías
   const [productos, setProductos] = useState<Producto[]>([]);
   const [categorias, setCategorias] = useState<
@@ -236,8 +239,6 @@ export default function GestionProductos() {
   const handleUpdate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedProduct) return;
-    setMensaje("");
-    setMensajeTipo("");
 
     const form = e.currentTarget;
     const formData = new FormData(form);
@@ -273,20 +274,20 @@ export default function GestionProductos() {
       if (res.ok) {
         await fetchProductos();
         setShowEditModal(false);
-        setMensaje("Producto editado correctamente.");
-        setMensajeTipo("success");
+        setSuccessMessage("Producto editado correctamente.");
+        setShowSuccessModal(true);
       } else if (res.status === 422) {
         // Validación Laravel: mostrar los mensajes de error
         const validationMsg =
           body && typeof body === "object"
             ? Object.values(body).flat().join(" - ")
             : "Error de validación.";
-        setMensaje(validationMsg);
-        setMensajeTipo("error");
+        setErrorMessage(validationMsg);
+        setShowErrorModal(true);
         console.error("Validation errors:", body);
       } else {
-        setMensaje(body?.message || `Error ${res.status}`);
-        setMensajeTipo("error");
+        setErrorMessage(body?.message || `Error ${res.status}`);
+        setShowErrorModal(true);
         console.error("Update error:", res.status, body);
       }
       if (!res.ok) {
@@ -296,15 +297,13 @@ export default function GestionProductos() {
       }
     } catch (error) {
       console.error("Fetch error:", error);
-      setMensaje("Error de conexión al actualizar el producto.");
-      setMensajeTipo("error");
+      setErrorMessage("Error de conexión al actualizar el producto.");
+      setShowErrorModal(true);
     }
   };
 
   // Eliminar producto (si no tiene lotes vinculados)
   const handleDelete = async (id: string) => {
-    setMensaje("");
-    setMensajeTipo("");
     const token = localStorage.getItem("token");
     try {
       const res = await fetch(
@@ -320,28 +319,23 @@ export default function GestionProductos() {
       const body = await res.json().catch(() => null);
       if (res.ok) {
         await fetchProductos();
-        setMensaje("Producto eliminado correctamente.");
-        setMensajeTipo("success");
+        setSuccessMessage("Producto eliminado correctamente.");
+        setShowSuccessModal(true);
       } else if (res.status === 409) {
         // Según tu controlador: 409 cuando tiene lotes vinculados
-        setMensaje(body?.message || "El producto tiene lotes vinculados.");
-        setMensajeTipo("error");
+        setErrorMessage(body?.message || "El producto tiene lotes vinculados.");
+        setShowErrorModal(true);
       } else if (res.status === 404) {
-        setMensaje(body?.message || "Producto no encontrado.");
-        setMensajeTipo("error");
+        setErrorMessage(body?.message || "Producto no encontrado.");
+        setShowErrorModal(true);
       } else {
-        setMensaje(body?.message || `Error ${res.status}`);
-        setMensajeTipo("error");
+        setErrorMessage(body?.message || `Error ${res.status}`);
+        setShowErrorModal(true);
       }
     } catch (error) {
       console.error("Delete error:", error);
-      setMensaje("Error de conexión al eliminar el producto.");
-      setMensajeTipo("error");
-    } finally {
-      setTimeout(() => {
-        setMensaje("");
-        setMensajeTipo("");
-      }, 4000);
+      setErrorMessage("Error de conexión al eliminar el producto.");
+      setShowErrorModal(true);
     }
   };
 
@@ -418,19 +412,65 @@ export default function GestionProductos() {
         <Nav />
         <div className="page-wrapper">
           <div className="page-content">
-            {mensaje && (
-              <div
-                className={`alert alert-${
-                  mensajeTipo === "success" ? "success" : "danger"
-                } alert-dismissible fade show`}
-                role="alert"
-              >
-                {mensaje}
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={() => setMensaje("")}
-                ></button>
+            {/* Modal de Éxito */}
+            {showSuccessModal && (
+              <div className="modal show d-block" tabIndex={-1}>
+                <div className="modal-dialog modal-dialog-centered modal-md">
+                  <div className="modal-content">
+                    <div className="modal-header bg-success text-white">
+                      <div className="d-flex align-items-center gap-2">
+                        <i className="bx bx-check-circle fs-5"></i>
+                        <h5 className="modal-title mb-0">Éxito</h5>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn-close btn-close-white"
+                        onClick={() => setShowSuccessModal(false)}
+                      ></button>
+                    </div>
+                    <div className="modal-body">{successMessage}</div>
+                    <div className="modal-footer">
+                      <button
+                        type="button"
+                        className="btn btn-success"
+                        onClick={() => setShowSuccessModal(false)}
+                      >
+                        <i className="bx bx-check"></i> Aceptar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Modal de Error */}
+            {showErrorModal && (
+              <div className="modal show d-block" tabIndex={-1}>
+                <div className="modal-dialog modal-dialog-centered modal-md">
+                  <div className="modal-content">
+                    <div className="modal-header bg-danger text-white">
+                      <div className="d-flex align-items-center gap-2">
+                        <i className="bx bx-x-circle fs-5"></i>
+                        <h5 className="modal-title mb-0">Error</h5>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn-close btn-close-white"
+                        onClick={() => setShowErrorModal(false)}
+                      ></button>
+                    </div>
+                    <div className="modal-body">{errorMessage}</div>
+                    <div className="modal-footer">
+                      <button
+                        type="button"
+                        className="btn btn-danger"
+                        onClick={() => setShowErrorModal(false)}
+                      >
+                        <i className="bx bx-x"></i> Cerrar
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
             {/* Breadcrumb */}

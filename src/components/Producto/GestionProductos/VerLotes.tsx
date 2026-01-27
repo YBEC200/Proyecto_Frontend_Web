@@ -38,8 +38,11 @@ export default function VerLotes({
   // ...existing code...
   const [lotes, setLotes] = useState<Lote[]>([]);
   const [loading, setLoading] = useState(true);
-  const [mensaje, setMensaje] = useState("");
-  const [mensajeTipo, setMensajeTipo] = useState<"success" | "error" | "">("");
+  // Modals para mensajes de éxito/error
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
 
   // inputs (controlados)
   const [searchInput, setSearchInput] = useState("");
@@ -58,6 +61,11 @@ export default function VerLotes({
   const [showDeleteModalLote, setShowDeleteModalLote] = useState(false);
   const [deleteTargetLote, setDeleteTargetLote] = useState<Lote | null>(null);
 
+  // Estado para lotes que pueden ser eliminados (sin vinculación a DetailLote)
+  const [lotesEliminables, setLotesEliminables] = useState<Set<string>>(
+    new Set(),
+  );
+
   // Abrir modal editar
   const handleEditLote = (lote: Lote) => {
     setSelectedLote(lote);
@@ -68,8 +76,6 @@ export default function VerLotes({
   const handleUpdateLote = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedLote) return;
-    setMensaje("");
-    setMensajeTipo("");
     const form = e.currentTarget;
     const formData = new FormData(form);
     const loteNombre = String(formData.get("Lote") ?? "").trim();
@@ -78,7 +84,7 @@ export default function VerLotes({
     const token = localStorage.getItem("token");
     try {
       const res = await fetch(
-        `https://proyecto-backend-web-1.onrender.com/api/lotes/${selectedLote.Id}`,
+        `http://127.0.0.1:8000/api/lotes/${selectedLote.Id}`,
         {
           method: "PUT",
           headers: {
@@ -90,24 +96,24 @@ export default function VerLotes({
             Cantidad: cantidad,
             Estado: estado,
           }),
-        }
+        },
       );
       const body = await res.json().catch(() => null);
       if (res.ok) {
         await fetchLotes();
         setShowEditModalLote(false);
         setSelectedLote(null);
-        setMensaje("Lote actualizado correctamente.");
-        setMensajeTipo("success");
+        setSuccessMessage("Lote actualizado correctamente.");
+        setShowSuccessModal(true);
       } else {
-        setMensaje(body?.message || `Error ${res.status}`);
-        setMensajeTipo("error");
+        setErrorMessage(body?.message || `Error ${res.status}`);
+        setShowErrorModal(true);
         console.error("Update lote error:", res.status, body);
       }
     } catch (error) {
       console.error("Fetch error update lote:", error);
-      setMensaje("Error de conexión al actualizar el lote.");
-      setMensajeTipo("error");
+      setErrorMessage("Error de conexión al actualizar el lote.");
+      setShowErrorModal(true);
     }
   };
 
@@ -119,11 +125,20 @@ export default function VerLotes({
 
   // Eliminar lote
   const handleDeleteLote = async (Id: string) => {
-    setMensaje("");
-    setMensajeTipo("");
+    // Validación: verificar que el lote puede ser eliminado
+    if (!lotesEliminables.has(Id)) {
+      setErrorMessage(
+        "No se puede eliminar este lote porque está vinculado a una o más ventas.",
+      );
+      setShowErrorModal(true);
+      setShowDeleteModalLote(false);
+      setDeleteTargetLote(null);
+      return;
+    }
+
     const token = localStorage.getItem("token");
     try {
-      const res = await fetch(`https://proyecto-backend-web-1.onrender.com/api/lotes/${Id}`, {
+      const res = await fetch(`http://127.0.0.1:8000/api/lotes/${Id}`, {
         method: "DELETE",
         headers: {
           Authorization: token ? `Bearer ${token}` : "",
@@ -133,16 +148,16 @@ export default function VerLotes({
       const body = await res.json().catch(() => null);
       if (res.ok) {
         await fetchLotes();
-        setMensaje("Lote eliminado correctamente.");
-        setMensajeTipo("success");
+        setSuccessMessage("Lote eliminado correctamente.");
+        setShowSuccessModal(true);
       } else {
-        setMensaje(body?.message || `Error ${res.status}`);
-        setMensajeTipo("error");
+        setErrorMessage(body?.message || `Error ${res.status}`);
+        setShowErrorModal(true);
       }
     } catch (error) {
       console.error("Delete lote error:", error);
-      setMensaje("Error de conexión al eliminar el lote.");
-      setMensajeTipo("error");
+      setErrorMessage("Error de conexión al eliminar el lote.");
+      setShowErrorModal(true);
     } finally {
       setShowDeleteModalLote(false);
       setDeleteTargetLote(null);
@@ -158,6 +173,33 @@ export default function VerLotes({
     return "badge";
   };
 
+  // Verificar si un lote puede ser eliminado (sin vinculación a DetailLote)
+  const verificarEliminabilidadLote = async (loteId: string) => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(
+        `http://127.0.0.1:8000/api/lotes/${loteId}/can-delete`,
+        {
+          headers: {
+            Authorization: token ? `Bearer ${token}` : "",
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      if (!res.ok) {
+        return;
+      }
+
+      const data = await res.json();
+      if (data.can_delete) {
+        setLotesEliminables((prev) => new Set(prev).add(loteId));
+      }
+    } catch (error) {
+      console.error("Error verificando eliminabilidad del lote:", error);
+    }
+  };
+
   // Construir y ejecutar request al backend con parámetros
   const fetchLotes = async (signal?: AbortSignal) => {
     // no hacer nada si no hay producto seleccionado
@@ -168,7 +210,6 @@ export default function VerLotes({
     }
 
     setLoading(true);
-    setMensaje(""); // limpiar mensaje anterior
     try {
       const params = new URLSearchParams();
       params.set("product_id", productoId);
@@ -178,7 +219,7 @@ export default function VerLotes({
       if (estadoFilter) params.set("estado", estadoFilter);
 
       const token = localStorage.getItem("token");
-      const url = `https://proyecto-backend-web-1.onrender.com/api/lotes?${params.toString()}`;
+      const url = `http://127.0.0.1:8000/api/lotes?${params.toString()}`;
 
       console.debug("fetchLotes ->", { productoId, url });
 
@@ -193,11 +234,7 @@ export default function VerLotes({
       if (!response.ok) {
         if (response.status === 404) {
           setLotes([]);
-          setMensaje("No se encontraron lotes.");
-          setMensajeTipo("");
         } else {
-          setMensaje("Error al cargar los lotes");
-          setMensajeTipo("error");
           setLotes([]);
         }
         return;
@@ -206,16 +243,12 @@ export default function VerLotes({
       const data = await response.json();
       console.debug("fetchLotes result:", data);
       setLotes(Array.isArray(data) ? data : []);
-      setMensaje("");
-      setMensajeTipo("");
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       if (error?.name === "AbortError") {
         return;
       }
       console.error("Error fetching lotes:", error);
-      setMensaje("Error de conexión al cargar los lotes");
-      setMensajeTipo("error");
       setLotes([]);
     } finally {
       // Sólo actualizar loading si la petición NO fue abortada
@@ -242,6 +275,16 @@ export default function VerLotes({
     cantidadRange.max,
     estadoFilter,
   ]);
+
+  // Verificar eliminabilidad de lotes después de cargarlos
+  useEffect(() => {
+    if (lotes.length > 0) {
+      setLotesEliminables(new Set());
+      lotes.forEach((lote) => {
+        verificarEliminabilidadLote(lote.Id);
+      });
+    }
+  }, [lotes]);
 
   // Handler para Enter en inputs: aplica filtro correspondiente
   const handleKeyDownApply = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -270,19 +313,65 @@ export default function VerLotes({
 
   return (
     <div className="page-content">
-      {mensaje && (
-        <div
-          className={`alert alert-${
-            mensajeTipo === "success" ? "success" : "danger"
-          } alert-dismissible fade show`}
-          role="alert"
-        >
-          {mensaje}
-          <button
-            type="button"
-            className="btn-close"
-            onClick={() => setMensaje("")}
-          ></button>
+      {/* Modal de Éxito */}
+      {showSuccessModal && (
+        <div className="modal show d-block" tabIndex={-1}>
+          <div className="modal-dialog modal-dialog-centered modal-md">
+            <div className="modal-content">
+              <div className="modal-header bg-success text-white">
+                <div className="d-flex align-items-center gap-2">
+                  <i className="bx bx-check-circle fs-5"></i>
+                  <h5 className="modal-title mb-0">Éxito</h5>
+                </div>
+                <button
+                  type="button"
+                  className="btn-close btn-close-white"
+                  onClick={() => setShowSuccessModal(false)}
+                ></button>
+              </div>
+              <div className="modal-body">{successMessage}</div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-success"
+                  onClick={() => setShowSuccessModal(false)}
+                >
+                  <i className="bx bx-check"></i> Aceptar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Error */}
+      {showErrorModal && (
+        <div className="modal show d-block" tabIndex={-1}>
+          <div className="modal-dialog modal-dialog-centered modal-md">
+            <div className="modal-content">
+              <div className="modal-header bg-danger text-white">
+                <div className="d-flex align-items-center gap-2">
+                  <i className="bx bx-x-circle fs-5"></i>
+                  <h5 className="modal-title mb-0">Error</h5>
+                </div>
+                <button
+                  type="button"
+                  className="btn-close btn-close-white"
+                  onClick={() => setShowErrorModal(false)}
+                ></button>
+              </div>
+              <div className="modal-body">{errorMessage}</div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  onClick={() => setShowErrorModal(false)}
+                >
+                  <i className="bx bx-x"></i> Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -467,8 +556,21 @@ export default function VerLotes({
                           </button>
                           <button
                             className="btn-action-delete"
-                            title="Eliminar lote"
+                            title={
+                              lotesEliminables.has(lote.Id)
+                                ? "Eliminar lote"
+                                : "No se puede eliminar: lote vinculado a ventas"
+                            }
                             onClick={() => handleConfirmDeleteLote(lote)}
+                            disabled={!lotesEliminables.has(lote.Id)}
+                            style={{
+                              opacity: lotesEliminables.has(lote.Id)
+                                ? "1"
+                                : "0.5",
+                              cursor: lotesEliminables.has(lote.Id)
+                                ? "pointer"
+                                : "not-allowed",
+                            }}
                           >
                             <i className="bx bx-trash"></i>
                           </button>

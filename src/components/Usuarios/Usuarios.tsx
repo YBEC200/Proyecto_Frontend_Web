@@ -58,9 +58,15 @@ function Usuarios() {
   const [selectedUser, setSelectedUser] = useState<Usuario | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showOrdersModal, setShowOrdersModal] = useState(false);
-  // Modals message state
-  const [mensaje, setMensaje] = useState("");
-  const [mensajeTipo, setMensajeTipo] = useState<"success" | "error" | "">("");
+  // Modals para mensajes de éxito/error
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  // Estado para usuarios que pueden ser eliminados (sin ventas asociadas)
+  const [usuariosEliminables, setUsuariosEliminables] = useState<Set<number>>(
+    new Set(),
+  );
 
   // Función para obtener usuarios desde la API con filtros
   const fetchUsuarios = async () => {
@@ -83,7 +89,7 @@ function Usuarios() {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-        }
+        },
       );
       const data = await response.json();
       setUsuarios(data);
@@ -94,12 +100,37 @@ function Usuarios() {
     setLoading(false);
   };
 
+  // Verificar si un usuario puede ser eliminado (sin ventas asociadas)
+  const verificarEliminabilidadUsuario = async (usuarioId: number) => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(
+        `https://proyecto-backend-web-1.onrender.com/api/usuarios/${usuarioId}/can-delete`,
+        {
+          headers: {
+            Authorization: token ? `Bearer ${token}` : "",
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      if (!res.ok) {
+        return;
+      }
+
+      const data = await res.json();
+      if (data.can_delete) {
+        setUsuariosEliminables((prev) => new Set(prev).add(usuarioId));
+      }
+    } catch (error) {
+      console.error("Error verificando eliminabilidad del usuario:", error);
+    }
+  };
+
   // Función para manejar la edición de usuario
   const handleEditUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setEditError("");
-    setMensaje("");
-    setMensajeTipo("");
     // Validaciones
     if (!editNombre.trim()) {
       setEditError("El nombre es obligatorio.");
@@ -134,31 +165,40 @@ function Usuarios() {
             rol: editRol,
             estado: editEstado,
           }),
-        }
+        },
       );
       if (response.ok) {
         fetchUsuarios();
         setShowEditModal(false);
-        setMensaje("Usuario editado correctamente.");
-        setMensajeTipo("success");
+        setSuccessMessage("Usuario editado correctamente.");
+        setShowSuccessModal(true);
       } else {
         setEditError("Error al actualizar el usuario.");
-        setMensaje("Error al editar el usuario.");
-        setMensajeTipo("error");
+        setErrorMessage("Error al editar el usuario.");
+        setShowErrorModal(true);
       }
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (error) {
       setEditError("Error de conexión.");
-      setMensaje("Error de conexión al editar.");
-      setMensajeTipo("error");
+      setErrorMessage("Error de conexión al editar.");
+      setShowErrorModal(true);
     }
   };
 
   // Función para manejar la eliminación de usuario
   const handleDeleteUser = async () => {
     if (!selectedUser) return;
-    setMensaje("");
-    setMensajeTipo("");
+
+    // Validación: verificar que el usuario puede ser eliminado
+    if (!usuariosEliminables.has(selectedUser.id)) {
+      setErrorMessage(
+        "No se puede eliminar este usuario porque tiene ventas asociadas.",
+      );
+      setShowErrorModal(true);
+      setShowDeleteModal(false);
+      return;
+    }
+
     const token = localStorage.getItem("token");
     try {
       const response = await fetch(
@@ -169,23 +209,23 @@ function Usuarios() {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-        }
+        },
       );
       if (response.ok) {
         setShowDeleteModal(false);
         fetchUsuarios();
-        setMensaje("Usuario eliminado correctamente.");
-        setMensajeTipo("success");
+        setSuccessMessage("Usuario eliminado correctamente.");
+        setShowSuccessModal(true);
       } else {
         setShowDeleteModal(false);
-        setMensaje("Error al eliminar el usuario.");
-        setMensajeTipo("error");
+        setErrorMessage("Error al eliminar el usuario.");
+        setShowErrorModal(true);
       }
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (error) {
       setShowDeleteModal(false);
-      setMensaje("Error de conexión al eliminar.");
-      setMensajeTipo("error");
+      setErrorMessage("Error de conexión al eliminar.");
+      setShowErrorModal(true);
     }
   };
 
@@ -210,6 +250,16 @@ function Usuarios() {
     // eslint-disable-next-line
   }, [searchTerm, roleFilter, fechaRegistroFiltro, fechaActualizacionFiltro]);
 
+  // Verificar eliminabilidad de usuarios después de cargarlos
+  useEffect(() => {
+    if (usuarios.length > 0) {
+      setUsuariosEliminables(new Set());
+      usuarios.forEach((usuario) => {
+        verificarEliminabilidadUsuario(usuario.id);
+      });
+    }
+  }, [usuarios]);
+
   useEffect(() => {
     if (showEditModal && selectedUser) {
       setEditNombre(selectedUser.nombre);
@@ -226,20 +276,65 @@ function Usuarios() {
         <Nav />
         <div className="page-wrapper">
           <div className="page-content">
-            {/* Alert messages */}
-            {mensaje && (
-              <div
-                className={`alert alert-${
-                  mensajeTipo === "success" ? "success" : "danger"
-                } alert-dismissible fade show`}
-                role="alert"
-              >
-                {mensaje}
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={() => setMensaje("")}
-                ></button>
+            {/* Modal de Éxito */}
+            {showSuccessModal && (
+              <div className="modal show d-block" tabIndex={-1}>
+                <div className="modal-dialog modal-dialog-centered modal-md">
+                  <div className="modal-content">
+                    <div className="modal-header bg-success text-white">
+                      <div className="d-flex align-items-center gap-2">
+                        <i className="bx bx-check-circle fs-5"></i>
+                        <h5 className="modal-title mb-0">Éxito</h5>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn-close btn-close-white"
+                        onClick={() => setShowSuccessModal(false)}
+                      ></button>
+                    </div>
+                    <div className="modal-body">{successMessage}</div>
+                    <div className="modal-footer">
+                      <button
+                        type="button"
+                        className="btn btn-success"
+                        onClick={() => setShowSuccessModal(false)}
+                      >
+                        <i className="bx bx-check"></i> Aceptar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Modal de Error */}
+            {showErrorModal && (
+              <div className="modal show d-block" tabIndex={-1}>
+                <div className="modal-dialog modal-dialog-centered modal-md">
+                  <div className="modal-content">
+                    <div className="modal-header bg-danger text-white">
+                      <div className="d-flex align-items-center gap-2">
+                        <i className="bx bx-x-circle fs-5"></i>
+                        <h5 className="modal-title mb-0">Error</h5>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn-close btn-close-white"
+                        onClick={() => setShowErrorModal(false)}
+                      ></button>
+                    </div>
+                    <div className="modal-body">{errorMessage}</div>
+                    <div className="modal-footer">
+                      <button
+                        type="button"
+                        className="btn btn-danger"
+                        onClick={() => setShowErrorModal(false)}
+                      >
+                        <i className="bx bx-x"></i> Cerrar
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
             {/* Breadcrumb */}
@@ -382,9 +477,23 @@ function Usuarios() {
                               </button>
                               <button
                                 className="btn-action-delete"
+                                title={
+                                  usuariosEliminables.has(user.id)
+                                    ? "Eliminar usuario"
+                                    : "No se puede eliminar: usuario con ventas asociadas"
+                                }
                                 onClick={() => {
                                   setSelectedUser(user);
                                   setShowDeleteModal(true);
+                                }}
+                                disabled={!usuariosEliminables.has(user.id)}
+                                style={{
+                                  opacity: usuariosEliminables.has(user.id)
+                                    ? "1"
+                                    : "0.5",
+                                  cursor: usuariosEliminables.has(user.id)
+                                    ? "pointer"
+                                    : "not-allowed",
                                 }}
                               >
                                 <i className="bx bx-trash"></i>
@@ -432,13 +541,16 @@ function Usuarios() {
             {/* Modal de Edición */}
             {showEditModal && selectedUser && (
               <div className="modal show d-block" tabIndex={-1}>
-                <div className="modal-dialog">
+                <div className="modal-dialog modal-dialog-centered modal-md">
                   <div className="modal-content">
                     <div className="modal-header bg-primary text-white">
-                      <h5 className="modal-title">Editar Usuario</h5>
+                      <div className="d-flex align-items-center gap-2">
+                        <i className="bx bx-edit fs-5"></i>
+                        <h5 className="modal-title mb-0">Editar Usuario</h5>
+                      </div>
                       <button
                         type="button"
-                        className="btn-close"
+                        className="btn-close btn-close-white"
                         onClick={() => setShowEditModal(false)}
                       ></button>
                     </div>
@@ -521,13 +633,16 @@ function Usuarios() {
               <div className="modal show d-block" tabIndex={-1}>
                 <div className="modal-dialog modal-dialog-centered modal-lg">
                   <div className="modal-content">
-                    <div className="modal-header">
-                      <h5 className="modal-title">
-                        Compras de {selectedUser.nombre}
-                      </h5>
+                    <div className="modal-header bg-info text-white">
+                      <div className="d-flex align-items-center gap-2">
+                        <i className="bx bx-receipt fs-5"></i>
+                        <h5 className="modal-title mb-0">
+                          Compras de {selectedUser.nombre}
+                        </h5>
+                      </div>
                       <button
                         type="button"
-                        className="btn-close"
+                        className="btn-close btn-close-white"
                         onClick={() => setShowOrdersModal(false)}
                       ></button>
                     </div>
@@ -565,7 +680,7 @@ function Usuarios() {
                         className="btn btn-secondary"
                         onClick={() => setShowOrdersModal(false)}
                       >
-                        Cerrar
+                        <i className="bx bx-x"></i> Cerrar
                       </button>
                     </div>
                   </div>
@@ -576,13 +691,18 @@ function Usuarios() {
             {/* Modal de Eliminación */}
             {showDeleteModal && selectedUser && (
               <div className="modal show d-block" tabIndex={-1}>
-                <div className="modal-dialog">
+                <div className="modal-dialog modal-dialog-centered modal-md">
                   <div className="modal-content">
                     <div className="modal-header bg-danger text-white">
-                      <h5 className="modal-title">Confirmar Eliminación</h5>
+                      <div className="d-flex align-items-center gap-2">
+                        <i className="bx bx-trash fs-5"></i>
+                        <h5 className="modal-title mb-0">
+                          Confirmar Eliminación
+                        </h5>
+                      </div>
                       <button
                         type="button"
-                        className="btn-close"
+                        className="btn-close btn-close-white"
                         onClick={() => setShowDeleteModal(false)}
                       ></button>
                     </div>
@@ -598,14 +718,14 @@ function Usuarios() {
                         className="btn btn-secondary"
                         onClick={() => setShowDeleteModal(false)}
                       >
-                        Cancelar
+                        <i className="bx bx-x"></i> Cancelar
                       </button>
                       <button
                         type="button"
                         className="btn btn-danger"
                         onClick={handleDeleteUser}
                       >
-                        Eliminar
+                        <i className="bx bx-trash"></i> Eliminar
                       </button>
                     </div>
                   </div>

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import Nav from "../../Layout/Nav";
 import Sidebar from "../../Layout/Sidebar";
 import "./Analisis.css";
-import { Bar } from "react-chartjs-2";
+import { Bar, Doughnut } from "react-chartjs-2";
 import {
   Chart,
   CategoryScale,
@@ -31,11 +31,12 @@ function Analisis() {
   const [productos, setProductos] = useState<any[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [lotes, setLotes] = useState<any[]>([]);
-  const [statusFilter, setStatusFilter] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("");
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
   const [categories, setCategories] = useState<
     { Id: number; Nombre: string }[]
   >([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [ventas, setVentas] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -59,11 +60,10 @@ function Analisis() {
 
   const fetchLotes = useCallback(async () => {
     const token = localStorage.getItem("token");
-    const params = new URLSearchParams();
 
     try {
       const response = await fetch(
-        `https://proyecto-backend-web-1.onrender.com/api/lotes?${params.toString()}`,
+        `https://proyecto-backend-web-1.onrender.com/api/lotes`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -80,6 +80,7 @@ function Analisis() {
       }
 
       const data = await response.json();
+      setLotes(Array.isArray(data) ? data : []);
       const lotesArray = Array.isArray(data) ? data : [];
 
       setLotes(lotesArray);
@@ -96,8 +97,10 @@ function Analisis() {
     const token = localStorage.getItem("token");
     const params = new URLSearchParams();
 
-    if (categoryFilter) params.append("categoria", categoryFilter);
-    if (statusFilter) params.append("estado", statusFilter);
+    // Filtrar por categoría si está seleccionada
+    if (selectedCategoryId) {
+      params.append("categoria", selectedCategoryId);
+    }
 
     try {
       const response = await fetch(
@@ -141,10 +144,57 @@ function Analisis() {
       setLotes([]);
       setLoading(false);
     }
-  }, [categoryFilter, statusFilter, fetchLotes]);
+  }, [selectedCategoryId, fetchLotes]);
 
-  // Función para agrupar lotes activos e inactivos por producto
-  const obtenerDatosLotesConEstado = () => {
+  // Obtener ventas (para gráficos de clientes y tipo de pago)
+  const fetchVentas = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(
+        `https://proyecto-backend-web-1.onrender.com/api/ventas`,
+        {
+          headers: {
+            Authorization: token ? `Bearer ${token}` : "",
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      if (!response.ok) {
+        setVentas([]);
+        return;
+      }
+
+      const data = await response.json();
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const normalized = (Array.isArray(data) ? data : []).map((item: any) => ({
+        id: item.id || item.Id,
+        metodo_pago: item.metodo_pago || item.Metodo_Pago,
+        user: {
+          id: item.id_usuario || item.Id_Usuario,
+          nombre:
+            item.user?.nombre ||
+            item.nombre_cliente ||
+            item.nombre ||
+            item.user?.Nombre ||
+            "Sin cliente",
+        },
+      }));
+
+      setVentas(normalized);
+    } catch (err) {
+      console.error("Error fetching ventas:", err);
+      setVentas([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchVentas();
+  }, [fetchVentas]);
+
+  // Función para contar lotes ACTIVOS por producto
+  const obtenerDatosLotesTotales = () => {
     const productosMap = new Map();
 
     // Primero, crear entrada para cada producto
@@ -153,23 +203,19 @@ function Analisis() {
       productosMap.set(productoId, {
         id: productoId,
         nombre: producto.nombre || "Sin nombre",
-        activos: 0,
-        inactivos: 0,
+        totalLotes: 0,
       });
     });
 
-    // Ahora, contar lotes por producto e estado
-    // ✓ CAMBIO: Usar Id_Producto (tal como lo devuelve el controlador)
+    // Contar solo lotes ACTIVOS por producto
     lotes.forEach((lote) => {
-      const productoId = lote.Id_Producto;
+      // Filtrar solo lotes con estado "Activo"
+      if (lote.Estado === "Activo" || lote.Estado === "activo") {
+        const productoId = lote.Id_Producto;
 
-      if (productosMap.has(productoId)) {
-        const producto = productosMap.get(productoId);
-        // ✓ CAMBIO: Usar Estado (con mayúscula)
-        if (lote.Estado === "activo" || lote.Estado === "Activo") {
-          producto.activos += 1;
-        } else {
-          producto.inactivos += 1;
+        if (productosMap.has(productoId)) {
+          const producto = productosMap.get(productoId);
+          producto.totalLotes += 1;
         }
       }
     });
@@ -178,24 +224,103 @@ function Analisis() {
     return resultado;
   };
 
-  const datosLotesConEstado = obtenerDatosLotesConEstado();
+  const datosLotesTotales = obtenerDatosLotesTotales();
 
-  const lotesPorProductoConEstado = {
-    labels: datosLotesConEstado.map((p) => p.nombre),
+  const lotesPorProducto = {
+    labels: datosLotesTotales.map((p) => p.nombre),
     datasets: [
       {
         label: "Lotes Activos",
-        data: datosLotesConEstado.map((p) => p.activos),
-        backgroundColor: "#00b09b",
-        borderColor: "#00b09b",
+        data: datosLotesTotales.map((p) => p.totalLotes),
+        backgroundColor: "#0d6efd",
+        borderColor: "#0d6efd",
         borderWidth: 1,
       },
+    ],
+  };
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: true,
+    plugins: {
+      legend: {
+        position: "top" as const,
+      },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        max: Math.max(...datosLotesTotales.map((p) => p.totalLotes), 10),
+      },
+    },
+  };
+  // --- Datos para gráfico: Clientes con más compras ---
+  const obtenerClientesTop = (top = 10) => {
+    const map = new Map<string, number>();
+    ventas.forEach((v) => {
+      const nombre = v.user?.nombre || "Sin cliente";
+      map.set(nombre, (map.get(nombre) || 0) + 1);
+    });
+    const arr = Array.from(map.entries()).map(([nombre, count]) => ({
+      nombre,
+      count,
+    }));
+    arr.sort((a, b) => b.count - a.count);
+    return arr.slice(0, top);
+  };
+
+  const datosClientesTop = obtenerClientesTop(10);
+
+  const clientesChartData = {
+    labels: datosClientesTop.map((d) => d.nombre),
+    datasets: [
       {
-        label: "Lotes Inactivos",
-        data: datosLotesConEstado.map((p) => p.inactivos),
-        backgroundColor: "#ff6b6b",
-        borderColor: "#ff6b6b",
+        label: "Compras",
+        data: datosClientesTop.map((d) => d.count),
+        backgroundColor: "#198754",
+        borderColor: "#198754",
         borderWidth: 1,
+      },
+    ],
+  };
+
+  const clientesChartOptions = {
+    responsive: true,
+    maintainAspectRatio: true,
+    plugins: { legend: { display: false } },
+    scales: { y: { beginAtZero: true } },
+  };
+
+  // --- Datos para gráfico: Tipos de pago ---
+  const obtenerTiposPago = () => {
+    const map = new Map<string, number>();
+    ventas.forEach((v) => {
+      const metodo = v.metodo_pago || v.metodoPago || "Desconocido";
+      map.set(metodo, (map.get(metodo) || 0) + 1);
+    });
+    return Array.from(map.entries()).map(([metodo, count]) => ({
+      metodo,
+      count,
+    }));
+  };
+
+  const datosTiposPago = obtenerTiposPago();
+
+  const coloresTipoPago = [
+    "#0d6efd",
+    "#198754",
+    "#ffc107",
+    "#dc3545",
+    "#6c757d",
+    "#6610f2",
+  ];
+
+  const tiposPagoData = {
+    labels: datosTiposPago.map((d) => d.metodo),
+    datasets: [
+      {
+        data: datosTiposPago.map((d) => d.count),
+        backgroundColor: coloresTipoPago.slice(0, datosTiposPago.length),
       },
     ],
   };
@@ -278,16 +403,12 @@ function Analisis() {
               <div className="col-12">
                 <div className="card radius-10">
                   <div className="card-header">
-                    <h6 className="mb-0">Panel de Control</h6>
+                    <h6 className="mb-0">
+                      Bienvenido al Sistema de Administración de la Corporacion
+                      Digital Technology
+                    </h6>
                   </div>
                   <div className="card-body">
-                    <div className="d-flex align-items-center">
-                      <h5>
-                        Bienvenido al Sistema de Administración de la
-                        Corporacion Digital Technology
-                      </h5>
-                    </div>
-
                     <div className="row mt-3">
                       <div className="col-12">
                         <div className="card radius-10">
@@ -297,51 +418,38 @@ function Analisis() {
                             </h6>
                           </div>
                           <div className="card-body">
-                            <div className="row mb-3">
-                              <div className="col-md-4">
-                                <label
-                                  htmlFor="categoryFilter"
-                                  className="form-label"
-                                >
-                                  Categoría
+                            <div className="row mb-4">
+                              <div className="col-12">
+                                <label className="form-label">
+                                  Filtrar por Categoría
                                 </label>
-                                <select
-                                  id="categoryFilter"
-                                  className="form-select"
-                                  value={categoryFilter}
-                                  onChange={(e) =>
-                                    setCategoryFilter(e.target.value)
-                                  }
-                                >
-                                  <option value="">Todas las categorías</option>
+                                <div className="d-flex gap-2 flex-wrap">
+                                  <button
+                                    className={`btn ${
+                                      selectedCategoryId === ""
+                                        ? "btn-primary"
+                                        : "btn-outline-primary"
+                                    }`}
+                                    onClick={() => setSelectedCategoryId("")}
+                                  >
+                                    Todas las categorías
+                                  </button>
                                   {categories.map((c) => (
-                                    <option key={c.Id} value={String(c.Id)}>
+                                    <button
+                                      key={c.Id}
+                                      className={`btn ${
+                                        selectedCategoryId === String(c.Id)
+                                          ? "btn-primary"
+                                          : "btn-outline-primary"
+                                      }`}
+                                      onClick={() =>
+                                        setSelectedCategoryId(String(c.Id))
+                                      }
+                                    >
                                       {c.Nombre}
-                                    </option>
+                                    </button>
                                   ))}
-                                </select>
-                              </div>
-                              <div className="col-md-4">
-                                <label
-                                  htmlFor="statusFilter"
-                                  className="form-label"
-                                >
-                                  Estado
-                                </label>
-                                <select
-                                  id="statusFilter"
-                                  className="form-select"
-                                  value={statusFilter}
-                                  onChange={(e) =>
-                                    setStatusFilter(e.target.value)
-                                  }
-                                >
-                                  <option value="">Todos los estados</option>
-                                  <option value="Abastecido">Abastecido</option>
-                                  <option value="Agotado">Agotado</option>
-                                  <option value="Activo">Activo</option>
-                                  <option value="Inactivo">Inactivo</option>
-                                </select>
+                                </div>
                               </div>
                             </div>
                             {loading ? (
@@ -378,8 +486,79 @@ function Analisis() {
                                   Productos: {productos.length} | Lotes:{" "}
                                   {lotes.length}
                                 </div>
-                                {datosLotesConEstado.length > 0 ? (
-                                  <Bar data={lotesPorProductoConEstado} />
+                                {datosLotesTotales.length > 0 ? (
+                                  <>
+                                    <div
+                                      style={{
+                                        height: "400px",
+                                        maxHeight: "500px",
+                                      }}
+                                    >
+                                      <Bar
+                                        data={lotesPorProducto}
+                                        options={chartOptions}
+                                      />
+                                    </div>
+
+                                    <div className="row mt-4">
+                                      <div className="col-md-8">
+                                        <div className="card radius-10">
+                                          <div className="card-header">
+                                            <h6 className="mb-0">
+                                              Clientes con más compras
+                                            </h6>
+                                          </div>
+                                          <div className="card-body">
+                                            {datosClientesTop.length > 0 ? (
+                                              <div style={{ height: "300px" }}>
+                                                <Bar
+                                                  data={clientesChartData}
+                                                  options={clientesChartOptions}
+                                                />
+                                              </div>
+                                            ) : (
+                                              <div
+                                                style={{
+                                                  textAlign: "center",
+                                                  color: "#999",
+                                                }}
+                                              >
+                                                No hay datos de clientes
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      <div className="col-md-4">
+                                        <div className="card radius-10">
+                                          <div className="card-header">
+                                            <h6 className="mb-0">
+                                              Métodos de Pago
+                                            </h6>
+                                          </div>
+                                          <div className="card-body">
+                                            {datosTiposPago.length > 0 ? (
+                                              <div style={{ height: "300px" }}>
+                                                <Doughnut
+                                                  data={tiposPagoData}
+                                                />
+                                              </div>
+                                            ) : (
+                                              <div
+                                                style={{
+                                                  textAlign: "center",
+                                                  color: "#999",
+                                                }}
+                                              >
+                                                No hay datos de pago
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </>
                                 ) : (
                                   <div
                                     style={{

@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import Nav from "../../Layout/Nav";
 import Sidebar from "../../Layout/Sidebar";
 import "./AsignarPedidos.css";
+import { QRCodeCanvas } from "qrcode.react";
 
 interface DetalleRow {
   id: string;
@@ -60,14 +61,15 @@ export default function AsignarPedidos() {
   >({});
 
   const [selectedMetodoPago, setSelectedMetodoPago] = useState<string>("");
-  // Estado automático: siempre "Entregado"
-  const [selectedEstado] = useState<string>("Entregado");
+  // Estado dinámico según tipo de entrega
+  // Recojo = Entregado, Envío = Pendiente
+  const [selectedEstado, setSelectedEstado] = useState<string>("Pendiente");
   // Fecha automática: fecha actual del equipo
   const [fecha] = useState<string>(() => {
     const today = new Date();
     return today.toISOString().split("T")[0];
   });
-  const [tipoEntrega, setTipoEntrega] = useState<string>("Envío");
+  const [tipoEntrega, setTipoEntrega] = useState<string>("Envío a Domicilio");
   const [, setCiudad] = useState<string>("");
   const [, setCalle] = useState<string>("");
   const [, setReferencia] = useState<string>("");
@@ -83,15 +85,30 @@ export default function AsignarPedidos() {
   const [showModalError, setShowModalError] = useState(false);
   const [showModalDireccion, setShowModalDireccion] = useState(false);
   const [showModalDireccionExito, setShowModalDireccionExito] = useState(false);
+  const [showModalDuplicado, setShowModalDuplicado] = useState(false);
+  const [showModalValidacion, setShowModalValidacion] = useState(false);
+  const [erroresValidacion, setErroresValidacion] = useState<string[]>([]);
   const [successMessage, setSuccessMessage] = useState("");
   const [successData, setSuccessData] = useState<Record<string, unknown>>({});
   const [errorMessage, setErrorMessage] = useState("");
   const [errorDetails, setErrorDetails] = useState<Record<string, string>>({});
+  const [mensajeDuplicado, setMensajeDuplicado] = useState("");
+  const [qrToken, setQrToken] = useState<string | null>(null);
+
   const [direccionExitoData, setDireccionExitoData] = useState<
     Record<string, string>
   >({});
 
   useEffect(() => {}, [showModalSuccess, showModalError]);
+
+  // Actualizar estado según tipo de entrega
+  useEffect(() => {
+    if (tipoEntrega === "Recojo en Tienda") {
+      setSelectedEstado("Entregado");
+    } else {
+      setSelectedEstado("Pendiente");
+    }
+  }, [tipoEntrega]);
 
   useEffect(() => {
     const t = rows.reduce((s, r) => s + r.subtotal, 0);
@@ -182,6 +199,21 @@ export default function AsignarPedidos() {
     setRows((r) => r.filter((x) => x.id !== id));
   }
   function updateRowProducto(id: string, productoId: string) {
+    // Validar que el producto no esté duplicado en otras filas
+    const productoDuplicado = rows.some(
+      (row) =>
+        row.id !== id && row.productoId === productoId && productoId !== "",
+    );
+
+    if (productoDuplicado) {
+      // Mostrar modal si el producto ya existe
+      setMensajeDuplicado(
+        `Este producto ya fue agregado. Aumenta la cantidad en esa fila en lugar de crear una nueva.`,
+      );
+      setShowModalDuplicado(true);
+      return;
+    }
+
     const prod = productos.find((p) => String(p.id) === productoId);
     const pid = prod ? prod.id : 0;
     // cargar lotes del producto
@@ -282,23 +314,70 @@ export default function AsignarPedidos() {
     }
   }
 
+  // Función para validar el formulario antes de guardar
+  function validarFormularioVenta(): boolean {
+    const errores: string[] = [];
+
+    // Validar usuario seleccionado
+    if (!selectedUsuario || selectedUsuario.trim() === "") {
+      errores.push("⚠️ Selecciona un cliente para registrar la venta");
+    }
+
+    // Validar método de pago
+    if (!selectedMetodoPago || selectedMetodoPago.trim() === "") {
+      errores.push(
+        "⚠️ Elige un método de pago (Efectivo, Tarjeta, Depósito, Yape)",
+      );
+    }
+
+    // Validar comprobante
+    if (!selectedComprobante || selectedComprobante.trim() === "") {
+      errores.push("⚠️ Selecciona el comprobante a emitir (Boleta o Factura)");
+    }
+
+    // Validar tipo de entrega y dirección
+    if (
+      tipoEntrega === "Envío a Domicilio" &&
+      (!idDireccion || idDireccion.toString().trim() === "")
+    ) {
+      errores.push("⚠️ Debes guardar una dirección para envíos a domicilio");
+    }
+
+    // Validar que haya productos en la venta
+    if (!rows || rows.length === 0) {
+      errores.push("⚠️ Agrega al menos un producto a la venta");
+    } else {
+      // Validar cada fila de producto
+      rows.forEach((row, index) => {
+        if (!row.productoId || row.productoId.toString().trim() === "") {
+          errores.push(`⚠️ Fila ${index + 1}: Selecciona un producto`);
+        }
+        if (!row.cantidad || row.cantidad <= 0) {
+          errores.push(`⚠️ Fila ${index + 1}: La cantidad debe ser mayor a 0`);
+        }
+      });
+    }
+
+    // Validar total
+    if (!total || total <= 0) {
+      errores.push("⚠️ El total de la venta debe ser mayor a 0");
+    }
+
+    if (errores.length > 0) {
+      setErroresValidacion(errores);
+      setShowModalValidacion(true);
+      return false;
+    }
+
+    return true;
+  }
+
   // Crear venta y enviar al backend
   async function handleCrearVenta(e?: React.FormEvent<HTMLFormElement>) {
     if (e) e.preventDefault();
 
-    if (!selectedUsuario) {
-      alert("Seleccione un usuario.");
-      return;
-    }
-
-    if (tipoEntrega === "Envío" && !idDireccion) {
-      alert("Debe guardar una dirección para envío a domicilio.");
-      return;
-    }
-
-    // Validar que todos los productos tengan cantidad mayor a 0
-    if (rows.some((r) => !r.productoId || r.cantidad <= 0)) {
-      alert("Complete todos los detalles de productos con cantidad válida.");
+    // Ejecutar validación completa
+    if (!validarFormularioVenta()) {
       return;
     }
 
@@ -314,7 +393,8 @@ export default function AsignarPedidos() {
       fecha: fecha,
       metodo_pago: selectedMetodoPago || null,
       comprobante: selectedComprobante || null,
-      id_direccion: tipoEntrega === "Recojo" ? null : Number(idDireccion),
+      id_direccion:
+        tipoEntrega === "Recojo en Tienda" ? null : Number(idDireccion),
       tipo_entrega: tipoEntrega,
       costo_total: Number(total),
       estado: selectedEstado,
@@ -325,17 +405,23 @@ export default function AsignarPedidos() {
 
     const token = localStorage.getItem("token");
     try {
-      const res = await fetch("https://proyecto-backend-web-1.onrender.com/api/ventas", {
-        method: "POST",
-        headers: {
-          Authorization: token ? `Bearer ${token}` : "",
-          "Content-Type": "application/json",
+      const res = await fetch(
+        "https://proyecto-backend-web-1.onrender.com/api/ventas",
+        {
+          method: "POST",
+          headers: {
+            Authorization: token ? `Bearer ${token}` : "",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
         },
-        body: JSON.stringify(payload),
-      });
+      );
       const body = await res.json().catch(() => null);
+
       if (res.ok) {
         // Guardar datos de la venta exitosa
+        const qr = body?.qr_token || null; // 👈 AQUÍ RECIBIMOS EL TOKEN
+        setQrToken(qr);
         const ventaData = {
           usuario: usuarios.find((u) => String(u.id) === selectedUsuario)
             ?.nombre,
@@ -377,7 +463,7 @@ export default function AsignarPedidos() {
           setSelectedComprobante("");
           setRuc("");
           // Estado y fecha son automáticos, no se resetean
-          setTipoEntrega("Envío");
+          setTipoEntrega("Envío a Domicilio");
         }, 500);
       } else {
         console.error("Error crear venta:", body);
@@ -523,14 +609,17 @@ export default function AsignarPedidos() {
     console.log("Enviando dirección:", payload);
 
     try {
-      const res = await fetch("https://proyecto-backend-web-1.onrender.com/api/directions", {
-        method: "POST",
-        headers: {
-          Authorization: token ? `Bearer ${token}` : "",
-          "Content-Type": "application/json",
+      const res = await fetch(
+        "https://proyecto-backend-web-1.onrender.com/api/directions",
+        {
+          method: "POST",
+          headers: {
+            Authorization: token ? `Bearer ${token}` : "",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
         },
-        body: JSON.stringify(payload),
-      });
+      );
 
       console.log("Respuesta status:", res.status);
       const body = await res.json().catch(() => null);
@@ -637,6 +726,9 @@ export default function AsignarPedidos() {
                               </option>
                             ))}
                           </select>
+                          <small className="form-text text-muted d-block mt-1">
+                            Selecciona el cliente que realiza la compra
+                          </small>
                         </div>
 
                         <div className="col-md-3">
@@ -672,6 +764,9 @@ export default function AsignarPedidos() {
                             <option value="Deposito">Deposito</option>
                             <option value="Yape">Yape</option>
                           </select>
+                          <small className="form-text text-muted d-block mt-1">
+                            Elige cómo pagará el cliente
+                          </small>
                         </div>
 
                         <div className="col-md-3">
@@ -690,6 +785,9 @@ export default function AsignarPedidos() {
                               </option>
                             ))}
                           </select>
+                          <small className="form-text text-muted d-block mt-1">
+                            Comprobante a emitir (Boleta o Factura)
+                          </small>
                         </div>
 
                         {/** Mostrar RUC si se eligió Factura */}
@@ -715,16 +813,24 @@ export default function AsignarPedidos() {
                             value={tipoEntrega}
                             onChange={(e) => {
                               setTipoEntrega(e.target.value);
-                              if (e.target.value === "Recojo")
+                              if (e.target.value === "Recojo en Tienda")
                                 setIdDireccion(null);
                             }}
                           >
-                            <option value="Envío">Envío a domicilio</option>
-                            <option value="Recojo">Recojo en tienda</option>
+                            <option value="Envío a Domicilio">
+                              Envío a Domicilio
+                            </option>
+                            <option value="Recojo en Tienda">
+                              Recojo en Tienda
+                            </option>
                           </select>
+                          <small className="form-text text-muted d-block mt-1">
+                            Tipo de entrega (Recojo en tienda o Envío a
+                            domicilio)
+                          </small>
                         </div>
 
-                        {tipoEntrega === "Envío" && (
+                        {tipoEntrega === "Envío a Domicilio" && (
                           <div className="col-md-6">
                             <label className="form-label">Dirección</label>
                             <div className="d-flex gap-2">
@@ -761,14 +867,24 @@ export default function AsignarPedidos() {
                               disabled
                             />
                             <span
-                              className="input-group-text bg-success text-white fw-bold"
-                              title="El estado se establece automáticamente como Entregado para POS"
+                              className={`input-group-text text-white fw-bold ${
+                                selectedEstado === "Entregado"
+                                  ? "bg-success"
+                                  : "bg-warning"
+                              }`}
+                              title={
+                                tipoEntrega === "Recojo en Tienda"
+                                  ? "Recojo en Tienda: Estado Entregado"
+                                  : "Envío a Domicilio: Estado Pendiente"
+                              }
                             >
                               Automático
                             </span>
                           </div>
                           <small className="text-muted">
-                            Todos los pedidos se crean como "Entregado" en POS.
+                            {tipoEntrega === "Recojo en Tienda"
+                              ? "✓ Recojo en Tienda: Se crea como 'Entregado'"
+                              : "⏳ Envío a Domicilio: Se crea como 'Pendiente'"}
                           </small>
                         </div>
 
@@ -933,32 +1049,47 @@ export default function AsignarPedidos() {
                 zIndex: 1050,
               }}
             >
-              <div className="modal-dialog">
-                <div className="modal-content">
-                  <div className="modal-header">
-                    <h5 className="modal-title">Agregar Dirección</h5>
+              <div className="modal-dialog modal-dialog-centered modal-md">
+                <div className="modal-content border-primary shadow-lg">
+                  <div className="modal-header bg-primary text-white">
+                    <h5 className="modal-title">
+                      <i
+                        className="bx bx-map-pin me-2"
+                        style={{ fontSize: "1.5rem" }}
+                      ></i>
+                      Agregar Dirección
+                    </h5>
                     <button
                       type="button"
-                      className="btn-close"
+                      className="btn-close btn-close-white"
                       onClick={() => setShowModalDireccion(false)}
                       aria-label="Cerrar"
                     ></button>
                   </div>
                   <div className="modal-body">
                     <div className="mb-3">
-                      <label>Ciudad</label>
-                      <input id="ciudadInput" className="form-control" />
+                      <label className="form-label fw-bold">Ciudad</label>
+                      <input
+                        id="ciudadInput"
+                        className="form-control"
+                        placeholder="Ingresa la ciudad"
+                      />
                     </div>
                     <div className="mb-3">
-                      <label>Calle</label>
-                      <input id="calleInput" className="form-control" />
+                      <label className="form-label fw-bold">Calle</label>
+                      <input
+                        id="calleInput"
+                        className="form-control"
+                        placeholder="Ingresa la calle y número"
+                      />
                     </div>
                     <div className="mb-3">
-                      <label>Referencia</label>
+                      <label className="form-label fw-bold">Referencia</label>
                       <textarea
                         id="refInput"
                         className="form-control"
                         rows={2}
+                        placeholder="Ej: cerca al parque, departamento 305"
                       ></textarea>
                     </div>
                   </div>
@@ -968,6 +1099,7 @@ export default function AsignarPedidos() {
                       className="btn btn-secondary"
                       onClick={() => setShowModalDireccion(false)}
                     >
+                      <i className="bx bx-x me-1"></i>
                       Cancelar
                     </button>
                     <button
@@ -975,6 +1107,7 @@ export default function AsignarPedidos() {
                       className="btn btn-primary"
                       onClick={guardarDireccionSimulada}
                     >
+                      <i className="bx bx-check me-1"></i>
                       Guardar Dirección
                     </button>
                   </div>
@@ -1068,6 +1201,28 @@ export default function AsignarPedidos() {
                         </table>
                       </div>
                     )}
+                    {qrToken && (
+                      <div className="mt-4 d-flex justify-content-center">
+                        <div className="text-center">
+                          <h6 className="fw-bold mb-2">
+                            📦 Código QR para validación de entrega
+                          </h6>
+
+                          <QRCodeCanvas
+                            value={qrToken} // 👈 EL TOKEN SE CONVIERTE EN QR
+                            size={180}
+                            bgColor="#ffffff"
+                            fgColor="#000000"
+                            level="H"
+                            includeMargin={true}
+                          />
+
+                          <p className="text-muted small mt-2">
+                            Escanea este código al momento de entregar el pedido
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div className="modal-footer">
                     <button
@@ -1134,6 +1289,101 @@ export default function AsignarPedidos() {
                       type="button"
                       className="btn btn-danger"
                       onClick={() => setShowModalError(false)}
+                    >
+                      <i className="bx bx-x me-1"></i>
+                      Cerrar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Producto Duplicado */}
+            <div
+              className={`modal fade ${showModalDuplicado ? "show" : ""}`}
+              id="modalDuplicado"
+              tabIndex={-1}
+              inert={!showModalDuplicado}
+              style={{
+                display: showModalDuplicado ? "block" : "none",
+                zIndex: 1050,
+              }}
+            >
+              <div className="modal-dialog modal-dialog-centered modal-md">
+                <div className="modal-content border-warning shadow-lg">
+                  <div className="modal-header bg-warning text-dark">
+                    <h5 className="modal-title">
+                      <i
+                        className="bx bx-info-circle me-2"
+                        style={{ fontSize: "1.5rem" }}
+                      ></i>
+                      Producto Duplicado
+                    </h5>
+                  </div>
+                  <div className="modal-body">
+                    <div className="alert alert-warning-light">
+                      <p className="mb-0 text-warning fw-bold">
+                        <i className="bx bx-bulb me-1"></i>
+                        {mensajeDuplicado}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="modal-footer">
+                    <button
+                      type="button"
+                      className="btn btn-warning"
+                      onClick={() => setShowModalDuplicado(false)}
+                    >
+                      <i className="bx bx-check me-1"></i>
+                      Entendido
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal de Validación - Errores */}
+            <div
+              className={`modal fade ${showModalValidacion ? "show" : ""}`}
+              id="modalValidacion"
+              tabIndex={-1}
+              inert={!showModalValidacion}
+              style={{
+                display: showModalValidacion ? "block" : "none",
+                zIndex: 1050,
+              }}
+            >
+              <div className="modal-dialog modal-dialog-centered modal-md">
+                <div className="modal-content border-warning shadow-lg">
+                  <div className="modal-header bg-warning text-dark">
+                    <h5 className="modal-title">
+                      <i
+                        className="bx bx-error-circle me-2"
+                        style={{ fontSize: "1.5rem" }}
+                      ></i>
+                      Hay Errores en el Formulario
+                    </h5>
+                  </div>
+                  <div className="modal-body">
+                    <div className="alert alert-warning-light">
+                      <p className="text-warning fw-bold mb-2">
+                        <i className="bx bx-check-circle me-1"></i>
+                        Por favor completa los siguientes campos:
+                      </p>
+                      <ul className="mb-0 ps-3">
+                        {erroresValidacion.map((error, index) => (
+                          <li key={index} className="text-warning small mb-1">
+                            {error}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                  <div className="modal-footer">
+                    <button
+                      type="button"
+                      className="btn btn-warning"
+                      onClick={() => setShowModalValidacion(false)}
                     >
                       <i className="bx bx-x me-1"></i>
                       Cerrar
