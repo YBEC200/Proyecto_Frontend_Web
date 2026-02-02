@@ -4,7 +4,7 @@ import Sidebar from "../../Layout/Sidebar";
 import VerLotes from "./VerLotes";
 import "./GestionProductos.css";
 import "./VerLotes.css";
-
+const API_URL = import.meta.env.VITE_API_URL;
 interface Producto {
   id: string;
   nombre: string;
@@ -83,7 +83,7 @@ export default function GestionProductos() {
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(
-        `https://proyecto-backend-web-1.onrender.com/api/productos/${productoId}/can-delete`,
+        `${API_URL}/api/productos/${productoId}/can-delete`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -119,7 +119,7 @@ export default function GestionProductos() {
 
     try {
       const response = await fetch(
-        `https://proyecto-backend-web-1.onrender.com/api/productos?${params.toString()}`,
+        `${API_URL}/api/productos?${params.toString()}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -161,15 +161,12 @@ export default function GestionProductos() {
   const fetchCategorias = async () => {
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(
-        `https://proyecto-backend-web-1.onrender.com/api/categorias`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
+      const response = await fetch(`${API_URL}/api/categorias`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
-      );
+      });
 
       if (!response.ok) {
         setCategorias([]);
@@ -252,7 +249,7 @@ export default function GestionProductos() {
 
     try {
       const res = await fetch(
-        `https://proyecto-backend-web-1.onrender.com/api/productos/${selectedProduct.id}`,
+        `${API_URL}/api/productos/${selectedProduct.id}`,
         {
           method: "PUT",
           headers: {
@@ -306,16 +303,13 @@ export default function GestionProductos() {
   const handleDelete = async (id: string) => {
     const token = localStorage.getItem("token");
     try {
-      const res = await fetch(
-        `https://proyecto-backend-web-1.onrender.com/api/productos/${id}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: token ? `Bearer ${token}` : "",
-            "Content-Type": "application/json",
-          },
+      const res = await fetch(`${API_URL}/api/productos/${id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: token ? `Bearer ${token}` : "",
+          "Content-Type": "application/json",
         },
-      );
+      });
       const body = await res.json().catch(() => null);
       if (res.ok) {
         await fetchProductos();

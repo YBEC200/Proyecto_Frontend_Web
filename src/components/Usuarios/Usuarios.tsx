@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import Nav from "../Layout/Nav";
 import Sidebar from "../Layout/Sidebar";
 import "./Usuarios.css";
+const API_URL = import.meta.env.VITE_API_URL;
 
 interface Compra {
   id: number;
@@ -83,7 +84,7 @@ function Usuarios() {
 
     try {
       const response = await fetch(
-        `https://proyecto-backend-web-1.onrender.com/api/usuarios?${params.toString()}`,
+        `${API_URL}/api/usuarios?${params.toString()}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -105,7 +106,7 @@ function Usuarios() {
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(
-        `https://proyecto-backend-web-1.onrender.com/api/usuarios/${usuarioId}/can-delete`,
+        `${API_URL}/api/usuarios/${usuarioId}/can-delete`,
         {
           headers: {
             Authorization: token ? `Bearer ${token}` : "",
@@ -152,7 +153,7 @@ function Usuarios() {
     const token = localStorage.getItem("token");
     try {
       const response = await fetch(
-        `https://proyecto-backend-web-1.onrender.com/api/usuarios/${selectedUser.id}`,
+        `${API_URL}/api/usuarios/${selectedUser.id}`,
         {
           method: "PUT",
           headers: {
@@ -202,7 +203,7 @@ function Usuarios() {
     const token = localStorage.getItem("token");
     try {
       const response = await fetch(
-        `https://proyecto-backend-web-1.onrender.com/api/usuarios/${selectedUser.id}`,
+        `${API_URL}/api/usuarios/${selectedUser.id}`,
         {
           method: "DELETE",
           headers: {

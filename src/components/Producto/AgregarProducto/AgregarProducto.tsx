@@ -3,7 +3,7 @@ import Nav from "../../Layout/Nav";
 import Sidebar from "../../Layout/Sidebar";
 import { Link } from "react-router-dom";
 import "./AgregarProducto.css";
-
+const API_URL = import.meta.env.VITE_API_URL;
 interface Categoria {
   id: number;
   nombre: string;
@@ -50,15 +50,12 @@ export default function AgregarProducto() {
     const fetchCategorias = async () => {
       try {
         const token = localStorage.getItem("token");
-        const response = await fetch(
-          "https://proyecto-backend-web-1.onrender.com/api/categorias",
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
+        const response = await fetch(`${API_URL}/api/categorias`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
           },
-        );
+        });
 
         if (!response.ok) {
           setLoadingCategorias(false);
@@ -175,17 +172,14 @@ export default function AgregarProducto() {
         costo_unit: parseFloat(String(costoUnit)),
       };
 
-      const response = await fetch(
-        "https://proyecto-backend-web-1.onrender.com/api/productos",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
+      const response = await fetch(`${API_URL}/api/productos`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify(payload),
+      });
 
       if (!response.ok) {
         const errorData = await response.json();

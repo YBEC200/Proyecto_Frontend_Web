@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import "./VerLotes.css";
-
+const API_URL = import.meta.env.VITE_API_URL;
 interface Lote {
   Id: string;
   Lote: string;
@@ -83,21 +83,18 @@ export default function VerLotes({
     const estado = String(formData.get("Estado") ?? "");
     const token = localStorage.getItem("token");
     try {
-      const res = await fetch(
-        `http://127.0.0.1:8000/api/lotes/${selectedLote.Id}`,
-        {
-          method: "PUT",
-          headers: {
-            Authorization: token ? `Bearer ${token}` : "",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            Lote: loteNombre,
-            Cantidad: cantidad,
-            Estado: estado,
-          }),
+      const res = await fetch(`${API_URL}/api/lotes/${selectedLote.Id}`, {
+        method: "PUT",
+        headers: {
+          Authorization: token ? `Bearer ${token}` : "",
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify({
+          Lote: loteNombre,
+          Cantidad: cantidad,
+          Estado: estado,
+        }),
+      });
       const body = await res.json().catch(() => null);
       if (res.ok) {
         await fetchLotes();
@@ -138,7 +135,7 @@ export default function VerLotes({
 
     const token = localStorage.getItem("token");
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/lotes/${Id}`, {
+      const res = await fetch(`${API_URL}/api/lotes/${Id}`, {
         method: "DELETE",
         headers: {
           Authorization: token ? `Bearer ${token}` : "",
@@ -177,15 +174,12 @@ export default function VerLotes({
   const verificarEliminabilidadLote = async (loteId: string) => {
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(
-        `http://127.0.0.1:8000/api/lotes/${loteId}/can-delete`,
-        {
-          headers: {
-            Authorization: token ? `Bearer ${token}` : "",
-            "Content-Type": "application/json",
-          },
+      const res = await fetch(`${API_URL}/api/lotes/${loteId}/can-delete`, {
+        headers: {
+          Authorization: token ? `Bearer ${token}` : "",
+          "Content-Type": "application/json",
         },
-      );
+      });
 
       if (!res.ok) {
         return;
@@ -219,7 +213,7 @@ export default function VerLotes({
       if (estadoFilter) params.set("estado", estadoFilter);
 
       const token = localStorage.getItem("token");
-      const url = `http://127.0.0.1:8000/api/lotes?${params.toString()}`;
+      const url = `${API_URL}/api/lotes?${params.toString()}`;
 
       console.debug("fetchLotes ->", { productoId, url });
 

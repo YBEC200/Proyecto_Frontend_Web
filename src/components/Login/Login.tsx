@@ -1,6 +1,6 @@
 import { useState } from "react";
 import "./Login.css";
-
+const API_URL = import.meta.env.VITE_API_URL;
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -37,7 +37,7 @@ export default function Login() {
     if (!valido) return;
 
     try {
-      const response = await fetch("https://proyecto-backend-web-1.onrender.com/api/admin/login", {
+      const response = await fetch(`${API_URL}/api/admin/login`, {
         method: "POST",
         headers: {
           Authorization: "Bearer " + localStorage.getItem("token"),
@@ -55,7 +55,7 @@ export default function Login() {
         window.location.href = "/dashboard";
       } else {
         setErrorMessage(
-          data.message || "Correo electrónico y/o contraseña incorrectos."
+          data.message || "Correo electrónico y/o contraseña incorrectos.",
         );
       }
       // eslint-disable-next-line @typescript-eslint/no-unused-vars

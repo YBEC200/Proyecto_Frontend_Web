@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { useState } from "react";
 import "./Nav.css";
-
+const API_URL = import.meta.env.VITE_API_URL;
 export default function Nav() {
   const [showChatModal, setShowChatModal] = useState(false);
   // Valores estáticos por ahora (sin backend)
@@ -14,7 +14,7 @@ export default function Nav() {
     const token = localStorage.getItem("token");
     if (token) {
       try {
-        await fetch("https://proyecto-backend-web-1.onrender.com/api/admin/logout", {
+        await fetch(`${API_URL}/api/admin/logout`, {
           method: "POST",
           headers: {
             Authorization: "Bearer " + token,

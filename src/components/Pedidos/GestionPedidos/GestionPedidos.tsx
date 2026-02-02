@@ -3,7 +3,7 @@ import Nav from "../../Layout/Nav";
 import Sidebar from "../../Layout/Sidebar";
 import "./GestionPedidos.css";
 import { QRCodeCanvas } from "qrcode.react";
-
+const API_URL = import.meta.env.VITE_API_URL;
 interface Usuario {
   id: number;
   nombre: string;
@@ -101,15 +101,12 @@ function GestionPedidos() {
   const fetchUsuarios = async (): Promise<Map<number, string>> => {
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(
-        "https://proyecto-backend-web-1.onrender.com/api/usuarios",
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
+      const response = await fetch("${API_URL}/api/usuarios", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
-      );
+      });
 
       if (!response.ok) {
         return new Map();
@@ -147,7 +144,7 @@ function GestionPedidos() {
       const usuariosMap = await fetchUsuarios();
 
       const response = await fetch(
-        `https://proyecto-backend-web-1.onrender.com/api/ventas?${params.toString()}`,
+        `${API_URL}/api/ventas?${params.toString()}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -212,15 +209,12 @@ function GestionPedidos() {
     try {
       const token = localStorage.getItem("token");
 
-      const response = await fetch(
-        `https://proyecto-backend-web-1.onrender.com/api/ventas/${ventaId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
+      const response = await fetch(`${API_URL}/api/ventas/${ventaId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
-      );
+      });
 
       if (!response.ok) {
         setError("Error al cargar los detalles de la venta");
@@ -385,7 +379,7 @@ function GestionPedidos() {
     try {
       const token = localStorage.getItem("token");
       const response = await fetch(
-        `https://proyecto-backend-web-1.onrender.com/api/ventas/${ventaACancelar.id}`,
+        `${API_URL}/api/ventas/${ventaACancelar.id}`,
         {
           method: "PUT",
           headers: {

@@ -3,6 +3,7 @@ import Nav from "../../Layout/Nav";
 import Sidebar from "../../Layout/Sidebar";
 import "./Analisis.css";
 import { Bar, Doughnut, Line } from "react-chartjs-2";
+const API_URL = import.meta.env.VITE_API_URL;
 import {
   Chart,
   CategoryScale,
@@ -53,7 +54,7 @@ function Analisis() {
     const token = localStorage.getItem("token");
     (async () => {
       try {
-        const res = await fetch("http://127.0.0.1:8000/api/categorias", {
+        const res = await fetch("${API_URL}/api/categorias", {
           headers: { Authorization: token ? `Bearer ${token}` : "" },
         });
         if (!res.ok) return;
@@ -76,7 +77,7 @@ function Analisis() {
       }
 
       const response = await fetch(
-        `http://127.0.0.1:8000/api/estadisticas/lotes-activos-por-categoria?${params.toString()}`,
+        `${API_URL}/api/estadisticas/lotes-activos-por-categoria?${params.toString()}`,
         {
           headers: {
             Authorization: token ? `Bearer ${token}` : "",
@@ -119,7 +120,7 @@ function Analisis() {
 
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/api/productos?${params.toString()}`,
+        `${API_URL}/api/productos?${params.toString()}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -167,7 +168,7 @@ function Analisis() {
     setLoadingPagos(true);
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(`http://127.0.0.1:8000/api/ventas`, {
+      const response = await fetch(`${API_URL}/api/ventas`, {
         headers: {
           Authorization: token ? `Bearer ${token}` : "",
           "Content-Type": "application/json",
@@ -214,7 +215,7 @@ function Analisis() {
     try {
       const token = localStorage.getItem("token");
       const response = await fetch(
-        `http://127.0.0.1:8000/api/estadisticas/categorias-mas-vendidas`,
+        `${API_URL}/api/estadisticas/categorias-mas-vendidas`,
         {
           headers: {
             Authorization: token ? `Bearer ${token}` : "",
@@ -243,7 +244,7 @@ function Analisis() {
     try {
       const token = localStorage.getItem("token");
       const response = await fetch(
-        `http://127.0.0.1:8000/api/estadisticas/ventasPorMesYTipoEntrega?year=${year}`,
+        `${API_URL}/api/estadisticas/ventasPorMesYTipoEntrega?year=${year}`,
         {
           headers: {
             Authorization: token ? `Bearer ${token}` : "",

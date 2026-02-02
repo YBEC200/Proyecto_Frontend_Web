@@ -4,7 +4,7 @@ import Nav from "../../Layout/Nav";
 import Sidebar from "../../Layout/Sidebar";
 import "./AsignarPedidos.css";
 import { QRCodeCanvas } from "qrcode.react";
-
+const API_URL = import.meta.env.VITE_API_URL;
 interface DetalleRow {
   id: string;
   productoId: string;
@@ -133,10 +133,10 @@ export default function AsignarPedidos() {
     (async () => {
       try {
         const [pRes, uRes] = await Promise.all([
-          fetch("https://proyecto-backend-web-1.onrender.com/api/productos", {
+          fetch(`${API_URL}/api/productos`, {
             headers,
           }),
-          fetch("https://proyecto-backend-web-1.onrender.com/api/usuarios", {
+          fetch(`${API_URL}/api/usuarios`, {
             headers,
           }),
         ]);
@@ -172,15 +172,12 @@ export default function AsignarPedidos() {
     if (lotesByProduct[productId]) return; // ya cargado
     const token = localStorage.getItem("token");
     try {
-      const res = await fetch(
-        `https://proyecto-backend-web-1.onrender.com/api/lotes?product_id=${productId}`,
-        {
-          headers: {
-            Authorization: token ? `Bearer ${token}` : "",
-            "Content-Type": "application/json",
-          },
+      const res = await fetch(`${API_URL}/api/lotes?product_id=${productId}`, {
+        headers: {
+          Authorization: token ? `Bearer ${token}` : "",
+          "Content-Type": "application/json",
         },
-      );
+      });
       if (!res.ok) return;
       const data = await res.json();
       setLotesByProduct((s) => ({ ...s, [productId]: data }));
@@ -291,7 +288,7 @@ export default function AsignarPedidos() {
     const token = localStorage.getItem("token");
     try {
       const res = await fetch(
-        `https://proyecto-backend-web-1.onrender.com/api/lotes?product_id=${productoId}&estado=Activo`,
+        `${API_URL}/api/lotes?product_id=${productoId}&estado=Activo`,
         {
           headers: {
             Authorization: token ? `Bearer ${token}` : "",
@@ -416,17 +413,14 @@ export default function AsignarPedidos() {
 
     const token = localStorage.getItem("token");
     try {
-      const res = await fetch(
-        "https://proyecto-backend-web-1.onrender.com/api/ventas",
-        {
-          method: "POST",
-          headers: {
-            Authorization: token ? `Bearer ${token}` : "",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
+      const res = await fetch(`${API_URL}/api/ventas`, {
+        method: "POST",
+        headers: {
+          Authorization: token ? `Bearer ${token}` : "",
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify(payload),
+      });
       const body = await res.json().catch(() => null);
 
       if (res.ok) {
@@ -620,17 +614,14 @@ export default function AsignarPedidos() {
     console.log("Enviando dirección:", payload);
 
     try {
-      const res = await fetch(
-        "https://proyecto-backend-web-1.onrender.com/api/directions",
-        {
-          method: "POST",
-          headers: {
-            Authorization: token ? `Bearer ${token}` : "",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
+      const res = await fetch(`${API_URL}/api/directions`, {
+        method: "POST",
+        headers: {
+          Authorization: token ? `Bearer ${token}` : "",
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify(payload),
+      });
 
       console.log("Respuesta status:", res.status);
       const body = await res.json().catch(() => null);
@@ -690,7 +681,7 @@ export default function AsignarPedidos() {
     } catch (err) {
       console.error("Fetch error guardar dirección:", err);
       alert(
-        "Error de conexión al guardar la dirección. Verifica que el servidor esté en https://proyecto-backend-web-1.onrender.com",
+        "Error de conexión al guardar la dirección. Verifica que el servidor esté en ${API_URL}",
       );
     }
   }

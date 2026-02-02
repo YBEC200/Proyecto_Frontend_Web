@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import Nav from "../../Layout/Nav";
 import Sidebar from "../../Layout/Sidebar";
 import "./GestionCategorias.css";
-
+const API_URL = import.meta.env.VITE_API_URL;
 interface Categoria {
   Id: number;
   Nombre: string;
@@ -29,7 +29,7 @@ export default function GestionCategorias() {
   // ========== TABLA CATEGORÍAS CRUD ==========
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [selectedCategoria, setSelectedCategoria] = useState<Categoria | null>(
-    null
+    null,
   );
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -54,7 +54,7 @@ export default function GestionCategorias() {
     setLoadingCategorias(true);
     try {
       const token = getToken();
-      const response = await fetch(`https://proyecto-backend-web-1.onrender.com/api/categorias`, {
+      const response = await fetch(`${API_URL}/api/categorias`, {
         headers: {
           Authorization: token ? `Bearer ${token}` : "",
         },
@@ -99,8 +99,8 @@ export default function GestionCategorias() {
       const method = isEditing && selectedCategoria ? "PUT" : "POST";
       const url =
         method === "PUT"
-          ? `https://proyecto-backend-web-1.onrender.com/api/categorias/${selectedCategoria?.Id}`
-          : `https://proyecto-backend-web-1.onrender.com/api/categorias`;
+          ? `${API_URL}/api/categorias/${selectedCategoria?.Id}`
+          : `${API_URL}/api/categorias`;
 
       const response = await fetch(url, {
         method,
@@ -116,7 +116,7 @@ export default function GestionCategorias() {
         setMensaje(
           isEditing
             ? "Categoría actualizada correctamente"
-            : "Categoría creada correctamente"
+            : "Categoría creada correctamente",
         );
         setMensajeTipo("success");
         setIsEditing(false);
@@ -128,7 +128,7 @@ export default function GestionCategorias() {
         if (modalElement instanceof HTMLElement) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const bsModal = (window as any).bootstrap?.Modal.getInstance(
-            modalElement
+            modalElement,
           );
           bsModal?.hide();
         }
@@ -153,13 +153,13 @@ export default function GestionCategorias() {
     const token = getToken();
     try {
       const response = await fetch(
-        `https://proyecto-backend-web-1.onrender.com/api/categorias/${categoria.Id}`,
+        `${API_URL}/api/categorias/${categoria.Id}`,
         {
           method: "DELETE",
           headers: {
             Authorization: token ? `Bearer ${token}` : "",
           },
-        }
+        },
       );
 
       if (response.ok) {
@@ -185,7 +185,7 @@ export default function GestionCategorias() {
   const fetchProductos = useCallback(async () => {
     try {
       const token = getToken();
-      const response = await fetch(`https://proyecto-backend-web-1.onrender.com/api/productos`, {
+      const response = await fetch(`${API_URL}/api/productos`, {
         headers: {
           Authorization: token ? `Bearer ${token}` : "",
         },
@@ -201,7 +201,7 @@ export default function GestionCategorias() {
   }, []);
 
   const productosFiltrados = productos.filter((p) =>
-    p.nombre.toLowerCase().includes(productoNombreInput.toLowerCase())
+    p.nombre.toLowerCase().includes(productoNombreInput.toLowerCase()),
   );
 
   const handleSelectProducto = (productoId: string, productoNombre: string) => {
@@ -234,7 +234,7 @@ export default function GestionCategorias() {
     }
 
     try {
-      const response = await fetch(`https://proyecto-backend-web-1.onrender.com/api/lotes`, {
+      const response = await fetch(`${API_URL}/api/lotes`, {
         method: "POST",
         headers: {
           Authorization: token ? `Bearer ${token}` : "",
@@ -383,7 +383,7 @@ export default function GestionCategorias() {
                                       onClick={() =>
                                         handleSelectProducto(
                                           producto.id,
-                                          producto.nombre
+                                          producto.nombre,
                                         )
                                       }
                                     >
@@ -414,7 +414,7 @@ export default function GestionCategorias() {
                               setLoteCantidad(
                                 e.target.value === ""
                                   ? ""
-                                  : Number(e.target.value)
+                                  : Number(e.target.value),
                               )
                             }
                             required
