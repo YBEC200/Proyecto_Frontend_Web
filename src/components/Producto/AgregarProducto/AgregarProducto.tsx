@@ -170,6 +170,7 @@ export default function AgregarProducto() {
         id_categoria: parseInt(idCategoria),
         estado: estado,
         costo_unit: parseFloat(String(costoUnit)),
+        fecha_registro: new Date().toISOString(),
       };
 
       const response = await fetch(`${API_URL}/api/productos`, {

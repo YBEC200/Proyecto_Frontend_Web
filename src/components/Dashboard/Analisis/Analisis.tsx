@@ -36,6 +36,7 @@ function Analisis() {
   const [categories, setCategories] = useState<
     { Id: number; Nombre: string }[]
   >([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [ventas, setVentas] = useState<any[]>([]);
   const [loadingProductos, setLoadingProductos] = useState(false);
@@ -50,18 +51,72 @@ function Analisis() {
     new Date().getFullYear(),
   );
 
+  // Estados para las tarjetas superiores
+  const [ventasEntregadasAnio, setVentasEntregadasAnio] = useState<number>(0);
+  const [productoMasVendido, setProductoMasVendido] = useState<{
+    product_id?: number;
+    product_name?: string;
+    total_vendido?: number;
+  } | null>(null);
+  const [totalClientes, setTotalClientes] = useState<number>(0);
+  const [gananciasMes, setGananciasMes] = useState<number>(0);
+  const [gananciasMesNombre, setGananciasMesNombre] = useState<string>("");
+
   useEffect(() => {
     const token = localStorage.getItem("token");
     (async () => {
+      setLoadingCategories(true);
       try {
-        const res = await fetch("${API_URL}/api/categorias", {
+        const res = await fetch(`${API_URL}/api/categorias`, {
           headers: { Authorization: token ? `Bearer ${token}` : "" },
         });
-        if (!res.ok) return;
-        const data = await res.json();
-        setCategories(Array.isArray(data) ? data : []);
+
+        // Si la ruta no existe o la BD está vacía, tratamos como lista vacía
+        if (res.status === 404) {
+          setCategories([]);
+          setLoadingCategories(false);
+          return;
+        }
+
+        if (!res.ok) {
+          // Intentamos leer el body para evitar excepciones al parsear
+          const text = await res.text();
+          if (!text) {
+            setCategories([]);
+            setLoadingCategories(false);
+            return;
+          }
+          try {
+            const parsed = JSON.parse(text);
+            setCategories(Array.isArray(parsed) ? parsed : []);
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          } catch (err) {
+            // Respuesta no JSON: ignorar y usar lista vacía
+            console.warn("Unexpected response for categorias:", text);
+            setCategories([]);
+          }
+          setLoadingCategories(false);
+          return;
+        }
+
+        // OK: parsear con seguridad incluso si body está vacío
+        const text = await res.text();
+        if (!text) {
+          setCategories([]);
+          setLoadingCategories(false);
+          return;
+        }
+        try {
+          const data = JSON.parse(text);
+          setCategories(Array.isArray(data) ? data : []);
+        } catch (e) {
+          console.warn("Error parsing categorias JSON:", e);
+          setCategories([]);
+        }
+        setLoadingCategories(false);
       } catch (err) {
         console.error("Error fetching categorias:", err);
+        setLoadingCategories(false);
       }
     })();
   }, []);
@@ -188,6 +243,8 @@ function Analisis() {
       const normalized = (Array.isArray(data) ? data : []).map((item: any) => ({
         id: item.id || item.Id,
         metodo_pago: item.metodo_pago || item.Metodo_Pago,
+        fecha: item.Fecha || item.fecha || item.created_at || null,
+        estado: (item.estado || item.Estado || "").toString(),
         user: {
           id: item.id_usuario || item.Id_Usuario,
           nombre:
@@ -200,6 +257,22 @@ function Analisis() {
       }));
 
       setVentas(normalized);
+
+      try {
+        // Calcular ventas entregadas del año seleccionado
+        const year = selectedYear;
+        const deliveredCount = normalized.filter((v) => {
+          if (!v.fecha) return false;
+          const d = new Date(v.fecha);
+          const y = d.getFullYear();
+          return y === year && String(v.estado).toLowerCase() === "entregado";
+        }).length;
+        setVentasEntregadasAnio(deliveredCount);
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (err) {
+        // en caso de fechas inesperadas no bloqueamos el flujo
+        setVentasEntregadasAnio(0);
+      }
     } catch (err) {
       console.error("Error fetching ventas:", err);
       setVentas([]);
@@ -207,7 +280,7 @@ function Analisis() {
       setLoadingClientes(false);
       setLoadingPagos(false);
     }
-  }, []);
+  }, [selectedYear]);
 
   // Obtener categorías más vendidas (reemplaza obtenerProductosComprados)
   const fetchCategoriasMasVendidas = useCallback(async () => {
@@ -238,13 +311,12 @@ function Analisis() {
     }
   }, []);
 
-  // Obtener ventas por mes
-  const fetchVentasPorMes = useCallback(async (year: number) => {
-    setLoadingVentasPorMes(true);
+  // Obtener producto más vendido
+  const fetchProductoMasVendido = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(
-        `${API_URL}/api/estadisticas/ventasPorMesYTipoEntrega?year=${year}`,
+      const res = await fetch(
+        `${API_URL}/api/estadisticas/producto-mas-vendido`,
         {
           headers: {
             Authorization: token ? `Bearer ${token}` : "",
@@ -253,13 +325,158 @@ function Analisis() {
         },
       );
 
+      // Manejo explícito para 404 (BD vacía) o respuestas sin body
+      if (res.status === 404) {
+        setProductoMasVendido(null);
+        return;
+      }
+
+      if (!res.ok) {
+        setProductoMasVendido(null);
+        return;
+      }
+
+      // Evitar excepción si el body está vacío
+      const text = await res.text();
+      if (!text) {
+        setProductoMasVendido(null);
+        return;
+      }
+      const data = JSON.parse(text);
+      setProductoMasVendido(data);
+    } catch (err) {
+      console.error("Error fetching producto mas vendido:", err);
+      setProductoMasVendido(null);
+    }
+  }, []);
+
+  // Contar clientes (rol: Cliente)
+  const fetchContarClientes = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_URL}/api/estadisticas/contar-clientes`, {
+        headers: {
+          Authorization: token ? `Bearer ${token}` : "",
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (res.status === 404) {
+        setTotalClientes(0);
+        return;
+      }
+
+      if (!res.ok) {
+        setTotalClientes(0);
+        return;
+      }
+
+      const text = await res.text();
+      if (!text) {
+        setTotalClientes(0);
+        return;
+      }
+      const data = JSON.parse(text);
+      setTotalClientes(Number(data.cantidad ?? 0));
+    } catch (err) {
+      console.error("Error fetching total clientes:", err);
+      setTotalClientes(0);
+    }
+  }, []);
+
+  // Obtener ganancias anuales y extraer ganancias del mes
+  const fetchGananciasAnio = useCallback(async (year: number) => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(
+        `${API_URL}/api/estadisticas/ganancias-anio/${year}`,
+        {
+          headers: {
+            Authorization: token ? `Bearer ${token}` : "",
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      if (res.status === 404) {
+        setGananciasMes(0);
+        setGananciasMesNombre("");
+        return;
+      }
+
+      if (!res.ok) {
+        setGananciasMes(0);
+        setGananciasMesNombre("");
+        return;
+      }
+
+      const text = await res.text();
+      if (!text) {
+        setGananciasMes(0);
+        setGananciasMesNombre("");
+        return;
+      }
+      const data = JSON.parse(text);
+      const monthIndex = new Date().getMonth(); // 0-based
+      const monthNumber = monthIndex + 1; // 1-12
+      const mensual = data.mensual || {};
+      const valor = Number(mensual[monthNumber] ?? 0);
+      const monthNames = [
+        "Enero",
+        "Febrero",
+        "Marzo",
+        "Abril",
+        "Mayo",
+        "Junio",
+        "Julio",
+        "Agosto",
+        "Septiembre",
+        "Octubre",
+        "Noviembre",
+        "Diciembre",
+      ];
+      setGananciasMes(valor);
+      setGananciasMesNombre(monthNames[monthIndex]);
+    } catch (err) {
+      console.error("Error fetching ganancias anio:", err);
+      setGananciasMes(0);
+      setGananciasMesNombre("");
+    }
+  }, []);
+
+  // Obtener ventas por mes
+  const fetchVentasPorMes = useCallback(async (year: number) => {
+    setLoadingVentasPorMes(true);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(
+        `${API_URL}/api/estadisticas/ventas-por-mes-y-tipo-entrega?year=${year}`,
+        {
+          headers: {
+            Authorization: token ? `Bearer ${token}` : "",
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      if (response.status === 404) {
+        setVentasPorMesData(null);
+        setLoadingVentasPorMes(false);
+        return;
+      }
+
       if (!response.ok) {
         setVentasPorMesData(null);
         setLoadingVentasPorMes(false);
         return;
       }
 
-      const data = await response.json();
+      const text = await response.text();
+      if (!text) {
+        setVentasPorMesData(null);
+        return;
+      }
+      const data = JSON.parse(text);
       setVentasPorMesData(data);
     } catch (err) {
       console.error("Error fetching ventas por mes:", err);
@@ -277,10 +494,16 @@ function Analisis() {
     fetchVentas();
     fetchCategoriasMasVendidas();
     fetchVentasPorMes(selectedYear);
+    fetchProductoMasVendido();
+    fetchContarClientes();
+    fetchGananciasAnio(selectedYear);
   }, [
     fetchVentas,
     fetchCategoriasMasVendidas,
     fetchVentasPorMes,
+    fetchProductoMasVendido,
+    fetchContarClientes,
+    fetchGananciasAnio,
     selectedYear,
   ]);
 
@@ -521,8 +744,10 @@ function Analisis() {
                   <div className="card-body">
                     <div className="d-flex align-items-center">
                       <div className="me-auto">
-                        <p className="mb-0 text-white">Total de ventas</p>
-                        <h4 className="my-1 text-white">100</h4>
+                        <p className="mb-0 text-white">{`Ventas entregadas (${selectedYear})`}</p>
+                        <h4 className="my-1 text-white">
+                          {ventasEntregadasAnio}
+                        </h4>
                       </div>
                       <div>
                         <i className="bx bx-cart text-white fs-3"></i>
@@ -537,11 +762,16 @@ function Analisis() {
                   <div className="card-body">
                     <div className="d-flex align-items-center">
                       <div className="me-auto">
-                        <p className="mb-0 text-white">Total Mantenimientos</p>
-                        <h4 className="my-1 text-white">85</h4>
+                        <p className="mb-0 text-white">Producto más vendido</p>
+                        <h6 className="my-1 text-white">
+                          {productoMasVendido?.product_name || "—"}
+                        </h6>
+                        <small className="text-white">
+                          Vendidos: {productoMasVendido?.total_vendido ?? 0}
+                        </small>
                       </div>
                       <div>
-                        <i className="bx bx-wrench text-white fs-3"></i>
+                        <i className="bx bx-award text-white fs-3"></i>
                       </div>
                     </div>
                   </div>
@@ -553,8 +783,8 @@ function Analisis() {
                   <div className="card-body">
                     <div className="d-flex align-items-center">
                       <div className="me-auto">
-                        <p className="mb-0 text-white">Ganancias del Mes</p>
-                        <h4 className="my-1 text-white">S/. 8,950</h4>
+                        <p className="mb-0 text-white">{`Ganancias del Mes ${gananciasMesNombre ? `("${gananciasMesNombre}")` : ""}`}</p>
+                        <h4 className="my-1 text-white">{`S/. ${gananciasMes.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</h4>
                       </div>
                       <div></div>
                     </div>
@@ -568,7 +798,7 @@ function Analisis() {
                     <div className="d-flex align-items-center">
                       <div className="me-auto">
                         <p className="mb-0 text-white">Total Clientes</p>
-                        <h4 className="my-1 text-white">168</h4>
+                        <h4 className="my-1 text-white">{totalClientes}</h4>
                       </div>
                       <div>
                         <i className="bx bx-group text-white fs-3"></i>
@@ -623,24 +853,40 @@ function Analisis() {
                                         : "btn-outline-primary"
                                     }`}
                                     onClick={() => setSelectedCategoryId("")}
+                                    disabled={loadingCategories}
                                   >
                                     Todas las categorías
                                   </button>
-                                  {categories.map((c) => (
-                                    <button
-                                      key={c.Id}
-                                      className={`btn ${
-                                        selectedCategoryId === String(c.Id)
-                                          ? "btn-primary"
-                                          : "btn-outline-primary"
-                                      }`}
-                                      onClick={() =>
-                                        setSelectedCategoryId(String(c.Id))
-                                      }
-                                    >
-                                      {c.Nombre}
-                                    </button>
-                                  ))}
+                                  {loadingCategories ? (
+                                    <small className="text-muted ms-2 d-flex align-items-center gap-2">
+                                      <span
+                                        className="spinner-border spinner-border-sm"
+                                        role="status"
+                                        aria-hidden="true"
+                                      ></span>
+                                      Cargando categorías...
+                                    </small>
+                                  ) : categories.length === 0 ? (
+                                    <small className="text-muted ms-2">
+                                      No hay categorías registradas
+                                    </small>
+                                  ) : (
+                                    categories.map((c) => (
+                                      <button
+                                        key={c.Id}
+                                        className={`btn ${
+                                          selectedCategoryId === String(c.Id)
+                                            ? "btn-primary"
+                                            : "btn-outline-primary"
+                                        }`}
+                                        onClick={() =>
+                                          setSelectedCategoryId(String(c.Id))
+                                        }
+                                      >
+                                        {c.Nombre}
+                                      </button>
+                                    ))
+                                  )}
                                 </div>
                               </div>
                             </div>

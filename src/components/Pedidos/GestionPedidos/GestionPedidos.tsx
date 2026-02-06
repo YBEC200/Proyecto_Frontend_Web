@@ -101,7 +101,7 @@ function GestionPedidos() {
   const fetchUsuarios = async (): Promise<Map<number, string>> => {
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch("${API_URL}/api/usuarios", {
+      const response = await fetch(`${API_URL}/api/usuarios`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",

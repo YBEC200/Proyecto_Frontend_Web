@@ -20,10 +20,9 @@ export default function GestionCategorias() {
   const [productoSeleccionado, setProductoSeleccionado] = useState("");
   const [productoNombreInput, setProductoNombreInput] = useState("");
   const [loteCantidad, setLoteCantidad] = useState<number | "">("");
-  const [mensajeLote, setMensajeLote] = useState("");
-  const [mensajeLoteTipo, setMensajeLoteTipo] = useState<
-    "success" | "error" | ""
-  >("");
+  const [showSuccessLote, setShowSuccessLote] = useState(false);
+  const [showErrorLote, setShowErrorLote] = useState(false);
+  const [messageLote, setMessageLote] = useState("");
   const [showProductoDropdown, setShowProductoDropdown] = useState(false);
 
   // ========== TABLA CATEGORÍAS CRUD ==========
@@ -36,8 +35,9 @@ export default function GestionCategorias() {
   const [deleteTargetCategoria, setDeleteTargetCategoria] =
     useState<Categoria | null>(null);
   const [loadingCategorias, setLoadingCategorias] = useState(false);
-  const [mensaje, setMensaje] = useState("");
-  const [mensajeTipo, setMensajeTipo] = useState<"success" | "error" | "">("");
+  const [showSuccessCategoria, setShowSuccessCategoria] = useState(false);
+  const [showErrorCategoria, setShowErrorCategoria] = useState(false);
+  const [messageCategoria, setMessageCategoria] = useState("");
 
   // Form estados para editar categoría
   const [editFormNombre, setEditFormNombre] = useState("");
@@ -66,8 +66,8 @@ export default function GestionCategorias() {
       setCategorias(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error fetching categorías:", error);
-      setMensaje("Error al cargar las categorías");
-      setMensajeTipo("error");
+      setMessageCategoria("Error al cargar las categorías");
+      setShowErrorCategoria(true);
     } finally {
       setLoadingCategorias(false);
     }
@@ -90,8 +90,8 @@ export default function GestionCategorias() {
     };
 
     if (!payload.Nombre) {
-      setMensaje("El nombre es obligatorio.");
-      setMensajeTipo("error");
+      setMessageCategoria("El nombre es obligatorio.");
+      setShowErrorCategoria(true);
       return;
     }
 
@@ -113,12 +113,12 @@ export default function GestionCategorias() {
 
       if (response.ok) {
         await fetchCategorias();
-        setMensaje(
+        setMessageCategoria(
           isEditing
             ? "Categoría actualizada correctamente"
             : "Categoría creada correctamente",
         );
-        setMensajeTipo("success");
+        setShowSuccessCategoria(true);
         setIsEditing(false);
         setSelectedCategoria(null);
         setEditFormNombre("");
@@ -134,13 +134,13 @@ export default function GestionCategorias() {
         }
       } else {
         const errorData = await response.json().catch(() => ({}));
-        setMensaje(errorData.message || `Error ${response.status}`);
-        setMensajeTipo("error");
+        setMessageCategoria(errorData.message || `Error ${response.status}`);
+        setShowErrorCategoria(true);
       }
     } catch (error) {
       console.error("Error guardando categoría:", error);
-      setMensaje("Error de conexión al guardar la categoría.");
-      setMensajeTipo("error");
+      setMessageCategoria("Error de conexión al guardar la categoría.");
+      setShowErrorCategoria(true);
     }
   };
 
@@ -164,17 +164,19 @@ export default function GestionCategorias() {
 
       if (response.ok) {
         await fetchCategorias();
-        setMensaje("Categoría eliminada correctamente");
-        setMensajeTipo("success");
+        setMessageCategoria("Categoría eliminada correctamente");
+        setShowSuccessCategoria(true);
       } else {
         const errorData = await response.json().catch(() => ({}));
-        setMensaje(errorData.message || "Error al eliminar la categoría");
-        setMensajeTipo("error");
+        setMessageCategoria(
+          errorData.message || "Error al eliminar la categoría",
+        );
+        setShowErrorCategoria(true);
       }
     } catch (error) {
       console.error("Error deleting categoría:", error);
-      setMensaje("Error al eliminar la categoría");
-      setMensajeTipo("error");
+      setMessageCategoria("Error al eliminar la categoría");
+      setShowErrorCategoria(true);
     } finally {
       setShowDeleteModal(false);
       setDeleteTargetCategoria(null);
@@ -212,8 +214,7 @@ export default function GestionCategorias() {
 
   const handleSubmitLote = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setMensajeLote("");
-    setMensajeLoteTipo("");
+    setMessageLote("");
     const token = getToken();
 
     const payload = {
@@ -228,8 +229,8 @@ export default function GestionCategorias() {
       !payload.Cantidad ||
       payload.Cantidad <= 0
     ) {
-      setMensajeLote("Complete todos los campos correctamente.");
-      setMensajeLoteTipo("error");
+      setMessageLote("Complete todos los campos correctamente.");
+      setShowErrorLote(true);
       return;
     }
 
@@ -244,21 +245,21 @@ export default function GestionCategorias() {
       });
 
       if (response.ok) {
-        setMensajeLote("Lote creado correctamente");
-        setMensajeLoteTipo("success");
+        setMessageLote("Lote creado correctamente");
+        setShowSuccessLote(true);
         setLoteNombre("");
         setProductoSeleccionado("");
         setProductoNombreInput("");
         setLoteCantidad("");
       } else {
         const errorData = await response.json().catch(() => ({}));
-        setMensajeLote(errorData.message || `Error ${response.status}`);
-        setMensajeLoteTipo("error");
+        setMessageLote(errorData.message || `Error ${response.status}`);
+        setShowErrorLote(true);
       }
     } catch (error) {
       console.error("Error guardando lote:", error);
-      setMensajeLote("Error de conexión al guardar el lote.");
-      setMensajeLoteTipo("error");
+      setMessageLote("Error de conexión al guardar el lote.");
+      setShowErrorLote(true);
     }
   };
 
@@ -293,34 +294,139 @@ export default function GestionCategorias() {
             </div>
 
             {/* Alertas */}
-            {mensaje && (
-              <div
-                className={`alert alert-${
-                  mensajeTipo === "success" ? "success" : "danger"
-                } alert-dismissible fade show`}
-                role="alert"
-              >
-                {mensaje}
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={() => setMensaje("")}
-                ></button>
+            {/* Modal Éxito Categorías */}
+            {showSuccessCategoria && (
+              <div className="modal show d-block" tabIndex={-1}>
+                <div className="modal-dialog modal-dialog-centered modal-md">
+                  <div className="modal-content">
+                    <div className="modal-header bg-success text-white">
+                      <h5 className="modal-title">
+                        <i className="bx bx-check-circle me-2"></i>Éxito
+                      </h5>
+                      <button
+                        type="button"
+                        className="btn-close btn-close-white"
+                        onClick={() => setShowSuccessCategoria(false)}
+                        aria-label="Close"
+                      ></button>
+                    </div>
+                    <div className="modal-body">
+                      <p>
+                        <strong>{messageCategoria}</strong>
+                      </p>
+                    </div>
+                    <div className="modal-footer">
+                      <button
+                        type="button"
+                        className="btn btn-success"
+                        onClick={() => setShowSuccessCategoria(false)}
+                      >
+                        Aceptar
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
-            {mensajeLote && (
-              <div
-                className={`alert alert-${
-                  mensajeLoteTipo === "success" ? "success" : "danger"
-                } alert-dismissible fade show`}
-                role="alert"
-              >
-                {mensajeLote}
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={() => setMensajeLote("")}
-                ></button>
+
+            {/* Modal Error Categorías */}
+            {showErrorCategoria && (
+              <div className="modal show d-block" tabIndex={-1}>
+                <div className="modal-dialog modal-dialog-centered modal-md">
+                  <div className="modal-content">
+                    <div className="modal-header bg-danger text-white">
+                      <h5 className="modal-title">
+                        <i className="bx bx-error-circle me-2"></i>Error
+                      </h5>
+                      <button
+                        type="button"
+                        className="btn-close btn-close-white"
+                        onClick={() => setShowErrorCategoria(false)}
+                        aria-label="Close"
+                      ></button>
+                    </div>
+                    <div className="modal-body">
+                      <p className="text-muted mb-0">{messageCategoria}</p>
+                    </div>
+                    <div className="modal-footer">
+                      <button
+                        type="button"
+                        className="btn btn-danger"
+                        onClick={() => setShowErrorCategoria(false)}
+                      >
+                        Cerrar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Modal Éxito Lote */}
+            {showSuccessLote && (
+              <div className="modal show d-block" tabIndex={-1}>
+                <div className="modal-dialog modal-dialog-centered modal-md">
+                  <div className="modal-content">
+                    <div className="modal-header bg-success text-white">
+                      <h5 className="modal-title">
+                        <i className="bx bx-check-circle me-2"></i>Éxito
+                      </h5>
+                      <button
+                        type="button"
+                        className="btn-close btn-close-white"
+                        onClick={() => setShowSuccessLote(false)}
+                        aria-label="Close"
+                      ></button>
+                    </div>
+                    <div className="modal-body">
+                      <p>
+                        <strong>{messageLote}</strong>
+                      </p>
+                    </div>
+                    <div className="modal-footer">
+                      <button
+                        type="button"
+                        className="btn btn-success"
+                        onClick={() => setShowSuccessLote(false)}
+                      >
+                        Aceptar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Modal Error Lote */}
+            {showErrorLote && (
+              <div className="modal show d-block" tabIndex={-1}>
+                <div className="modal-dialog modal-dialog-centered modal-md">
+                  <div className="modal-content">
+                    <div className="modal-header bg-danger text-white">
+                      <h5 className="modal-title">
+                        <i className="bx bx-error-circle me-2"></i>Error
+                      </h5>
+                      <button
+                        type="button"
+                        className="btn-close btn-close-white"
+                        onClick={() => setShowErrorLote(false)}
+                        aria-label="Close"
+                      ></button>
+                    </div>
+                    <div className="modal-body">
+                      <p className="text-muted mb-0">{messageLote}</p>
+                    </div>
+                    <div className="modal-footer">
+                      <button
+                        type="button"
+                        className="btn btn-danger"
+                        onClick={() => setShowErrorLote(false)}
+                      >
+                        Cerrar
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -619,6 +725,22 @@ export default function GestionCategorias() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Backdrop para los modales */}
+      {(showSuccessCategoria ||
+        showErrorCategoria ||
+        showSuccessLote ||
+        showErrorLote) && (
+        <div
+          className="modal-backdrop fade show"
+          onClick={() => {
+            setShowSuccessCategoria(false);
+            setShowErrorCategoria(false);
+            setShowSuccessLote(false);
+            setShowErrorLote(false);
+          }}
+        ></div>
       )}
     </div>
   );

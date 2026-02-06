@@ -13,9 +13,9 @@ interface Producto {
   estado: "Abastecido" | "Agotado" | "Inactivo";
   lotes: number;
   id_categoria: string;
-  categoria?: { id: string; nombre: string };
+  categoria_nombre?: string;
   fecha_registro: string;
-  ultimo_abastecimiento: string | null;
+  fecha_ultimo_lote: string | null;
 }
 
 function formatFecha(fecha: string) {
@@ -74,9 +74,9 @@ export default function GestionProductos() {
     new Set(),
   );
 
-  // Obtener nombre de categoría por ID
-  const getCategoryName = (idCategoria?: string) =>
-    categorias.find((c) => c.id === idCategoria)?.nombre || idCategoria || "";
+  // Obtener nombre de categoría
+  const getCategoryName = (producto: Producto) =>
+    producto.categoria_nombre ?? "Sin categoría";
 
   // Verificar si un producto puede ser eliminado (sin lotes ni ventas)
   const verificarEliminabilidad = async (productoId: string) => {
@@ -134,21 +134,7 @@ export default function GestionProductos() {
       }
 
       const data = await response.json();
-      // Normalizar campos esperados en el frontend (NO solicitar lotes aquí)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const normalized = (data || []).map((p: any) => ({
-        ...p,
-        // si el backend ya devuelve 'lotes' úsalo; si no, dejamos 0 por defecto
-        lotes:
-          typeof p.lotes !== "undefined"
-            ? Number(p.lotes)
-            : Number(p.lotes ?? 0),
-        fecha_registro: p.fecha_registro ?? p.fechaRegistro ?? "",
-        ultimo_abastecimiento:
-          p.ultimo_abastecimiento ?? p.ultimoAbastecimiento ?? null,
-      }));
-
-      setProductos(normalized);
+      setProductos(data || []);
     } catch (error) {
       console.error("Error fetching productos:", error);
       setProductos([]);
@@ -654,10 +640,10 @@ export default function GestionProductos() {
                             </span>
                           </td>
                           <td>{producto.lotes ?? 0}</td>
-                          <td>{getCategoryName(producto.id_categoria)}</td>
+                          <td>{getCategoryName(producto)}</td>
                           <td>
                             {formatFecha(
-                              producto.ultimo_abastecimiento ??
+                              producto.fecha_ultimo_lote ??
                                 producto.fecha_registro,
                             )}
                           </td>
