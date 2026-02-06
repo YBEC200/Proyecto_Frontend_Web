@@ -174,21 +174,38 @@ function GestionPedidos() {
             metodo_pago: item.metodo_pago || item.Metodo_Pago,
             comprobante: item.comprobante || item.Comprobante,
             id_direccion: item.id_direccion || item.Id_Direccion,
-            fecha: item.fecha || item.Fecha,
+            fecha: item.Fecha || item.fecha,
             costo_total:
-              typeof (item.costo_total || item.Costo_total) === "string"
-                ? parseFloat(item.costo_total || item.Costo_total)
-                : item.costo_total || item.Costo_total,
+              typeof (item.Costo_Total || item.costo_total) === "string"
+                ? parseFloat(item.Costo_Total || item.costo_total || "0")
+                : Number(item.Costo_Total || item.costo_total || 0),
             estado: item.estado || item.Estado,
             tipo_entrega: item.tipo_entrega || item.Tipo_Entrega,
+            qr_token: item.qr_token || item.QR_Token || null,
             // Relaciones
             user: {
               id: userId,
               nombre: userName,
-              correo: item.user?.correo,
+              correo:
+                item.user?.correo ||
+                item.user?.Correo ||
+                item.user?.email ||
+                "",
+              rol: item.user?.rol || item.user?.Rol || "",
+              estado: item.user?.estado || item.user?.Estado || "",
             },
-            direction: item.direction || null,
-            details: item.details || [],
+            direction: item.direction
+              ? {
+                  id: item.direction.id || item.direction.Id,
+                  ciudad: item.direction.ciudad || item.direction.Ciudad,
+                  calle: item.direction.calle || item.direction.Calle,
+                  referencia:
+                    item.direction.referencia ||
+                    item.direction.Referencia ||
+                    "",
+                }
+              : null,
+            details: Array.isArray(item.details) ? item.details : [],
           };
         },
       );
@@ -285,20 +302,21 @@ function GestionPedidos() {
         metodo_pago: data.metodo_pago || data.Metodo_Pago,
         comprobante: data.comprobante || data.Comprobante,
         id_direccion: data.id_direccion || data.Id_Direccion,
-        fecha: data.fecha || data.Fecha,
+        fecha: data.Fecha || data.fecha,
         costo_total:
-          typeof (data.costo_total || data.Costo_total) === "string"
-            ? parseFloat(data.costo_total || data.Costo_total)
-            : data.costo_total || data.Costo_total,
+          typeof (data.Costo_Total || data.costo_total) === "string"
+            ? parseFloat(data.Costo_Total || data.costo_total || "0")
+            : Number(data.Costo_Total || data.costo_total || 0),
         estado: data.estado || data.Estado,
         tipo_entrega: data.tipo_entrega || data.Tipo_Entrega,
-        qr_token: data.qr_token || data.QR_Token,
+        qr_token: data.qr_token || data.QR_Token || null,
         user: data.user
           ? {
               id: data.user.id || data.user.Id,
               nombre: data.user.nombre || data.user.Nombre || data.user.name,
               correo: data.user.correo || data.user.Correo || data.user.email,
-              rol: data.user.estado || data.user.Rol,
+              rol: data.user.rol || data.user.Rol,
+              estado: data.user.estado || data.user.Estado,
             }
           : undefined,
         direction: data.direction

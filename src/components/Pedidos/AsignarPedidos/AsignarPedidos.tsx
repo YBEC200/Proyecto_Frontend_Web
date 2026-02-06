@@ -396,6 +396,17 @@ export default function AsignarPedidos() {
     const estadoFinal =
       tipoEntrega === "Recojo en Tienda" ? "Entregado" : "Pendiente";
 
+    // Validar que tipoEntrega tenga un valor válido
+    if (
+      tipoEntrega !== "Envío a Domicilio" &&
+      tipoEntrega !== "Recojo en Tienda"
+    ) {
+      alert(
+        "❌ El tipo de entrega debe ser 'Envío a Domicilio' o 'Recojo en Tienda'",
+      );
+      return;
+    }
+
     const payload = {
       id_usuario: Number(selectedUsuario),
       fecha: getFechaActual(),
@@ -403,13 +414,15 @@ export default function AsignarPedidos() {
       comprobante: selectedComprobante || null,
       id_direccion:
         tipoEntrega === "Recojo en Tienda" ? null : Number(idDireccion),
-      tipo_entrega: tipoEntrega,
+      tipo_entrega: tipoEntrega, // Debe ser "Envío a Domicilio" o "Recojo en Tienda"
       costo_total: Number(total),
       estado: estadoFinal,
       details,
     };
 
     console.log("Payload a enviar:", payload);
+    console.log("tipoEntrega actual:", tipoEntrega);
+    console.log("estadoFinal actual:", estadoFinal);
 
     const token = localStorage.getItem("token");
     try {

@@ -11,6 +11,20 @@ interface Compra {
   estado: string;
 }
 
+interface Venta {
+  id: number;
+  total: number;
+  fecha: string;
+  estado: string;
+  tipo_entrega: string;
+}
+
+interface UsuarioDetalle {
+  id: number;
+  nombre: string;
+  correo: string;
+}
+
 interface Usuario {
   id: number;
   nombre: string;
@@ -59,6 +73,11 @@ function Usuarios() {
   const [selectedUser, setSelectedUser] = useState<Usuario | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showOrdersModal, setShowOrdersModal] = useState(false);
+  const [ordenesLoading, setOrdenesLoading] = useState(false);
+  const [usuarioDetalle, setUsuarioDetalle] = useState<UsuarioDetalle | null>(
+    null,
+  );
+  const [ventasUsuario, setVentasUsuario] = useState<Venta[]>([]);
   // Modals para mensajes de éxito/error
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
@@ -99,6 +118,55 @@ function Usuarios() {
       setUsuarios([]);
     }
     setLoading(false);
+  };
+
+  // Función para obtener las ventas de un usuario específico
+  const fetchUserVentas = async (usuarioId: number) => {
+    setOrdenesLoading(true);
+    const token = localStorage.getItem("token");
+    try {
+      const response = await fetch(`${API_URL}/api/usuarios/${usuarioId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        setVentasUsuario([]);
+        setUsuarioDetalle(null);
+        setOrdenesLoading(false);
+        return;
+      }
+
+      const data = await response.json();
+      // Normalizar datos desde la API
+      setUsuarioDetalle({
+        id: data.usuario.id,
+        nombre: data.usuario.nombre,
+        correo: data.usuario.correo,
+      });
+
+      // Normalizr ventas - asegurar que total sea number
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ventasNormalizadas = (data.ventas || []).map((venta: any) => ({
+        id: venta.id || venta.Id,
+        total:
+          typeof venta.total === "string"
+            ? parseFloat(venta.total)
+            : venta.total || 0,
+        fecha: venta.fecha || venta.Fecha,
+        estado: venta.estado || venta.Estado,
+        tipo_entrega: venta.tipo_entrega || venta.Tipo_Entrega || "",
+      }));
+      setVentasUsuario(ventasNormalizadas);
+    } catch (error) {
+      console.error("Error fetching user ventas:", error);
+      setVentasUsuario([]);
+      setUsuarioDetalle(null);
+    } finally {
+      setOrdenesLoading(false);
+    }
   };
 
   // Verificar si un usuario puede ser eliminado (sin ventas asociadas)
@@ -463,6 +531,7 @@ function Usuarios() {
                                 onClick={() => {
                                   setSelectedUser(user);
                                   setShowOrdersModal(true);
+                                  fetchUserVentas(user.id);
                                 }}
                               >
                                 <i className="bx bx-receipt"></i>
@@ -630,56 +699,119 @@ function Usuarios() {
               </div>
             )}
             {/* Modal de Órdenes */}
-            {showOrdersModal && selectedUser && (
+            {showOrdersModal && usuarioDetalle && (
               <div className="modal show d-block" tabIndex={-1}>
                 <div className="modal-dialog modal-dialog-centered modal-lg">
                   <div className="modal-content">
                     <div className="modal-header bg-info text-white">
                       <div className="d-flex align-items-center gap-2">
                         <i className="bx bx-receipt fs-5"></i>
-                        <h5 className="modal-title mb-0">
-                          Compras de {selectedUser.nombre}
-                        </h5>
+                        <div>
+                          <h5 className="modal-title mb-0">
+                            Ventas de {usuarioDetalle.nombre}
+                          </h5>
+                          <small className="text-white-50">
+                            {usuarioDetalle.correo}
+                          </small>
+                        </div>
                       </div>
                       <button
                         type="button"
                         className="btn-close btn-close-white"
-                        onClick={() => setShowOrdersModal(false)}
+                        onClick={() => {
+                          setShowOrdersModal(false);
+                          setVentasUsuario([]);
+                          setUsuarioDetalle(null);
+                        }}
                       ></button>
                     </div>
                     <div className="modal-body">
-                      <table className="table">
-                        <thead>
-                          <tr>
-                            <th>ID Pedido</th>
-                            <th>Total</th>
-                            <th>Fecha</th>
-                            <th>Estado</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {selectedUser.compras.map((compra) => (
-                            <tr key={compra.id}>
-                              <td>{compra.id}</td>
-                              <td>S/ {compra.total.toFixed(2)}</td>
-                              <td>{compra.fecha}</td>
-                              <td>
-                                <span
-                                  className={`badge badge-${compra.estado.toLowerCase()}`}
-                                >
-                                  {compra.estado}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                      {ordenesLoading ? (
+                        <div style={{ textAlign: "center", padding: "2em" }}>
+                          <div
+                            className="spinner-border text-primary"
+                            role="status"
+                          >
+                            <span className="visually-hidden">Cargando...</span>
+                          </div>
+                          <div
+                            style={{
+                              marginTop: "1em",
+                              color: "#0d6efd",
+                              fontWeight: "bold",
+                            }}
+                          >
+                            Cargando ventas...
+                          </div>
+                        </div>
+                      ) : ventasUsuario.length === 0 ? (
+                        <div
+                          className="alert alert-info d-flex align-items-center gap-2"
+                          role="alert"
+                        >
+                          <i className="bx bx-info-circle fs-5"></i>
+                          <div>
+                            <strong>Sin ventas registradas</strong>
+                            <p className="mb-0 small">
+                              Este usuario aún no ha realizado ninguna compra.
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="table-responsive">
+                          <table className="table table-hover mb-0">
+                            <thead className="table-light">
+                              <tr>
+                                <th>ID Venta</th>
+                                <th>Total (S/)</th>
+                                <th>Fecha</th>
+                                <th>Estado</th>
+                                <th>Tipo Entrega</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {ventasUsuario.map((venta) => (
+                                <tr key={venta.id}>
+                                  <td className="fw-bold">#{venta.id}</td>
+                                  <td>S/ {venta.total.toFixed(2)}</td>
+                                  <td>{formatFecha(venta.fecha)}</td>
+                                  <td>
+                                    <span
+                                      className={`badge ${
+                                        venta.estado === "Entregado"
+                                          ? "bg-success"
+                                          : venta.estado === "Pendiente"
+                                            ? "bg-warning"
+                                            : "bg-danger"
+                                      }`}
+                                    >
+                                      {venta.estado}
+                                    </span>
+                                  </td>
+                                  <td>
+                                    <small>
+                                      {venta.tipo_entrega ===
+                                      "Envío a Domicilio"
+                                        ? "📦 Envío"
+                                        : "🏪 Recojo"}
+                                    </small>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
                     </div>
                     <div className="modal-footer">
                       <button
                         type="button"
                         className="btn btn-secondary"
-                        onClick={() => setShowOrdersModal(false)}
+                        onClick={() => {
+                          setShowOrdersModal(false);
+                          setVentasUsuario([]);
+                          setUsuarioDetalle(null);
+                        }}
                       >
                         <i className="bx bx-x"></i> Cerrar
                       </button>

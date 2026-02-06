@@ -1452,18 +1452,16 @@ function Analisis() {
                                   <div className="row mt-3 text-center border-top pt-3">
                                     <div className="col-4">
                                       <p className="text-muted mb-1 small">
-                                        Promedio
+                                        Promedio Mensual
                                       </p>
                                       <h6 className="mb-0 text-info">
                                         S/.{" "}
-                                        {(
-                                          ventasPorMesData?.data?.reduce(
-                                            (sum: number, val: number) =>
-                                              sum + val,
-                                            0,
-                                          ) /
-                                          (ventasPorMesData?.data?.length || 1)
-                                        ).toFixed(0)}
+                                        {ventasPorMesData?.resumen
+                                          ?.promedio_mensual
+                                          ? ventasPorMesData.resumen.promedio_mensual.toFixed(
+                                              0,
+                                            )
+                                          : 0}
                                       </h6>
                                     </div>
                                     <div className="col-4">
@@ -1472,9 +1470,11 @@ function Analisis() {
                                       </p>
                                       <h6 className="mb-0 text-success">
                                         S/.{" "}
-                                        {Math.max(
-                                          ...(ventasPorMesData?.data || [0]),
-                                        )}
+                                        {ventasPorMesData?.resumen?.max_mensual
+                                          ? ventasPorMesData.resumen.max_mensual.toFixed(
+                                              0,
+                                            )
+                                          : 0}
                                       </h6>
                                     </div>
                                     <div className="col-4">
@@ -1483,9 +1483,11 @@ function Analisis() {
                                       </p>
                                       <h6 className="mb-0 text-warning">
                                         S/.{" "}
-                                        {Math.min(
-                                          ...(ventasPorMesData?.data || [0]),
-                                        )}
+                                        {ventasPorMesData?.resumen?.min_mensual
+                                          ? ventasPorMesData.resumen.min_mensual.toFixed(
+                                              0,
+                                            )
+                                          : 0}
                                       </h6>
                                     </div>
                                   </div>
