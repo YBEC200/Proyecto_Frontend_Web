@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import Nav from "../Layout/Nav";
 import Sidebar from "../Layout/Sidebar";
+import { updateCurrentUserLoggedIn } from "./useUpdateCurrentUser";
 import "./Usuarios.css";
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -237,6 +238,14 @@ function Usuarios() {
         },
       );
       if (response.ok) {
+        // Actualizar localStorage si el usuario actualizado es el usuario logueado
+        updateCurrentUserLoggedIn(selectedUser.id, {
+          nombre: editNombre,
+          correo: editCorreo,
+          rol: editRol,
+          estado: editEstado,
+        });
+
         fetchUsuarios();
         setShowEditModal(false);
         setSuccessMessage("Usuario editado correctamente.");

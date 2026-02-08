@@ -1,14 +1,116 @@
 import { Link } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "./Nav.css";
+
 const API_URL = import.meta.env.VITE_API_URL;
+
+interface Alert {
+  id: number;
+  tipo: "PRODUCTO" | "VENTA";
+  severidad: "baja" | "media" | "alta" | "critica";
+  titulo: string;
+  mensaje: string;
+  leida: boolean;
+  created_at: string;
+}
+
 export default function Nav() {
   const [showChatModal, setShowChatModal] = useState(false);
-  // Valores estáticos por ahora (sin backend)
-  const notificationsCount = 3;
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadAlerts, setUnreadAlerts] = useState<Alert[]>([]);
+  const [loadingAlerts, setLoadingAlerts] = useState(false);
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const adminName = user.nombre || "Administrador";
   const adminRole = user.rol || "Admin";
+
+  // Función para obtener el conteo de alertas no leídas
+  const fetchUnreadCount = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/api/alerts/unread-count`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setUnreadCount(data.unread || 0);
+      }
+    } catch (error) {
+      console.error("Error fetching unread count:", error);
+    }
+  };
+
+  // Función para obtener alertas no leídas
+  const fetchUnreadAlerts = async () => {
+    setLoadingAlerts(true);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/api/alerts/unread-index`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const alertsArray = Array.isArray(data) ? data : data.data || [];
+        setUnreadAlerts(alertsArray);
+      }
+    } catch (error) {
+      console.error("Error fetching unread alerts:", error);
+    } finally {
+      setLoadingAlerts(false);
+    }
+  };
+
+  // Cargar alertas no leídas cuando se abre el dropdown (simulado con useEffect)
+  useEffect(() => {
+    fetchUnreadCount();
+    // Refrescar cada 30 segundos
+    const interval = setInterval(fetchUnreadCount, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleAlertsBellClick = () => {
+    fetchUnreadAlerts();
+  };
+
+  // Función para obtener icono según severidad
+  const getIconBySeveridad = (severidad: string): string => {
+    switch (severidad) {
+      case "critica":
+        return "bx bx-error-circle";
+      case "alta":
+        return "bx bx-error";
+      case "media":
+        return "bx bx-info-circle";
+      case "baja":
+        return "bx bx-meh";
+      default:
+        return "bx bx-bell";
+    }
+  };
+
+  // Función para formatear fecha
+  const formatFecha = (fecha: string): string => {
+    if (!fecha) return "";
+    const date = new Date(fecha);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (minutes < 1) return "Ahora";
+    if (minutes < 60) return `Hace ${minutes}m`;
+    if (hours < 24) return `Hace ${hours}h`;
+    if (days < 7) return `Hace ${days}d`;
+    return date.toLocaleDateString("es-PE");
+  };
 
   const handleLogout = async () => {
     const token = localStorage.getItem("token");
@@ -33,6 +135,20 @@ export default function Nav() {
     // window.location.href = "/";
   };
 
+  const getSeveridadColor = (severidad: string): string => {
+    switch (severidad) {
+      case "critica":
+        return "alert-critica";
+      case "alta":
+        return "alert-alta";
+      case "media":
+        return "alert-media";
+      case "baja":
+        return "alert-baja";
+      default:
+        return "alert-default";
+    }
+  };
   return (
     <header>
       <div className="topbar d-flex align-items-center">
@@ -60,65 +176,71 @@ export default function Nav() {
                   href="#"
                   data-bs-toggle="dropdown"
                   aria-expanded="false"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleAlertsBellClick();
+                  }}
                 >
-                  <span className="alert-count">{notificationsCount}</span>
+                  {unreadCount > 0 && (
+                    <span className="alert-count">{unreadCount}</span>
+                  )}
                   <i className="bx bx-bell"></i>
                 </a>
 
-                <div className="dropdown-menu dropdown-menu-end">
+                <div className="dropdown-menu dropdown-menu-end alerts-dropdown">
                   <div className="msg-header">
-                    <p className="msg-header-title">Notificaciones</p>
+                    <p className="msg-header-title">Alertas pendientes</p>
                     <p className="msg-header-badge">
-                      {notificationsCount} Nuevas
+                      {unreadCount} {unreadCount === 1 ? "Nueva" : "Nuevas"}
                     </p>
                   </div>
 
                   <div className="header-notifications-list">
-                    <a className="dropdown-item" href="#">
-                      <div className="d-flex align-items-start">
-                        <div className="alert-image riesgo-medio">
-                          <img src="/assets/images/default.png" alt="img" />
-                        </div>
-                        <div className="flex-grow-1">
-                          <h6 className="msg-name">
-                            Pocos existencias
-                            <span className="msg-time float-end">
-                              Hace poco
-                            </span>
-                          </h6>
-                          <p className="msg-info">
-                            Quedan menos de 50 existencias del producto
-                            "Ejemplo".
-                          </p>
+                    {loadingAlerts ? (
+                      <div className="text-center py-3">
+                        <div
+                          className="spinner-border spinner-border-sm text-primary"
+                          role="status"
+                        >
+                          <span className="visually-hidden">Cargando...</span>
                         </div>
                       </div>
-                    </a>
-
-                    <a className="dropdown-item" href="#">
-                      <div className="d-flex align-items-center">
-                        <div className="alert-image riesgo-alto">
-                          <img src="/assets/images/default.png" alt="img" />
-                        </div>
-                        <div className="flex-grow-1">
-                          <h6 className="msg-name">
-                            Stock agotado{" "}
-                            <span className="msg-time float-end">
-                              Hace poco
-                            </span>
-                          </h6>
-                          <p className="msg-info">
-                            Se necesita reponer el stock del producto "Ejemplo
-                            2".
-                          </p>
-                        </div>
+                    ) : unreadAlerts.length === 0 ? (
+                      <div className="text-center py-3 text-muted">
+                        <i
+                          className="bx bx-mail-open d-block mb-2"
+                          style={{ fontSize: "2rem" }}
+                        ></i>
+                        <p className="mb-0">No hay alertas nuevas</p>
                       </div>
-                    </a>
+                    ) : (
+                      unreadAlerts.map((alert) => (
+                        <div
+                          key={alert.id}
+                          className={`alert-item ${getSeveridadColor(alert.severidad)}`}
+                        >
+                          <div className="alert-icon-wrapper">
+                            <i
+                              className={`${getIconBySeveridad(alert.severidad)} alert-icon`}
+                            ></i>
+                          </div>
+                          <div className="alert-content">
+                            <h6 className="alert-title">{alert.titulo}</h6>
+                            <p className="alert-message">{alert.mensaje}</p>
+                            <small className="alert-time">
+                              {formatFecha(alert.created_at)}
+                            </small>
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
 
                   <div className="text-center msg-footer p-2">
                     <Link to="/dashboard/notificaciones" className="w-100">
                       <button className="btn btn-primary w-100">
-                        Ir a todas las notificaciones
+                        <i className="bx bx-chevron-right"></i>
+                        Ver todas las alertas
                       </button>
                     </Link>
                   </div>

@@ -420,10 +420,6 @@ export default function AsignarPedidos() {
       details,
     };
 
-    console.log("Payload a enviar:", payload);
-    console.log("tipoEntrega actual:", tipoEntrega);
-    console.log("estadoFinal actual:", estadoFinal);
-
     const token = localStorage.getItem("token");
     try {
       const res = await fetch(`${API_URL}/api/ventas`, {
@@ -583,14 +579,12 @@ export default function AsignarPedidos() {
         setErrorMessage(message);
         setErrorDetails(details);
         setShowModalError(true);
-        console.log("Modal de error mostrado:", { message, details });
       }
     } catch (err) {
       console.error("Fetch error crear venta:", err);
       setErrorMessage("Error de conexión al crear la venta");
       setErrorDetails({ Conexión: "Verifique su conexión a internet" });
       setShowModalError(true);
-      console.log("Modal de error mostrado por conexión");
     }
   }
 
@@ -636,9 +630,7 @@ export default function AsignarPedidos() {
         body: JSON.stringify(payload),
       });
 
-      console.log("Respuesta status:", res.status);
       const body = await res.json().catch(() => null);
-      console.log("Respuesta body:", body);
 
       if (res.ok) {
         const direccionId = body.id;

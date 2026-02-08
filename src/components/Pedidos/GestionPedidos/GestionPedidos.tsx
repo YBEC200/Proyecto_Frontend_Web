@@ -339,7 +339,6 @@ function GestionPedidos() {
         details: normalizedDetails,
       };
       setSelectedVenta(normalized);
-      console.log("Selected Venta Details:", normalizedDetails);
     } catch (err) {
       console.error("Error fetching venta detail:", err);
       setError("Error de conexión al cargar los detalles");
@@ -396,33 +395,37 @@ function GestionPedidos() {
 
     try {
       const token = localStorage.getItem("token");
+      // Llamada al nuevo controlador que maneja anulacion y reabastecimiento de lotes
       const response = await fetch(
-        `${API_URL}/api/ventas/${ventaACancelar.id}`,
+        `${API_URL}/api/ventas/${ventaACancelar.id}/cancelar`,
         {
-          method: "PUT",
+          method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            estado: "Cancelado",
-          }),
         },
       );
 
-      if (!response.ok) {
-        setErrorCancelacion("Error al cancelar la venta. Intenta de nuevo.");
+      const result = await response.json().catch(() => null);
+
+      if (!response.ok || !result || result.success === false) {
+        setErrorCancelacion(
+          (result && result.message) ||
+            "Error al cancelar la venta. Intenta de nuevo.",
+        );
         setCancelacionEnProceso(false);
         return;
       }
 
-      // Actualizar la lista de ventas
+      // Actualizar la lista de ventas localmente (marcar como Cancelado)
       setVentas((prev) =>
         prev.map((v) =>
           v.id === ventaACancelar.id ? { ...v, estado: "Cancelado" } : v,
         ),
       );
 
+      // Cerrar modal y limpiar estados
       handleCerrarModalCancelar();
     } catch (err) {
       console.error("Error cancelando venta:", err);
