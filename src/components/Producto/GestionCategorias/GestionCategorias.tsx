@@ -217,22 +217,44 @@ export default function GestionCategorias() {
     setMessageLote("");
     const token = getToken();
 
+    // Validar nombre del lote
+    if (!loteNombre.trim()) {
+      setMessageLote("El nombre del lote es requerido.");
+      setShowErrorLote(true);
+      return;
+    }
+
+    if (!/[a-zA-Z0-9]/.test(loteNombre)) {
+      setMessageLote("El nombre del lote debe contener letras o números.");
+      setShowErrorLote(true);
+      return;
+    }
+
+    // Validar que el producto esté seleccionado
+    if (!productoSeleccionado) {
+      setMessageLote("Debes seleccionar un producto.");
+      setShowErrorLote(true);
+      return;
+    }
+
+    // Validar cantidad
+    if (loteCantidad === "" || loteCantidad <= 0) {
+      setMessageLote("La cantidad debe ser mayor a 0.");
+      setShowErrorLote(true);
+      return;
+    }
+
+    if (!Number.isInteger(loteCantidad)) {
+      setMessageLote("La cantidad debe ser un número entero.");
+      setShowErrorLote(true);
+      return;
+    }
+
     const payload = {
       Lote: loteNombre.trim(),
       Id_Producto: productoSeleccionado,
       Cantidad: loteCantidad,
     };
-
-    if (
-      !payload.Lote ||
-      !payload.Id_Producto ||
-      !payload.Cantidad ||
-      payload.Cantidad <= 0
-    ) {
-      setMessageLote("Complete todos los campos correctamente.");
-      setShowErrorLote(true);
-      return;
-    }
 
     try {
       const response = await fetch(`${API_URL}/api/lotes`, {
@@ -447,9 +469,16 @@ export default function GestionCategorias() {
                           className="form-control"
                           placeholder="Ej: LOTE-001"
                           value={loteNombre}
-                          onChange={(e) => setLoteNombre(e.target.value)}
+                          onChange={(e) => {
+                            const valor = e.target.value;
+                            setLoteNombre(valor);
+                          }}
+                          maxLength={100}
                           required
                         />
+                        <small className="text-muted d-block mt-1">
+                          {loteNombre.length}/100 caracteres
+                        </small>
                       </div>
 
                       <div className="mb-3">
@@ -512,20 +541,32 @@ export default function GestionCategorias() {
                           <input
                             type="number"
                             className="form-control"
-                            min="0"
+                            min="1"
                             step="1"
-                            placeholder="0"
+                            placeholder="1"
                             value={loteCantidad === "" ? "" : loteCantidad}
-                            onChange={(e) =>
-                              setLoteCantidad(
-                                e.target.value === ""
-                                  ? ""
-                                  : Number(e.target.value),
-                              )
-                            }
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === "") {
+                                setLoteCantidad("");
+                              } else {
+                                const num = Math.max(
+                                  1,
+                                  Math.floor(Number(val)),
+                                );
+                                setLoteCantidad(num);
+                              }
+                            }}
+                            title="La cantidad debe ser mayor a 0"
                             required
                           />
+                          <span className="input-group-text text-muted">
+                            unidades
+                          </span>
                         </div>
+                        <small className="text-muted d-block mt-1">
+                          Debe ser un número entero mayor a 0
+                        </small>
                       </div>
 
                       <button type="submit" className="btn btn-primary w-100">

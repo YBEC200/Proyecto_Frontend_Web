@@ -71,6 +71,21 @@ interface Venta {
   user?: Usuario;
   direction?: Direccion | null;
   details?: DetailVenta[];
+  // Campos de Nubefact
+  codigo_unico?: string | null;
+  serie?: string | null;
+  numero_comprobante?: string | null;
+  enlace_pdf?: string | null;
+}
+
+interface BajaVenta {
+  id: number;
+  codigo_unico: string;
+  serie: string;
+  numero_comprobante: string;
+  Fecha: string;
+  Costo_Total: number;
+  enlace_pdf: string;
 }
 
 function GestionPedidos() {
@@ -96,6 +111,12 @@ function GestionPedidos() {
   const [textoCancelacion, setTextoCancelacion] = useState("");
   const [cancelacionEnProceso, setCancelacionEnProceso] = useState(false);
   const [errorCancelacion, setErrorCancelacion] = useState("");
+
+  // Estados para modal de boleta
+  const [showBajaModal, setShowBajaModal] = useState(false);
+  const [selectedBaja, setSelectedBaja] = useState<BajaVenta | null>(null);
+  const [loadingBaja, setLoadingBaja] = useState(false);
+  const [errorBaja, setErrorBaja] = useState("");
 
   // Función para obtener usuarios y crear un mapa de lookup
   const fetchUsuarios = async (): Promise<Map<number, string>> => {
@@ -173,6 +194,14 @@ function GestionPedidos() {
             id_usuario: userId,
             metodo_pago: item.metodo_pago || item.Metodo_Pago,
             comprobante: item.comprobante || item.Comprobante,
+
+            // 👇 CAMPOS NUBEFACT (FALTABAN)
+            codigo_unico: item.codigo_unico || item.Codigo_Unico || null,
+            serie: item.serie || item.Serie || null,
+            numero_comprobante:
+              item.numero_comprobante || item.Numero_Comprobante || null,
+            enlace_pdf: item.enlace_pdf || item.Enlace_PDF || null,
+
             id_direccion: item.id_direccion || item.Id_Direccion,
             fecha: item.Fecha || item.fecha,
             costo_total:
@@ -432,6 +461,71 @@ function GestionPedidos() {
       setErrorCancelacion("Error de conexión. Intenta de nuevo.");
       setCancelacionEnProceso(false);
     }
+  };
+
+  // Función para abrir modal de boleta
+  const handleShowBaja = async (venta: Venta) => {
+    // Validar que la venta tenga código único
+    if (!venta.codigo_unico) {
+      setErrorBaja("Esta venta no tiene una boleta asociada en Nubefact");
+      setShowBajaModal(true);
+      return;
+    }
+
+    setLoadingBaja(true);
+    setErrorBaja("");
+    setSelectedBaja(null);
+
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(
+        `${API_URL}/api/comprobantes/boletas/${venta.codigo_unico}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      if (!response.ok) {
+        setErrorBaja("No se pudo cargar los detalles de la boleta");
+        setLoadingBaja(false);
+        setShowBajaModal(true);
+        return;
+      }
+
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setSelectedBaja(result.data);
+      } else {
+        setErrorBaja("Error al cargar los detalles de la boleta");
+      }
+    } catch (err) {
+      console.error("Error loading boleta:", err);
+      setErrorBaja("Error de conexión al cargar la boleta");
+    } finally {
+      setLoadingBaja(false);
+      setShowBajaModal(true);
+    }
+  };
+
+  // Función para cerrar modal de boleta
+  const handleCloseBajaModal = () => {
+    setShowBajaModal(false);
+    setSelectedBaja(null);
+    setErrorBaja("");
+  };
+
+  // Función para descargar PDF
+  const descargarPDF = (codigoUnico: string) => {
+    if (!codigoUnico) return;
+
+    const pdfUrl = `${API_URL}/api/comprobantes/boletas/${codigoUnico}/pdf`;
+
+    // Abrir en nueva pestaña (para poder descargar o visualizar)
+    window.open(pdfUrl, "_blank");
   };
 
   // Funciones de filtrado
@@ -767,12 +861,22 @@ function GestionPedidos() {
                             </td>
                             <td>
                               <button
-                                className="btn btn-sm btn-primary"
+                                className="btn btn-sm btn-primary ms-2"
                                 onClick={() => handleShowDetail(venta)}
                                 title="Ver detalles"
                               >
-                                <i className="bx bx-show"></i> Detalle
+                                <i className="bx bx-show action-icon"></i>
                               </button>
+                              {venta.comprobante === "Boleta" &&
+                                venta.codigo_unico && (
+                                  <button
+                                    className="btn btn-sm btn-success ms-2"
+                                    onClick={() => handleShowBaja(venta)}
+                                    title="Ver boleta Nubefact"
+                                  >
+                                    <i className="bx bx-receipt action-icon"></i>
+                                  </button>
+                                )}
                               {venta.estado !== "Cancelado" && (
                                 <button
                                   className="btn btn-sm btn-danger ms-2"
@@ -781,7 +885,7 @@ function GestionPedidos() {
                                   }
                                   title="Cancelar venta"
                                 >
-                                  <i className="bx bx-x-circle"></i> Cancelar
+                                  <i className="bx bx-x-circle action-icon"></i>
                                 </button>
                               )}
                             </td>
@@ -1220,6 +1324,171 @@ function GestionPedidos() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* MODAL DE BOLETA */}
+      {showBajaModal && (
+        <div className="modal show d-block" tabIndex={-1}>
+          <div className="modal-dialog modal-dialog-centered modal-lg">
+            <div className="modal-content">
+              <div className="modal-header bg-success text-white">
+                <h5 className="modal-title">
+                  <i className="bx bx-receipt me-2"></i>Boleta Nubefact
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close btn-close-white"
+                  onClick={handleCloseBajaModal}
+                  aria-label="Close"
+                ></button>
+              </div>
+
+              <div className="modal-body">
+                {errorBaja && (
+                  <div
+                    className="alert alert-danger alert-dismissible fade show"
+                    role="alert"
+                  >
+                    <strong>Error:</strong> {errorBaja}
+                    <button
+                      type="button"
+                      className="btn-close"
+                      onClick={() => setErrorBaja("")}
+                    ></button>
+                  </div>
+                )}
+
+                {loadingBaja ? (
+                  <div style={{ textAlign: "center", padding: "2em" }}>
+                    <div className="spinner-border text-success" role="status">
+                      <span className="visually-hidden">Cargando...</span>
+                    </div>
+                    <div
+                      style={{
+                        marginTop: "1em",
+                        color: "#198754",
+                        fontWeight: "bold",
+                      }}
+                    >
+                      Cargando detalles de boleta...
+                    </div>
+                  </div>
+                ) : selectedBaja ? (
+                  <>
+                    {/* Información de la boleta */}
+                    <div className="row mb-4">
+                      <div className="col-md-6">
+                        <div className="card bg-light">
+                          <div className="card-body">
+                            <h6 className="card-title text-success fw-bold mb-3">
+                              <i className="bx bx-info-circle me-2"></i>
+                              Información de Boleta
+                            </h6>
+                            <p className="mb-2">
+                              <strong>Código Único:</strong>
+                              <br />
+                              <span className="badge bg-primary">
+                                {selectedBaja.codigo_unico}
+                              </span>
+                            </p>
+                            <p className="mb-2">
+                              <strong>Serie:</strong> {selectedBaja.serie}
+                            </p>
+                            <p className="mb-2">
+                              <strong>Número:</strong>{" "}
+                              {selectedBaja.numero_comprobante}
+                            </p>
+                            <p className="mb-0">
+                              <strong>Fecha:</strong>{" "}
+                              {new Date(selectedBaja.Fecha).toLocaleDateString(
+                                "es-PE",
+                                {
+                                  year: "numeric",
+                                  month: "long",
+                                  day: "numeric",
+                                },
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="col-md-6">
+                        <div className="card bg-light">
+                          <div className="card-body">
+                            <h6 className="card-title text-success fw-bold mb-3">
+                              <i className="bx bx-money me-2"></i>Información de
+                              Monto
+                            </h6>
+                            <p className="mb-0">
+                              <strong className="display-6 text-success">
+                                {`S/ ${Number(selectedBaja?.Costo_Total || 0).toFixed(2)}`}
+                              </strong>
+                            </p>
+                            <small className="text-muted">
+                              Monto Total de la Boleta
+                            </small>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Información adicional */}
+                    <div className="alert alert-info" role="alert">
+                      <strong>
+                        <i className="bx bx-check-circle me-2"></i>Boleta
+                        Emitida en Nubefact
+                      </strong>
+                      <br />
+                      Esta boleta fue generada automáticamente en Nubefact y
+                      está lista para descargar.
+                    </div>
+                  </>
+                ) : null}
+              </div>
+
+              <div className="modal-footer">
+                {!errorBaja && !loadingBaja && selectedBaja && (
+                  <>
+                    <button
+                      type="button"
+                      className="btn btn-warning"
+                      onClick={() =>
+                        descargarPDF(selectedBaja?.codigo_unico || "")
+                      }
+                      title="Descargar PDF de la boleta"
+                    >
+                      <i className="bx bx-download me-2"></i>Descargar PDF
+                    </button>
+                    <a
+                      href={selectedBaja.enlace_pdf}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn btn-info"
+                      title="Ver boleta en línea"
+                    >
+                      <i className="bx bx-link-external me-2"></i>Ver en línea
+                    </a>
+                  </>
+                )}
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={handleCloseBajaModal}
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Backdrop para modal de boleta */}
+      {showBajaModal && (
+        <div
+          className="modal-backdrop fade show"
+          onClick={handleCloseBajaModal}
+        ></div>
       )}
 
       {/* Backdrop para modal de cancelación */}

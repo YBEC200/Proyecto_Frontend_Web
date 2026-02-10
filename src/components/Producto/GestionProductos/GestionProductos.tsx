@@ -9,6 +9,7 @@ interface Producto {
   id: string;
   nombre: string;
   marca: string;
+  descripcion?: string;
   costo_unit: number;
   estado: "Abastecido" | "Agotado" | "Inactivo";
   lotes: number;
@@ -52,6 +53,17 @@ export default function GestionProductos() {
   const [selectedProduct, setSelectedProduct] = useState<Producto | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Producto | null>(null);
+  // Imágenes del producto (para el modal de edición)
+  const [mainImageUrl, setMainImageUrl] = useState<string | null>(null);
+  const [secondaryImages, setSecondaryImages] = useState<
+    { id: number | string; url: string }[]
+  >([]);
+  const [loadingImages, setLoadingImages] = useState(false);
+  const [imageToDelete, setImageToDelete] = useState<{
+    id: number | string;
+    url: string;
+  } | null>(null);
+  const [showConfirmDeleteImage, setShowConfirmDeleteImage] = useState(false);
   // Modals para mensajes de éxito/error
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
@@ -212,6 +224,89 @@ export default function GestionProductos() {
   const handleEdit = (producto: Producto) => {
     setSelectedProduct(producto);
     setShowEditModal(true);
+    // Cargar imágenes del producto inmediatamente
+    fetchProductImages(producto.id);
+  };
+
+  // Obtener imágenes (principal y secundarias) desde backend
+  const fetchProductImages = async (productId: string) => {
+    setLoadingImages(true);
+    const token = localStorage.getItem("token");
+    try {
+      const res = await fetch(
+        `${API_URL}/api/productos/${productId}/imagenes`,
+        {
+          headers: {
+            Authorization: token ? `Bearer ${token}` : "",
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      if (!res.ok) {
+        setMainImageUrl(null);
+        setSecondaryImages([]);
+        return;
+      }
+
+      const data = await res.json();
+      setMainImageUrl(data.imagen_principal || null);
+      setSecondaryImages(
+        Array.isArray(data.imagenes_secundarias)
+          ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            data.imagenes_secundarias.map((i: any) => ({
+              id: i.id,
+              url: i.url,
+            }))
+          : [],
+      );
+    } catch (error) {
+      console.error("Error fetching product images:", error);
+      setMainImageUrl(null);
+      setSecondaryImages([]);
+    } finally {
+      setLoadingImages(false);
+    }
+  };
+
+  // Eliminar imagen secundaria
+  const handleDeleteSecondaryImage = async (imageId: number | string) => {
+    const token = localStorage.getItem("token");
+    try {
+      const res = await fetch(
+        `${API_URL}/api/imagenes-secundarias/${imageId}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: token ? `Bearer ${token}` : "",
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      const body = await res.json().catch(() => null);
+      if (res.ok) {
+        setSecondaryImages((prev) =>
+          prev.filter((i) => String(i.id) !== String(imageId)),
+        );
+        setSuccessMessage(
+          body?.message || "Imagen secundaria eliminada correctamente.",
+        );
+        setShowSuccessModal(true);
+      } else {
+        setErrorMessage(
+          body?.message || `Error ${res.status} al eliminar imagen`,
+        );
+        setShowErrorModal(true);
+      }
+    } catch (error) {
+      console.error("Error deleting image:", error);
+      setErrorMessage("Error de conexión al eliminar la imagen.");
+      setShowErrorModal(true);
+    } finally {
+      setImageToDelete(null);
+      setShowConfirmDeleteImage(false);
+    }
   };
 
   const handleViewLotes = (producto: Producto) => {
@@ -227,6 +322,7 @@ export default function GestionProductos() {
     const formData = new FormData(form);
     const nombre = String(formData.get("nombre") ?? "").trim();
     const marca = String(formData.get("marca") ?? "").trim();
+    const descripcion = String(formData.get("descripcion") ?? "").trim();
     const precio = Number(String(formData.get("precio") ?? ""));
     const estado = String(formData.get("estado") ?? "");
     const id_categoria = String(formData.get("categoria") ?? "");
@@ -245,6 +341,7 @@ export default function GestionProductos() {
           body: JSON.stringify({
             nombre,
             marca,
+            descripcion: descripcion || null,
             costo_unit: precio,
             estado,
             id_categoria,
@@ -702,7 +799,7 @@ export default function GestionProductos() {
             {/* Modal Editar */}
             {showEditModal && selectedProduct && (
               <div className="modal show d-block" tabIndex={-1}>
-                <div className="modal-dialog modal-dialog-centered modal-md">
+                <div className="modal-dialog modal-dialog-centered modal-lg">
                   <div className="modal-content">
                     <div className="modal-header bg-primary text-white">
                       <h5 className="modal-title">Editar Producto</h5>
@@ -714,72 +811,225 @@ export default function GestionProductos() {
                     </div>
                     <form onSubmit={handleUpdate}>
                       <div className="modal-body">
-                        <div className="mb-3">
-                          <label className="form-label">Nombre</label>
-                          <input
-                            name="nombre"
-                            type="text"
-                            className="form-control"
-                            defaultValue={selectedProduct?.nombre || ""}
-                            required
-                          />
-                        </div>
+                        <div className="row g-3">
+                          <div className="col-md-7">
+                            {/* Sección Información Básica */}
+                            <div className="border-bottom pb-3 mb-3">
+                              <h6 className="text-primary fw-bold mb-3">
+                                <i className="bx bx-package me-2"></i>
+                                Información Básica
+                              </h6>
+                              <div className="mb-3">
+                                <label className="form-label fw-semibold">
+                                  Nombre <span className="text-danger">*</span>
+                                </label>
+                                <input
+                                  name="nombre"
+                                  type="text"
+                                  className="form-control"
+                                  defaultValue={selectedProduct?.nombre || ""}
+                                  required
+                                />
+                              </div>
 
-                        <div className="mb-3">
-                          <label className="form-label">Marca</label>
-                          <input
-                            name="marca"
-                            type="text"
-                            className="form-control"
-                            defaultValue={selectedProduct?.marca || ""}
-                          />
-                        </div>
+                              <div className="mb-3">
+                                <label className="form-label fw-semibold">
+                                  Marca
+                                </label>
+                                <input
+                                  name="marca"
+                                  type="text"
+                                  className="form-control"
+                                  defaultValue={selectedProduct?.marca || ""}
+                                  placeholder="(Opcional)"
+                                />
+                              </div>
 
-                        <div className="mb-3">
-                          <label className="form-label">Precio</label>
-                          <input
-                            name="precio"
-                            type="number"
-                            step="0.01"
-                            className="form-control"
-                            defaultValue={selectedProduct?.costo_unit ?? ""}
-                            required
-                          />
-                        </div>
+                              <div className="mb-3">
+                                <label className="form-label fw-semibold">
+                                  Descripción
+                                </label>
+                                <textarea
+                                  name="descripcion"
+                                  className="form-control"
+                                  defaultValue={
+                                    selectedProduct?.descripcion || ""
+                                  }
+                                  placeholder="Describe el producto (Opcional)"
+                                  rows={3}
+                                  style={{ resize: "vertical" }}
+                                />
+                                <small className="text-muted">
+                                  Máximo 500 caracteres
+                                </small>
+                              </div>
+                            </div>
 
-                        <div className="mb-3">
-                          <label className="form-label">Estado</label>
-                          <select
-                            name="estado"
-                            className="form-select"
-                            defaultValue={
-                              selectedProduct?.estado || "Abastecido"
-                            }
-                            required
-                          >
-                            <option>Abastecido</option>
-                            <option>Agotado</option>
-                          </select>
-                        </div>
-                        <div className="mb-3">
-                          <label className="form-label">Categoría</label>
-                          <select
-                            name="categoria"
-                            className="form-select"
-                            defaultValue={selectedProduct?.id_categoria}
-                            onChange={(e) => {
-                              setSelectedProduct({
-                                ...selectedProduct!,
-                                id_categoria: e.target.value,
-                              });
-                            }}
-                          >
-                            {categorias.map((cat) => (
-                              <option key={cat.id} value={cat.id}>
-                                {cat.nombre}
-                              </option>
-                            ))}
-                          </select>
+                            {/* Sección Precio y Estado */}
+                            <div>
+                              <h6 className="text-primary fw-bold mb-3">
+                                <i className="bx bx-coin me-2"></i>Precios y
+                                Estado
+                              </h6>
+                              <div className="row g-2 mb-3">
+                                <div className="col-md-6">
+                                  <label className="form-label fw-semibold">
+                                    Precio{" "}
+                                    <span className="text-danger">*</span>
+                                  </label>
+                                  <div className="input-group">
+                                    <span className="input-group-text">S/</span>
+                                    <input
+                                      name="precio"
+                                      type="number"
+                                      step="0.01"
+                                      className="form-control"
+                                      defaultValue={
+                                        selectedProduct?.costo_unit ?? ""
+                                      }
+                                      required
+                                    />
+                                  </div>
+                                </div>
+                                <div className="col-md-6">
+                                  <label className="form-label fw-semibold">
+                                    Estado{" "}
+                                    <span className="text-danger">*</span>
+                                  </label>
+                                  <select
+                                    name="estado"
+                                    className="form-select"
+                                    defaultValue={
+                                      selectedProduct?.estado || "Abastecido"
+                                    }
+                                    required
+                                  >
+                                    <option>Abastecido</option>
+                                    <option>Agotado</option>
+                                    <option>Inactivo</option>
+                                  </select>
+                                </div>
+                              </div>
+
+                              <div className="mb-3">
+                                <label className="form-label fw-semibold">
+                                  Categoría{" "}
+                                  <span className="text-danger">*</span>
+                                </label>
+                                <select
+                                  name="categoria"
+                                  className="form-select"
+                                  defaultValue={selectedProduct?.id_categoria}
+                                  onChange={(e) => {
+                                    setSelectedProduct({
+                                      ...selectedProduct!,
+                                      id_categoria: e.target.value,
+                                    });
+                                  }}
+                                >
+                                  {categorias.map((cat) => (
+                                    <option key={cat.id} value={cat.id}>
+                                      {cat.nombre}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="col-md-5 ps-3 border-start">
+                            <h6 className="text-success fw-bold mb-3">
+                              <i className="bx bx-image me-2"></i>Galería de
+                              Imágenes
+                            </h6>
+                            {loadingImages ? (
+                              <div className="text-center py-4">
+                                <div
+                                  className="spinner-border text-secondary"
+                                  role="status"
+                                >
+                                  <span className="visually-hidden">
+                                    Cargando...
+                                  </span>
+                                </div>
+                              </div>
+                            ) : (
+                              <div>
+                                {/* Imagen principal — destacada */}
+                                <div className="mb-4 p-3 bg-light rounded">
+                                  <small className="text-muted d-block mb-2 fw-semibold">
+                                    📷 Imagen Principal
+                                  </small>
+                                  {mainImageUrl ? (
+                                    <img
+                                      src={mainImageUrl}
+                                      alt="Principal"
+                                      className="img-fluid rounded"
+                                      style={{
+                                        width: "100%",
+                                        maxHeight: 300,
+                                        objectFit: "cover",
+                                        border: "3px solid #28a745",
+                                      }}
+                                    />
+                                  ) : (
+                                    <div className="text-muted text-center py-4">
+                                      <i className="bx bx-image-add fs-4 d-block mb-2"></i>
+                                      Sin imagen principal
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Imágenes secundarias — miniaturas */}
+                                <div>
+                                  <small className="text-muted d-block mb-2 fw-semibold">
+                                    📸 Imágenes Secundarias (
+                                    {secondaryImages.length})
+                                  </small>
+                                  {secondaryImages.length === 0 ? (
+                                    <div className="text-muted text-center py-3">
+                                      <i className="bx bx-image-alt fs-5 d-block mb-2"></i>
+                                      Sin imágenes secundarias
+                                    </div>
+                                  ) : (
+                                    <div className="d-flex flex-wrap gap-2">
+                                      {secondaryImages.map((img) => (
+                                        <div
+                                          key={img.id}
+                                          className="card position-relative overflow-hidden"
+                                          style={{ width: 100 }}
+                                        >
+                                          <img
+                                            src={img.url}
+                                            alt={`img-${img.id}`}
+                                            className="card-img-top"
+                                            style={{
+                                              height: 80,
+                                              objectFit: "cover",
+                                            }}
+                                          />
+                                          <button
+                                            className="btn btn-sm btn-danger position-absolute top-0 end-0 m-1"
+                                            style={{
+                                              opacity: 0.85,
+                                              padding: "2px 6px",
+                                            }}
+                                            title="Eliminar imagen"
+                                            onClick={() => {
+                                              setImageToDelete(img);
+                                              setShowConfirmDeleteImage(true);
+                                            }}
+                                          >
+                                            <i className="bx bx-trash"></i>
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <div className="modal-footer">
@@ -846,6 +1096,58 @@ export default function GestionProductos() {
                           await handleDelete(deleteTarget.id);
                           setShowDeleteModal(false);
                           setDeleteTarget(null);
+                        }}
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Modal Confirmación Eliminar Imagen Secundaria */}
+            {showConfirmDeleteImage && imageToDelete && (
+              <div className="modal show d-block" tabIndex={-1}>
+                <div className="modal-dialog modal-dialog-centered modal-sm">
+                  <div className="modal-content">
+                    <div className="modal-header bg-danger text-white">
+                      <h5 className="modal-title">Eliminar imagen</h5>
+                      <button
+                        type="button"
+                        className="btn-close"
+                        onClick={() => {
+                          setShowConfirmDeleteImage(false);
+                          setImageToDelete(null);
+                        }}
+                      ></button>
+                    </div>
+                    <div className="modal-body text-center">
+                      <p>¿Deseas eliminar esta imagen secundaria?</p>
+                      <img
+                        src={imageToDelete.url}
+                        alt="preview"
+                        className="img-fluid rounded mb-2"
+                        style={{ maxHeight: 160, objectFit: "cover" }}
+                      />
+                    </div>
+                    <div className="modal-footer">
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => {
+                          setShowConfirmDeleteImage(false);
+                          setImageToDelete(null);
+                        }}
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-danger"
+                        onClick={async () => {
+                          if (!imageToDelete) return;
+                          await handleDeleteSecondaryImage(imageToDelete.id);
                         }}
                       >
                         Eliminar

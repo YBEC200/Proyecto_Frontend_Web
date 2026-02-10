@@ -1,27 +1,36 @@
 import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
 import Nav from "../../Layout/Nav";
 import Sidebar from "../../Layout/Sidebar";
 import "./Perfil.css";
 
-export default function Perfil() {
-  // Datos de ejemplo (simular backend)
-  const userData = {
-    id: 1,
-    nombre: "Carlos",
-    apellidoPaterno: "Apellido1",
-    apellidoMaterno: "Apellido2",
-    correo: "carlos@cdtech.com",
-    telefono: "+56 9 1234 5678",
-    rol: "Administrador",
-    website: "www.cd_technology.com",
-    facebook: "www.facebook.com/CD-TECH",
-  };
+interface UserData {
+  id: number;
+  nombre: string;
+  correo: string;
+  rol: string;
+}
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    // Aquí iría la lógica para actualizar el perfil
-    alert("Perfil actualizado correctamente");
-  };
+export default function Perfil() {
+  const [userData, setUserData] = useState<UserData>({
+    id: 0,
+    nombre: "Usuario",
+    correo: "usuario@example.com",
+    rol: "Administrador",
+  });
+
+  useEffect(() => {
+    // Obtener datos del localStorage
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        setUserData(parsedUser);
+      } catch (error) {
+        console.error("Error parsing user data:", error);
+      }
+    }
+  }, []);
 
   return (
     <div className="dashboard-layout">
@@ -59,7 +68,7 @@ export default function Perfil() {
                         <div className="d-flex flex-column align-items-center text-center">
                           <img
                             src="/assets/images/avatars/avatar-1.png"
-                            alt="Admin"
+                            alt="Usuario"
                             className="rounded-circle p-1 bg-primary"
                             width="110"
                           />
@@ -69,21 +78,12 @@ export default function Perfil() {
                               {userData.rol}
                             </p>
                             <p className="text-muted font-size-sm">
-                              {userData.telefono}
+                              ID: #{userData.id}
                             </p>
                           </div>
                         </div>
                         <hr className="my-4" />
                         <ul className="list-group list-group-flush">
-                          <li className="list-group-item d-flex justify-content-between align-items-center flex-wrap">
-                            <h6 className="mb-0">
-                              <i className="bx bx-globe me-2"></i>
-                              Website
-                            </h6>
-                            <span className="text-secondary">
-                              {userData.website}
-                            </span>
-                          </li>
                           <li className="list-group-item d-flex justify-content-between align-items-center flex-wrap">
                             <h6 className="mb-0">
                               <i className="bx bx-envelope me-2"></i>
@@ -95,11 +95,11 @@ export default function Perfil() {
                           </li>
                           <li className="list-group-item d-flex justify-content-between align-items-center flex-wrap">
                             <h6 className="mb-0">
-                              <i className="bx bxl-facebook-square me-2"></i>
-                              Facebook
+                              <i className="bx bx-shield me-2"></i>
+                              Rol
                             </h6>
                             <span className="text-secondary">
-                              {userData.facebook}
+                              {userData.rol}
                             </span>
                           </li>
                         </ul>
@@ -107,83 +107,73 @@ export default function Perfil() {
                     </div>
                   </div>
 
-                  {/* Formulario de Edición */}
+                  {/* Tarjeta de Información de la Aplicación */}
                   <div className="col-lg-8">
                     <div className="card">
                       <div className="card-body">
-                        <form onSubmit={handleSubmit}>
-                          <div className="row mb-3">
-                            <div className="col-sm-3">
-                              <h6 className="mb-0">Nombre</h6>
-                            </div>
-                            <div className="col-sm-9">
-                              <input
-                                type="text"
-                                className="form-control"
-                                defaultValue={userData.nombre}
-                              />
-                            </div>
-                          </div>
-                          <div className="row mb-3">
-                            <div className="col-sm-3">
-                              <h6 className="mb-0">Apellido Paterno</h6>
-                            </div>
-                            <div className="col-sm-9">
-                              <input
-                                type="text"
-                                className="form-control"
-                                defaultValue={userData.apellidoPaterno}
-                              />
-                            </div>
-                          </div>
-                          <div className="row mb-3">
-                            <div className="col-sm-3">
-                              <h6 className="mb-0">Apellido Materno</h6>
-                            </div>
-                            <div className="col-sm-9">
-                              <input
-                                type="text"
-                                className="form-control"
-                                defaultValue={userData.apellidoMaterno}
-                              />
-                            </div>
-                          </div>
-                          <div className="row mb-3">
-                            <div className="col-sm-3">
-                              <h6 className="mb-0">Correo</h6>
-                            </div>
-                            <div className="col-sm-9">
-                              <input
-                                type="email"
-                                className="form-control"
-                                defaultValue={userData.correo}
-                              />
-                            </div>
-                          </div>
-                          <div className="row mb-3">
-                            <div className="col-sm-3">
-                              <h6 className="mb-0">Teléfono</h6>
-                            </div>
-                            <div className="col-sm-9">
-                              <input
-                                type="text"
-                                className="form-control"
-                                defaultValue={userData.telefono}
-                              />
-                            </div>
-                          </div>
-                          <div className="row">
-                            <div className="col-sm-3"></div>
-                            <div className="col-sm-9">
-                              <button
-                                type="submit"
-                                className="btn btn-primary px-4"
-                              >
-                                Guardar Cambios
-                              </button>
-                            </div>
-                          </div>
-                        </form>
+                        <h5 className="card-title mb-4">
+                          <i className="bx bx-info-circle me-2"></i>Acerca de
+                          esta Plataforma
+                        </h5>
+
+                        <p className="mb-3">
+                          Bienvenido a nuestro{" "}
+                          <strong>
+                            Sistema de Gestión de Productos y Órdenes
+                          </strong>
+                          , una plataforma integral diseñada para optimizar la
+                          administración de inventario, ventas y logística.
+                        </p>
+
+                        <h6 className="text-primary fw-bold mt-4 mb-2">
+                          <i className="bx bx-star me-2"></i>Funcionalidades
+                        </h6>
+
+                        <ul className="list-unstyled">
+                          <li className="mb-2">
+                            <i className="bx bx-check text-success me-2"></i>
+                            <strong>Gestión de Productos:</strong> Administra tu
+                            catálogo completo con categorías, descripción,
+                            imágenes (principal y secundarias) almacenadas en
+                            Cloudinary, y estado de disponibilidad.
+                          </li>
+                          <li className="mb-2">
+                            <i className="bx bx-check text-success me-2"></i>
+                            <strong>Control de Lotes:</strong> Crea y gestiona
+                            lotes de productos con fechas de vencimiento,
+                            cantidades y registro automático de trazabilidad.
+                          </li>
+                          <li className="mb-2">
+                            <i className="bx bx-check text-success me-2"></i>
+                            <strong>Gestión de Ventas:</strong> Registra órdenes
+                            de compra, detalles de venta, y monitorea el estado
+                            de cada transacción en tiempo real.
+                          </li>
+                          <li className="mb-2">
+                            <i className="bx bx-check text-success me-2"></i>
+                            <strong>Gestión de Usuarios:</strong> Controla
+                            accesos, roles y permisos para garantizar la
+                            seguridad de tu información.
+                          </li>
+                          <li className="mb-2">
+                            <i className="bx bx-check text-success me-2"></i>
+                            <strong>Dashboard Analítico:</strong> Visualiza
+                            métricas, estadísticas de ventas, inventario y
+                            tendencias en un solo lugar.
+                          </li>
+                          <li className="mb-2">
+                            <i className="bx bx-check text-success me-2"></i>
+                            <strong>Notificaciones:</strong> Recibe alertas
+                            sobre cambios en inventario, órdenes pendientes y
+                            eventos importantes.
+                          </li>
+                        </ul>
+
+                        <div className="alert alert-info mt-4 mb-0">
+                          <i className="bx bx-bulb me-2"></i>
+                          <strong>Tip:</strong> Utiliza los menús laterales para
+                          acceder a cada sección.
+                        </div>
                       </div>
                     </div>
                   </div>

@@ -101,6 +101,7 @@ export default function AsignarPedidos() {
   const [errorDetails, setErrorDetails] = useState<Record<string, string>>({});
   const [mensajeDuplicado, setMensajeDuplicado] = useState("");
   const [qrToken, setQrToken] = useState<string | null>(null);
+  const [direccionTexto, setDireccionTexto] = useState<string>("");
 
   const [direccionExitoData, setDireccionExitoData] = useState<
     Record<string, string>
@@ -243,13 +244,17 @@ export default function AsignarPedidos() {
     );
   }
   function updateRowCantidad(id: string, cantidad: number) {
+    // Validar que la cantidad sea un número positivo mayor a 0
+    const cantidadValida =
+      isNaN(cantidad) || cantidad < 1 ? 1 : Math.floor(cantidad);
+
     setRows((r) =>
       r.map((row) =>
         row.id === id
           ? {
               ...row,
-              cantidad,
-              subtotal: Number((row.precioUnit * cantidad).toFixed(2)),
+              cantidad: cantidadValida,
+              subtotal: Number((row.precioUnit * cantidadValida).toFixed(2)),
             }
           : row,
       ),
@@ -339,6 +344,14 @@ export default function AsignarPedidos() {
       errores.push("⚠️ Selecciona el comprobante a emitir (Boleta o Factura)");
     }
 
+    if (selectedComprobante === "Factura") {
+      if (!ruc || ruc.trim() === "") {
+        errores.push("⚠️ El RUC es obligatorio para emitir Factura");
+      } else if (!/^\d{11}$/.test(ruc)) {
+        errores.push("⚠️ El RUC debe tener exactamente 11 dígitos");
+      }
+    }
+
     // Validar tipo de entrega y dirección
     if (
       tipoEntrega === "Envío a Domicilio" &&
@@ -356,8 +369,24 @@ export default function AsignarPedidos() {
         if (!row.productoId || row.productoId.toString().trim() === "") {
           errores.push(`⚠️ Fila ${index + 1}: Selecciona un producto`);
         }
-        if (!row.cantidad || row.cantidad <= 0) {
+
+        // Validar cantidad: debe ser mayor a 0
+        if (!row.cantidad || row.cantidad <= 0 || isNaN(row.cantidad)) {
           errores.push(`⚠️ Fila ${index + 1}: La cantidad debe ser mayor a 0`);
+        }
+
+        // Validar que la cantidad sea un número entero
+        if (!Number.isInteger(row.cantidad)) {
+          errores.push(
+            `⚠️ Fila ${index + 1}: La cantidad debe ser un número entero`,
+          );
+        }
+
+        // Validar precio unitario: debe ser mayor a 0
+        if (!row.precioUnit || row.precioUnit <= 0) {
+          errores.push(
+            `⚠️ Fila ${index + 1}: El precio unitario debe ser mayor a 0`,
+          );
         }
       });
     }
@@ -412,9 +441,10 @@ export default function AsignarPedidos() {
       fecha: getFechaActual(),
       metodo_pago: selectedMetodoPago || null,
       comprobante: selectedComprobante || null,
+      ruc: selectedComprobante === "Factura" ? ruc : null,
       id_direccion:
         tipoEntrega === "Recojo en Tienda" ? null : Number(idDireccion),
-      tipo_entrega: tipoEntrega, // Debe ser "Envío a Domicilio" o "Recojo en Tienda"
+      tipo_entrega: tipoEntrega,
       costo_total: Number(total),
       estado: estadoFinal,
       details,
@@ -470,6 +500,7 @@ export default function AsignarPedidos() {
           setTotal(0);
           setSelectedUsuario("");
           setIdDireccion(null);
+          setDireccionTexto("");
           setCiudad("");
           setCalle("");
           setReferencia("");
@@ -638,6 +669,9 @@ export default function AsignarPedidos() {
         setCalle(calleInput);
         setReferencia(referenciaInput);
         setIdDireccion(String(direccionId));
+        setDireccionTexto(
+          `${ciudadInput}${calleInput ? ", " + calleInput : ""}`,
+        );
 
         // Limpiar inputs
         (document.getElementById("ciudadInput") as HTMLInputElement).value = "";
@@ -810,6 +844,13 @@ export default function AsignarPedidos() {
                               onChange={(e) => setRuc(e.target.value)}
                               placeholder="Ingresa RUC"
                             />
+                            {selectedComprobante === "Factura" &&
+                              ruc.length > 0 &&
+                              ruc.length !== 11 && (
+                                <small className="text-danger">
+                                  El RUC debe tener 11 dígitos
+                                </small>
+                              )}
                           </div>
                         )}
 
@@ -844,8 +885,9 @@ export default function AsignarPedidos() {
                               <input
                                 id="direccionInput"
                                 className="form-control"
-                                placeholder="Agregar o seleccionar dirección"
-                                value={idDireccion ?? ""}
+                                placeholder="Dirección registrada"
+                                value={direccionTexto}
+                                readOnly
                                 onChange={(e) =>
                                   setIdDireccion(e.target.value || null)
                                 }
@@ -976,15 +1018,24 @@ export default function AsignarPedidos() {
                               <td>
                                 <input
                                   type="number"
-                                  min={1}
+                                  min="1"
+                                  step="1"
                                   className="form-control"
                                   value={row.cantidad}
-                                  onChange={(e) =>
-                                    updateRowCantidad(
-                                      row.id,
-                                      Number(e.target.value || 1),
-                                    )
-                                  }
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (val === "" || isNaN(Number(val))) {
+                                      updateRowCantidad(row.id, 1);
+                                    } else {
+                                      const num = Math.max(
+                                        1,
+                                        Math.floor(Number(val)),
+                                      );
+                                      updateRowCantidad(row.id, num);
+                                    }
+                                  }}
+                                  title="Cantidad debe ser mayor a 0"
+                                  placeholder="1"
                                 />
                               </td>
                               <td>
@@ -1035,7 +1086,14 @@ export default function AsignarPedidos() {
                       </div>
 
                       <div className="text-end">
-                        <button type="submit" className="btn btn-primary">
+                        <button
+                          type="submit"
+                          className="btn btn-primary"
+                          disabled={
+                            selectedComprobante === "Factura" &&
+                            (!ruc || ruc.length !== 11)
+                          }
+                        >
                           Guardar Venta
                         </button>
                       </div>

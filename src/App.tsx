@@ -38,7 +38,7 @@ function App() {
           }
         />
         <Route
-          path="/dashboard/historial"
+          path="/dashboard/pendientes"
           element={
             <PrivateRoute>
               <ListaPendientes />
