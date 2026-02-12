@@ -1,8 +1,9 @@
 import { Link } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import "./Nav.css";
 
 const API_URL = import.meta.env.VITE_API_URL;
+const RAG_URL = import.meta.env.VITE_RAG_URL;
 
 interface Alert {
   id: number;
@@ -15,6 +16,13 @@ interface Alert {
 }
 
 export default function Nav() {
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const [chatMessages, setChatMessages] = useState<
+    { role: "user" | "bot"; content: string }[]
+  >([]);
+
+  const [chatInput, setChatInput] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
   const [showChatModal, setShowChatModal] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [unreadAlerts, setUnreadAlerts] = useState<Alert[]>([]);
@@ -22,6 +30,51 @@ export default function Nav() {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const adminName = user.nombre || "Administrador";
   const adminRole = user.rol || "Admin";
+
+  const sendMessage = async () => {
+    if (!chatInput.trim()) return;
+
+    const userMessage = chatInput;
+
+    // Mostrar mensaje del usuario inmediatamente
+    setChatMessages((prev) => [
+      ...prev,
+      { role: "user", content: userMessage },
+    ]);
+
+    setChatInput("");
+    setChatLoading(true);
+
+    try {
+      // ✅ Conecta directo al RAG (sin autenticación)
+      const response = await fetch(`${RAG_URL}/chat/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ message: userMessage }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      setChatMessages((prev) => [
+        ...prev,
+        { role: "bot", content: data.answer || "Sin respuesta." },
+      ]);
+    } catch (error) {
+      console.error("Error:", error);
+      setChatMessages((prev) => [
+        ...prev,
+        { role: "bot", content: "❌ Error al conectar con el asistente." },
+      ]);
+    } finally {
+      setChatLoading(false);
+    }
+  };
 
   // Función para obtener el conteo de alertas no leídas
   const fetchUnreadCount = async () => {
@@ -149,6 +202,11 @@ export default function Nav() {
         return "alert-default";
     }
   };
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages]);
+
   return (
     <header>
       <div className="topbar d-flex align-items-center">
@@ -310,28 +368,42 @@ export default function Nav() {
                 ></button>
               </div>
               <div className="modal-body">
-                <div
-                  className="chat-box"
-                  style={{
-                    minHeight: "200px",
-                    background: "#f8f9fa",
-                    borderRadius: "8px",
-                    padding: "10px",
-                  }}
-                >
-                  {/* Aquí irán los mensajes del chat */}
-                  <div className="text-muted text-center">
-                    ¡Bienvenido al chat de soporte!
-                  </div>
+                <div className="chat-box">
+                  {chatMessages.length === 0 && (
+                    <div className="text-muted text-center">
+                      ¡Bienvenido al asistente inteligente!
+                    </div>
+                  )}
+
+                  {chatMessages.map((msg, index) => (
+                    <div key={index} className={`chat-message ${msg.role}`}>
+                      <div className="chat-bubble">{msg.content}</div>
+                    </div>
+                  ))}
+
+                  <div ref={chatEndRef} />
+
+                  {chatLoading && (
+                    <div className="text-muted small">Escribiendo...</div>
+                  )}
                 </div>
                 <div className="mt-3 d-flex">
                   <input
                     type="text"
                     className="form-control me-2"
                     placeholder="Escribe tu mensaje..."
-                    disabled
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") sendMessage();
+                    }}
+                    disabled={chatLoading}
                   />
-                  <button className="btn btn-primary" disabled>
+                  <button
+                    className="btn btn-primary"
+                    onClick={sendMessage}
+                    disabled={chatLoading}
+                  >
                     Enviar
                   </button>
                 </div>
