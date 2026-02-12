@@ -41,15 +41,16 @@ function ListaPendientes() {
   const [ventaToApprove, setVentaToApprove] = useState<number | null>(null);
   const [approving, setApproving] = useState(false);
 
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [ventaToDelete, setVentaToDelete] = useState<number | null>(null);
-  const [deleting, setDeleting] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [ventaToCancel, setVentaToCancel] = useState<number | null>(null);
+  const [canceling, setCanceling] = useState(false);
 
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [selectedDetail, setSelectedDetail] = useState<DetailVenta[] | null>(
     null,
   );
+  const [motivoCancelacion, setMotivoCancelacion] = useState("");
 
   // Fetch ventas en revisión
   const fetchVentasRevision = async () => {
@@ -178,37 +179,58 @@ function ListaPendientes() {
   };
 
   // Eliminar venta
-  const handleOpenDelete = (id: number) => {
-    setVentaToDelete(id);
-    setShowDeleteModal(true);
+  const handleOpenCancel = (id: number) => {
+    setVentaToCancel(id);
+    setMotivoCancelacion("");
+    setShowCancelModal(true);
   };
 
-  const handleConfirmDelete = async () => {
-    if (!ventaToDelete) return;
-    setDeleting(true);
+  const handleConfirmCancel = async () => {
+    if (!ventaToCancel) return;
+
+    if (!motivoCancelacion.trim()) {
+      alert("Debes ingresar un motivo de cancelación");
+      return;
+    }
+
+    setCanceling(true);
+
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${API_URL}/api/ventas/${ventaToDelete}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: token ? `Bearer ${token}` : "",
-          "Content-Type": "application/json",
+
+      const res = await fetch(
+        `${API_URL}/api/ventas/${ventaToCancel}/cancelar`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: token ? `Bearer ${token}` : "",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            motivo: motivoCancelacion,
+          }),
         },
-      });
+      );
+
       const result = await res.json().catch(() => null);
-      if (!res.ok) {
-        alert((result && result.message) || "Error al eliminar la venta");
-        setDeleting(false);
+
+      if (!res.ok || !result || result.success === false) {
+        alert((result && result.message) || "Error al cancelar la venta");
+        setCanceling(false);
         return;
       }
-      setVentas((prev) => prev.filter((v) => v.id !== ventaToDelete));
-      setShowDeleteModal(false);
-      setVentaToDelete(null);
+
+      // Remover de lista (ya no está en revisión)
+      setVentas((prev) => prev.filter((v) => v.id !== ventaToCancel));
+
+      setShowCancelModal(false);
+      setVentaToCancel(null);
+      setMotivoCancelacion("");
     } catch (err) {
       console.error(err);
-      alert("Error de conexión al eliminar la venta");
+      alert("Error de conexión al cancelar la venta");
     } finally {
-      setDeleting(false);
+      setCanceling(false);
     }
   };
 
@@ -336,9 +358,9 @@ function ListaPendientes() {
                               </button>
                               <button
                                 className="btn btn-sm btn-danger ms-2"
-                                onClick={() => handleOpenDelete(v.id)}
+                                onClick={() => handleOpenCancel(v.id)}
                               >
-                                <i className="bx bx-trash"></i> Rechazar
+                                <i className="bx bx-x-circle"></i> Cancelar
                               </button>
                               <button
                                 className="btn btn-sm btn-info ms-2"
@@ -457,39 +479,50 @@ function ListaPendientes() {
         </div>
       )}
 
-      {/* Modal Eliminar */}
-      {showDeleteModal && (
+      {/* Modal Cancelar */}
+      {showCancelModal && (
         <div className="modal show d-block" tabIndex={-1}>
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content">
               <div className="modal-header bg-danger text-white">
-                <h5 className="modal-title">Eliminar Venta</h5>
+                <h5 className="modal-title">Cancelar Venta</h5>
                 <button
                   type="button"
                   className="btn-close btn-close-white"
-                  onClick={() => setShowDeleteModal(false)}
+                  onClick={() => setShowCancelModal(false)}
                 ></button>
               </div>
               <div className="modal-body">
                 <p>
-                  ¿Seguro que deseas eliminar esta venta? Los productos se
-                  devolverán a los lotes.
+                  La venta pasará a estado <strong>Cancelado</strong>. El stock
+                  será devuelto.
                 </p>
+
+                <div className="mb-3">
+                  <label className="form-label">Motivo de cancelación</label>
+                  <textarea
+                    className="form-control"
+                    rows={3}
+                    value={motivoCancelacion}
+                    onChange={(e) => setMotivoCancelacion(e.target.value)}
+                    placeholder="Ej: Voucher no válido, pago no verificado, etc."
+                  />
+                </div>
               </div>
               <div className="modal-footer">
                 <button
                   className="btn btn-secondary"
-                  onClick={() => setShowDeleteModal(false)}
-                  disabled={deleting}
+                  onClick={() => setShowCancelModal(false)}
+                  disabled={canceling}
                 >
-                  Cancelar
+                  Volver
                 </button>
                 <button
                   className="btn btn-danger"
-                  onClick={handleConfirmDelete}
-                  disabled={deleting}
+                  onClick={handleConfirmCancel}
+                  disabled={canceling}
                 >
-                  {deleting ? "Eliminando..." : "Sí, eliminar"}
+                  {canceling ? "Cancelando..." : "Confirmar Cancelación"}
                 </button>
               </div>
             </div>
@@ -564,14 +597,14 @@ function ListaPendientes() {
       {/* Backdrops */}
       {(showVoucherModal ||
         showApproveModal ||
-        showDeleteModal ||
+        showCancelModal ||
         showDetailModal) && (
         <div
           className="modal-backdrop fade show"
           onClick={() => {
             setShowVoucherModal(false);
             setShowApproveModal(false);
-            setShowDeleteModal(false);
+            setShowCancelModal(false);
             setShowDetailModal(false);
           }}
         ></div>
