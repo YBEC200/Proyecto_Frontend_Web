@@ -60,6 +60,7 @@ export default function Nav() {
       }
 
       const data = await response.json();
+      console.log("RAG_URL:", RAG_URL);
 
       setChatMessages((prev) => [
         ...prev,
