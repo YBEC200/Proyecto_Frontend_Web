@@ -40,6 +40,15 @@ const sampleComprobantes = [
 
 export default function AsignarPedidos() {
   // Estados
+  const DISTRITOS_HUANCAYO = [
+    "Huancayo",
+    "El Tambo",
+    "Chilca",
+    "Pilcomayo",
+    "Huancán",
+    "San Agustín de Cajas",
+    "Sapallanga",
+  ];
   const [idDireccion, setIdDireccion] = useState<string | null>(null);
   const [rows, setRows] = useState<DetalleRow[]>([
     {
@@ -77,7 +86,7 @@ export default function AsignarPedidos() {
     return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
   };
   const [tipoEntrega, setTipoEntrega] = useState<string>("Envío a Domicilio");
-  const [, setCiudad] = useState<string>("");
+  const [ciudad, setCiudad] = useState<string>("");
   const [, setCalle] = useState<string>("");
   const [, setReferencia] = useState<string>("");
 
@@ -630,8 +639,7 @@ export default function AsignarPedidos() {
 
   // Guardar dirección a través del backend
   async function guardarDireccionSimulada() {
-    const ciudadInput =
-      (document.getElementById("ciudadInput") as HTMLInputElement)?.value || "";
+    const ciudadInput = ciudad;
     const calleInput =
       (document.getElementById("calleInput") as HTMLInputElement)?.value || "";
     const referenciaInput =
@@ -664,7 +672,7 @@ export default function AsignarPedidos() {
       const body = await res.json().catch(() => null);
 
       if (res.ok) {
-        const direccionId = body.id;
+        const direccionId = Number(body.id ?? body.Id);
         setCiudad(ciudadInput);
         setCalle(calleInput);
         setReferencia(referenciaInput);
@@ -674,7 +682,7 @@ export default function AsignarPedidos() {
         );
 
         // Limpiar inputs
-        (document.getElementById("ciudadInput") as HTMLInputElement).value = "";
+        setCiudad("");
         (document.getElementById("calleInput") as HTMLInputElement).value = "";
         (document.getElementById("refInput") as HTMLTextAreaElement).value = "";
 
@@ -689,6 +697,11 @@ export default function AsignarPedidos() {
           id: String(direccionId),
         });
         setShowModalDireccionExito(true);
+
+        if (!direccionId) {
+          alert("No se pudo obtener el ID de la dirección desde el backend");
+          return;
+        }
 
         // Cerrar modal de éxito después de 3 segundos
         setTimeout(() => {
@@ -1134,11 +1147,23 @@ export default function AsignarPedidos() {
                   <div className="modal-body">
                     <div className="mb-3">
                       <label className="form-label fw-bold">Ciudad</label>
-                      <input
+                      <select
                         id="ciudadInput"
-                        className="form-control"
-                        placeholder="Ingresa la ciudad"
-                      />
+                        className="form-select"
+                        value={ciudad}
+                        onChange={(e) => setCiudad(e.target.value)}
+                      >
+                        <option value="">Seleccione un distrito</option>
+                        {DISTRITOS_HUANCAYO.map((distrito) => (
+                          <option key={distrito} value={distrito}>
+                            {distrito}
+                          </option>
+                        ))}
+                      </select>
+
+                      <small className="text-muted">
+                        Selecciona el distrito de {`Huancayo`}
+                      </small>
                     </div>
                     <div className="mb-3">
                       <label className="form-label fw-bold">Calle</label>

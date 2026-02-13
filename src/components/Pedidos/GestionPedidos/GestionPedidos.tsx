@@ -519,15 +519,9 @@ function GestionPedidos() {
   };
 
   // Función para descargar PDF
-  const descargarPDF = (codigoUnico: string) => {
-    if (!codigoUnico) return;
-
-    const pdfUrl = `${API_URL}/api/comprobantes/boletas/${codigoUnico}/pdf`;
-
-    // Abrir en nueva pestaña (para poder descargar o visualizar)
-    window.open(pdfUrl, "_blank");
+  const descargarPDF = (codigo_unico: string) => {
+    window.open(`${API_URL}/api/descargar/${codigo_unico}/pdf`);
   };
-
   // Funciones de filtrado
   const applyFilters = () => {
     setSearchTerm(searchInput.trim());
