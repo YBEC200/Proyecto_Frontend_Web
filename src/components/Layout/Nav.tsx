@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import "./Nav.css";
 
 const API_URL = import.meta.env.VITE_API_URL;
-const RAG_URL = import.meta.env.VITE_RAG_URL ?? http://0.0.0.0:8001;
+const RAG_URL = https://ayako-questionless-antonio.ngrok-free.dev ;
 
 interface Alert {
   id: number;
