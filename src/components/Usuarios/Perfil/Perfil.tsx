@@ -12,6 +12,10 @@ interface UserData {
 }
 
 export default function Perfil() {
+  const [formData, setFormData] = useState<Partial<UserData>>({});
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
   const [userData, setUserData] = useState<UserData>({
     id: 0,
     nombre: "Usuario",
@@ -31,6 +35,75 @@ export default function Perfil() {
       }
     }
   }, []);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    });
+  };
+
+  const handleUpdate = async () => {
+    try {
+      const token = localStorage.getItem("token");
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const dataToSend: any = {};
+
+      // Solo enviar campos modificados
+      Object.keys(formData).forEach((key) => {
+        if (
+          formData[key as keyof UserData] !== userData[key as keyof UserData]
+        ) {
+          dataToSend[key] = formData[key as keyof UserData];
+        }
+      });
+
+      if (password) {
+        dataToSend.password = password;
+        dataToSend.password_confirmation = confirmPassword;
+      }
+
+      if (Object.keys(dataToSend).length === 0) {
+        alert("No hay cambios para actualizar.");
+        return;
+      }
+
+      const response = await fetch(
+        `http://localhost:8000/api/usuarios/${userData.id}`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(dataToSend),
+        },
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || "Error al actualizar");
+      }
+
+      const updatedUser = { ...userData, ...dataToSend };
+
+      setUserData(updatedUser);
+      localStorage.setItem("user", JSON.stringify(updatedUser));
+
+      setIsEditing(false);
+      setPassword("");
+      setConfirmPassword("");
+      setFormData({});
+
+      alert("Perfil actualizado correctamente");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (error: any) {
+      console.error(error);
+      alert(error.message);
+    }
+  };
 
   return (
     <div className="dashboard-layout">
@@ -65,44 +138,114 @@ export default function Perfil() {
                   <div className="col-lg-4">
                     <div className="card">
                       <div className="card-body">
-                        <div className="d-flex flex-column align-items-center text-center">
+                        <div className="text-center mb-3">
                           <img
                             src="/assets/images/avatars/avatar-1.png"
                             alt="Usuario"
                             className="rounded-circle p-1 bg-primary"
                             width="110"
                           />
-                          <div className="mt-3">
-                            <h4>{userData.nombre}</h4>
-                            <p className="text-secondary mb-1">
-                              {userData.rol}
-                            </p>
-                            <p className="text-muted font-size-sm">
-                              ID: #{userData.id}
-                            </p>
-                          </div>
                         </div>
-                        <hr className="my-4" />
-                        <ul className="list-group list-group-flush">
-                          <li className="list-group-item d-flex justify-content-between align-items-center flex-wrap">
-                            <h6 className="mb-0">
-                              <i className="bx bx-envelope me-2"></i>
-                              Correo
-                            </h6>
-                            <span className="text-secondary">
+
+                        {/* Nombre */}
+                        <div className="mb-3">
+                          <label className="form-label">Nombre</label>
+                          {isEditing ? (
+                            <input
+                              type="text"
+                              name="nombre"
+                              className="form-control"
+                              defaultValue={userData.nombre}
+                              onChange={handleChange}
+                            />
+                          ) : (
+                            <p className="form-control-plaintext">
+                              {userData.nombre}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Correo */}
+                        <div className="mb-3">
+                          <label className="form-label">Correo</label>
+                          {isEditing ? (
+                            <input
+                              type="email"
+                              name="correo"
+                              className="form-control"
+                              defaultValue={userData.correo}
+                              onChange={handleChange}
+                            />
+                          ) : (
+                            <p className="form-control-plaintext">
                               {userData.correo}
-                            </span>
-                          </li>
-                          <li className="list-group-item d-flex justify-content-between align-items-center flex-wrap">
-                            <h6 className="mb-0">
-                              <i className="bx bx-shield me-2"></i>
-                              Rol
-                            </h6>
-                            <span className="text-secondary">
-                              {userData.rol}
-                            </span>
-                          </li>
-                        </ul>
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Rol (solo lectura) */}
+                        <div className="mb-3">
+                          <label className="form-label">Rol</label>
+                          <p className="form-control-plaintext">
+                            {userData.rol}
+                          </p>
+                        </div>
+
+                        {/* Password */}
+                        {isEditing && (
+                          <>
+                            <div className="mb-3">
+                              <label className="form-label">
+                                Nueva contraseña
+                              </label>
+                              <input
+                                type="password"
+                                className="form-control"
+                                onChange={(e) => setPassword(e.target.value)}
+                              />
+                            </div>
+
+                            <div className="mb-3">
+                              <label className="form-label">
+                                Confirmar contraseña
+                              </label>
+                              <input
+                                type="password"
+                                className="form-control"
+                                onChange={(e) =>
+                                  setConfirmPassword(e.target.value)
+                                }
+                              />
+                            </div>
+                          </>
+                        )}
+
+                        {/* Botones */}
+                        <div className="d-flex justify-content-between">
+                          {isEditing ? (
+                            <>
+                              <button
+                                className="btn btn-success"
+                                onClick={handleUpdate}
+                              >
+                                Guardar
+                              </button>
+                              <button
+                                className="btn btn-secondary"
+                                onClick={() => setIsEditing(false)}
+                              >
+                                Cancelar
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              className="btn btn-primary w-100"
+                              onClick={() => setIsEditing(true)}
+                            >
+                              Editar Perfil
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
