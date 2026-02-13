@@ -519,9 +519,9 @@ function GestionPedidos() {
   };
 
   // Función para descargar PDF
-  const descargarPDF = (codigo_unico: string) => {
-    window.open(`${API_URL}/api/descargar/${codigo_unico}/pdf`);
-  };
+  //const descargarPDF = (codigo_unico: string) => {
+  //window.open(`${API_URL}/api/descargar/${codigo_unico}/pdf`);
+  //};
   // Funciones de filtrado
   const applyFilters = () => {
     setSearchTerm(searchInput.trim());
@@ -1443,7 +1443,7 @@ function GestionPedidos() {
               <div className="modal-footer">
                 {!errorBaja && !loadingBaja && selectedBaja && (
                   <>
-                    <button
+                    {/*<button
                       type="button"
                       className="btn btn-warning"
                       onClick={() =>
@@ -1452,7 +1452,7 @@ function GestionPedidos() {
                       title="Descargar PDF de la boleta"
                     >
                       <i className="bx bx-download me-2"></i>Descargar PDF
-                    </button>
+                    </button>*/}
                     <a
                       href={selectedBaja.enlace_pdf}
                       target="_blank"
