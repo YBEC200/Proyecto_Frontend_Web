@@ -645,8 +645,14 @@ export default function AsignarPedidos() {
     const referenciaInput =
       (document.getElementById("refInput") as HTMLTextAreaElement)?.value || "";
 
-    if (!ciudadInput) {
-      alert("Ingrese al menos la ciudad.");
+    // ✅ Validación mejorada
+    if (!ciudadInput.trim()) {
+      alert("La ciudad es obligatoria.");
+      return;
+    }
+    
+    if (!calleInput.trim()) {
+      alert("La calle es obligatoria.");
       return;
     }
 
@@ -681,13 +687,11 @@ export default function AsignarPedidos() {
           `${ciudadInput}${calleInput ? ", " + calleInput : ""}`,
         );
 
-        // Limpiar inputs
-        setCiudad("");
-        (document.getElementById("calleInput") as HTMLInputElement).value = "";
-        (document.getElementById("refInput") as HTMLTextAreaElement).value = "";
-
-        // Cerrar modal de dirección
-        setShowModalDireccion(false);
+        // ✅ Establecer ID de dirección PRIMERO
+        setIdDireccion(String(direccionId));
+        setDireccionTexto(
+          `${ciudadInput}${calleInput ? ", " + calleInput : ""}`,
+        );
 
         // Mostrar modal de éxito
         setDireccionExitoData({
@@ -696,12 +700,15 @@ export default function AsignarPedidos() {
           referencia: referenciaInput,
           id: String(direccionId),
         });
+
+        // Cerrar modal de dirección
+        setShowModalDireccion(false);
         setShowModalDireccionExito(true);
 
-        if (!direccionId) {
-          alert("No se pudo obtener el ID de la dirección desde el backend");
-          return;
-        }
+        // ✅ Limpiar inputs del modal
+        (document.getElementById("calleInput") as HTMLInputElement).value = "";
+        (document.getElementById("refInput") as HTMLTextAreaElement).value = "";
+        setCiudad("");
 
         // Cerrar modal de éxito después de 3 segundos
         setTimeout(() => {
