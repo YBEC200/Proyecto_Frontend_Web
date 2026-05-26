@@ -650,7 +650,6 @@ export default function AsignarPedidos() {
       alert("La ciudad es obligatoria.");
       return;
     }
-
     if (!calleInput.trim()) {
       alert("La calle es obligatoria.");
       return;
