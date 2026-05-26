@@ -103,6 +103,9 @@ function GestionPedidos() {
   const [ventas, setVentas] = useState<Venta[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  
+  // Estadísticas
+  const [stats, setStats] = useState({ total: 0, pendientes: 0, entregados: 0, cancelados: 0 });
 
   // Estados del modal de detalles
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -551,13 +554,7 @@ function GestionPedidos() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm, filterStatus, filterDate.start, filterDate.end]);
 
-  // Estadísticas
-  const stats = {
-    total: ventas.length,
-    pendientes: ventas.filter((v) => v.estado === "Pendiente").length,
-    entregados: ventas.filter((v) => v.estado === "Entregado").length,
-    cancelados: ventas.filter((v) => v.estado === "Cancelado").length,
-  };
+
 
   // Función para formatear fecha
   const formatFecha = (fecha: string) => {
