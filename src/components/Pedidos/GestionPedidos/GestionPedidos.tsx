@@ -3,6 +3,10 @@ import Nav from "../../Layout/Nav";
 import Sidebar from "../../Layout/Sidebar";
 import "./GestionPedidos.css";
 import { QRCodeCanvas } from "qrcode.react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import * as XLSX from "xlsx";
+
 const API_URL = import.meta.env.VITE_API_URL;
 interface Usuario {
   id: number;
@@ -571,6 +575,145 @@ function GestionPedidos() {
     return (price ?? 0).toFixed(2);
   };
 
+  // Función para descargar en PDF
+  const handleDescargarPDF = () => {
+    if (ventas.length === 0) {
+      alert("No hay datos para descargar");
+      return;
+    }
+
+    // Crear documento PDF
+    const doc = new jsPDF();
+
+    // Agregar título
+    doc.setFontSize(16);
+    doc.text("Reporte de Pedidos", 14, 15);
+
+    // Agregar información de filtros
+    doc.setFontSize(10);
+    let yPosition = 25;
+
+    if (searchTerm) {
+      doc.text(`Filtro Cliente: ${searchTerm}`, 14, yPosition);
+      yPosition += 5;
+    }
+    if (filterStatus) {
+      doc.text(`Filtro Estado: ${filterStatus}`, 14, yPosition);
+      yPosition += 5;
+    }
+    if (filterDate.start || filterDate.end) {
+      const dateRange = `${filterDate.start || "Inicio"} - ${filterDate.end || "Fin"}`;
+      doc.text(`Rango de Fechas: ${dateRange}`, 14, yPosition);
+      yPosition += 5;
+    }
+
+    // Fecha de generación
+    doc.text(
+      `Generado: ${new Date().toLocaleDateString("es-PE")}`,
+      14,
+      yPosition,
+    );
+    yPosition += 10;
+
+    // Preparar datos para la tabla
+    const tableData = ventas.map((venta) => [
+      `#${venta.id}`,
+      venta.user?.nombre || "Sin cliente",
+      formatFecha(venta.fecha),
+      venta.tipo_entrega === "Envío a Domicilio" ? "Envío" : "Recojo",
+      venta.metodo_pago,
+      `S/ ${formatPrice(venta.costo_total)}`,
+      venta.estado,
+    ]);
+
+    // Agregar tabla
+    autoTable(doc, {
+      head: [
+        [
+          "ID Venta",
+          "Cliente",
+          "Fecha",
+          "Entrega",
+          "Método Pago",
+          "Total",
+          "Estado",
+        ],
+      ],
+      body: tableData,
+      startY: yPosition,
+      styles: {
+        font: "helvetica",
+        fontSize: 9,
+        cellPadding: 3,
+      },
+      headStyles: {
+        fillColor: [63, 81, 181],
+        textColor: [255, 255, 255],
+        fontStyle: "bold",
+      },
+      alternateRowStyles: {
+        fillColor: [242, 242, 242],
+      },
+      margin: { top: 10, right: 10, bottom: 10, left: 10 },
+    });
+
+    // Descargar PDF
+    doc.save(`pedidos_${new Date().toISOString().split("T")[0]}.pdf`);
+  };
+
+  // Función para descargar en Excel
+  const handleDescargarExcel = () => {
+    if (ventas.length === 0) {
+      alert("No hay datos para descargar");
+      return;
+    }
+
+    // Preparar datos para la hoja de Excel
+    const excelData = ventas.map((venta) => ({
+      "ID Venta": `#${venta.id}`,
+      Cliente: venta.user?.nombre || "Sin cliente",
+      Email: venta.user?.correo || "N/A",
+      Fecha: formatFecha(venta.fecha),
+      "Tipo Entrega":
+        venta.tipo_entrega === "Envío a Domicilio"
+          ? "Envío a Domicilio"
+          : "Recojo en Tienda",
+      "Método Pago": venta.metodo_pago,
+      "Total (S/)": parseFloat(formatPrice(venta.costo_total)),
+      Estado: venta.estado,
+      Comprobante: venta.comprobante,
+      "Código Único": venta.codigo_unico || "N/A",
+    }));
+
+    // Crear hoja de trabajo
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+
+    // Ajustar ancho de columnas
+    const columnWidths = [
+      { wch: 10 }, // ID Venta
+      { wch: 20 }, // Cliente
+      { wch: 20 }, // Email
+      { wch: 20 }, // Fecha
+      { wch: 18 }, // Tipo Entrega
+      { wch: 15 }, // Método Pago
+      { wch: 12 }, // Total
+      { wch: 12 }, // Estado
+      { wch: 15 }, // Comprobante
+      { wch: 15 }, // Código Único
+    ];
+    worksheet["!cols"] = columnWidths;
+
+    // Crear libro de trabajo
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Pedidos");
+
+    // Descargar Excel
+    XLSX.writeFile(
+      workbook,
+      `pedidos_${new Date().toISOString().split("T")[0]}.xlsx`,
+    );
+  };
+
   return (
     <div className="dashboard-layout">
       <Sidebar />
@@ -751,6 +894,27 @@ function GestionPedidos() {
                         title="Limpiar todos los filtros"
                       >
                         <i className="bx bx-x"></i> Limpiar
+                      </button>
+                    </div>
+
+                    {/* Botones de descarga */}
+                    <div className="filtro-item">
+                      <button
+                        className="btn btn-outline-danger"
+                        onClick={handleDescargarPDF}
+                        title="Descargar tabla en PDF"
+                      >
+                        <i className="bx bx-file-pdf"></i> Descargar PDF
+                      </button>
+                    </div>
+
+                    <div className="filtro-item">
+                      <button
+                        className="btn btn-outline-success"
+                        onClick={handleDescargarExcel}
+                        title="Descargar tabla en Excel"
+                      >
+                        <i className="bx bx-file-excel"></i> Descargar Excel
                       </button>
                     </div>
                   </div>
