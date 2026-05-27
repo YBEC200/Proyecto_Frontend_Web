@@ -153,8 +153,7 @@ function GestionPedidos() {
       return new Map();
     }
   };
-
-  Función extra para calcular estadísticas globales fijas
+  
   const fetchStats = async () => {
     try {
       const token = localStorage.getItem("token");
