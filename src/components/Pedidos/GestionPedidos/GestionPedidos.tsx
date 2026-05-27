@@ -93,11 +93,18 @@ interface BajaVenta {
 }
 
 function GestionPedidos() {
-  // Estados de filtros
+  // Estados de filtros de entrada (UI)
   const [searchInput, setSearchInput] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterDate, setFilterDate] = useState({ start: "", end: "" });
-  const [filterStatus, setFilterStatus] = useState("");
+  const [filterDateInput, setFilterDateInput] = useState({ start: "", end: "" });
+  const [filterStatusInput, setFilterStatusInput] = useState("");
+
+  // Estado de filtros aplicados (para ejecutar la búsqueda)
+  const [appliedFilters, setAppliedFilters] = useState({
+    searchTerm: "",
+    status: "",
+    dateStart: "",
+    dateEnd: "",
+  });
 
   // Estados de datos
   const [ventas, setVentas] = useState<Venta[]>([]);
@@ -187,7 +194,7 @@ function GestionPedidos() {
     }
   };
   
-  // 2. useEffect para ejecutar la función SÓLO UNA VEZ al cargar la página
+  // useEffect para ejecutar la función estadísticas SÓLO UNA VEZ al cargar la página
   useEffect(() => {
     fetchStats();
   }, []);
@@ -201,10 +208,10 @@ function GestionPedidos() {
       const token = localStorage.getItem("token");
       const params = new URLSearchParams();
 
-      if (searchTerm) params.append("nombre_cliente", searchTerm);
-      if (filterStatus) params.append("estado", filterStatus);
-      if (filterDate.start) params.append("fecha_inicio", filterDate.start);
-      if (filterDate.end) params.append("fecha_fin", filterDate.end);
+      if (appliedFilters.searchTerm) params.append("nombre_cliente", appliedFilters.searchTerm);
+      if (appliedFilters.status) params.append("estado", appliedFilters.status);
+      if (appliedFilters.dateStart) params.append("fecha_inicio", appliedFilters.dateStart);
+      if (appliedFilters.dateEnd) params.append("fecha_fin", appliedFilters.dateEnd);
 
       // Obtener usuarios primero para mapping
       const usuariosMap = await fetchUsuarios();
@@ -563,36 +570,42 @@ function GestionPedidos() {
     setErrorBaja("");
   };
 
-  // Función para descargar PDF
-  //const descargarPDF = (codigo_unico: string) => {
-  //window.open(`${API_URL}/api/descargar/${codigo_unico}/pdf`);
-  //};
-  // Funciones de filtrado
-  const applyFilters = () => {
-    setSearchTerm(searchInput.trim());
+  // NUEVA FUNCIÓN: Aplicar filtros (se ejecuta solo cuando el usuario hace clic)
+  const handleApplyFilters = () => {
+    setAppliedFilters({
+      searchTerm: searchInput.trim(),
+      status: filterStatusInput,
+      dateStart: filterDateInput.start,
+      dateEnd: filterDateInput.end,
+    });
   };
 
-  const clearFilters = () => {
+  // Función para limpiar filtros
+  const handleClearFilters = () => {
     setSearchInput("");
-    setSearchTerm("");
-    setFilterDate({ start: "", end: "" });
-    setFilterStatus("");
+    setFilterStatusInput("");
+    setFilterDateInput({ start: "", end: "" });
+    setAppliedFilters({
+      searchTerm: "",
+      status: "",
+      dateStart: "",
+      dateEnd: "",
+    });
   };
 
+  // Permitir aplicar filtros con Enter en el input de búsqueda
   const handleKeyDownApply = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      applyFilters();
+      handleApplyFilters();
     }
   };
 
-  // useEffect para cargar ventas al cambiar filtros
+  // useEffect para cargar ventas solo cuando appliedFilters cambia
   useEffect(() => {
     fetchVentas();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm, filterStatus, filterDate.start, filterDate.end]);
-
-
+  }, [appliedFilters]);
 
   // Función para formatear fecha
   const formatFecha = (fecha: string) => {
@@ -628,16 +641,16 @@ function GestionPedidos() {
     doc.setFontSize(10);
     let yPosition = 25;
 
-    if (searchTerm) {
-      doc.text(`Filtro Cliente: ${searchTerm}`, 14, yPosition);
+    if (appliedFilters.searchTerm) {
+      doc.text(`Filtro Cliente: ${appliedFilters.searchTerm}`, 14, yPosition);
       yPosition += 5;
     }
-    if (filterStatus) {
-      doc.text(`Filtro Estado: ${filterStatus}`, 14, yPosition);
+    if (appliedFilters.status) {
+      doc.text(`Filtro Estado: ${appliedFilters.status}`, 14, yPosition);
       yPosition += 5;
     }
-    if (filterDate.start || filterDate.end) {
-      const dateRange = `${filterDate.start || "Inicio"} - ${filterDate.end || "Fin"}`;
+    if (appliedFilters.dateStart || appliedFilters.dateEnd) {
+      const dateRange = `${appliedFilters.dateStart || "Inicio"} - ${appliedFilters.dateEnd || "Fin"}`;
       doc.text(`Rango de Fechas: ${dateRange}`, 14, yPosition);
       yPosition += 5;
     }
@@ -876,8 +889,8 @@ function GestionPedidos() {
                       </label>
                       <select
                         className="form-select radius-30"
-                        value={filterStatus}
-                        onChange={(e) => setFilterStatus(e.target.value)}
+                        value={filterStatusInput}
+                        onChange={(e) => setFilterStatusInput(e.target.value)}
                       >
                         <option value="">Todos</option>
                         <option value="Pendiente">Pendiente</option>
@@ -894,9 +907,9 @@ function GestionPedidos() {
                       <input
                         type="date"
                         className="form-control radius-30"
-                        value={filterDate.start}
+                        value={filterDateInput.start}
                         onChange={(e) =>
-                          setFilterDate((prev) => ({
+                          setFilterDateInput((prev) => ({
                             ...prev,
                             start: e.target.value,
                           }))
@@ -911,9 +924,9 @@ function GestionPedidos() {
                       <input
                         type="date"
                         className="form-control radius-30"
-                        value={filterDate.end}
+                        value={filterDateInput.end}
                         onChange={(e) =>
-                          setFilterDate((prev) => ({
+                          setFilterDateInput((prev) => ({
                             ...prev,
                             end: e.target.value,
                           }))
@@ -921,11 +934,22 @@ function GestionPedidos() {
                       />
                     </div>
 
+                    {/* NUEVO BOTÓN: Aplicar filtros */}
+                    <div className="filtro-item">
+                      <button
+                        className="btn btn-primary"
+                        onClick={handleApplyFilters}
+                        title="Aplicar filtros seleccionados"
+                      >
+                        <i className="bx bx-search"></i> Buscar
+                      </button>
+                    </div>
+
                     {/* Botón limpiar filtros */}
                     <div className="filtro-item">
                       <button
                         className="btn btn-outline-secondary"
-                        onClick={clearFilters}
+                        onClick={handleClearFilters}
                         title="Limpiar todos los filtros"
                       >
                         <i className="bx bx-x"></i> Limpiar
@@ -939,7 +963,7 @@ function GestionPedidos() {
                         onClick={handleDescargarPDF}
                         title="Descargar tabla en PDF"
                       >
-                        <i className="bx bx-file-pdf"></i> Descargar PDF
+                        <i className="bx bx-file-pdf"></i> PDF
                       </button>
                     </div>
 
@@ -949,7 +973,7 @@ function GestionPedidos() {
                         onClick={handleDescargarExcel}
                         title="Descargar tabla en Excel"
                       >
-                        <i className="bx bx-file-excel"></i> Descargar Excel
+                        <i className="bx bx-file-excel"></i> Excel
                       </button>
                     </div>
                   </div>
