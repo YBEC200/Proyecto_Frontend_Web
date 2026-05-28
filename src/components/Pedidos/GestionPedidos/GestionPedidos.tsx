@@ -933,49 +933,49 @@ function GestionPedidos() {
                         }
                       />
                     </div>
-
-                    {/* NUEVO BOTÓN: Aplicar filtros */}
-                    <div className="filtro-item">
-                      <button
-                        className="btn btn-primary"
-                        onClick={handleApplyFilters}
-                        title="Aplicar filtros seleccionados"
-                      >
-                        <i className="bx bx-search"></i> Buscar
-                      </button>
-                    </div>
-
-                    {/* Botón limpiar filtros */}
-                    <div className="filtro-item">
-                      <button
-                        className="btn btn-outline-secondary"
-                        onClick={handleClearFilters}
-                        title="Limpiar todos los filtros"
-                      >
-                        <i className="bx bx-x"></i> Limpiar
-                      </button>
-                    </div>
-
-                    {/* Botones de descarga */}
-                    <div className="filtro-item">
-                      <button
-                        className="btn btn-outline-danger"
-                        onClick={handleDescargarPDF}
-                        title="Descargar tabla en PDF"
-                      >
-                        <i className="bx bx-file-pdf"></i> PDF
-                      </button>
-                    </div>
-
-                    <div className="filtro-item">
-                      <button
-                        className="btn btn-outline-success"
-                        onClick={handleDescargarExcel}
-                        title="Descargar tabla en Excel"
-                      >
-                        <i className="bx bx-file-excel"></i> Excel
-                      </button>
-                    </div>
+                    {/* Aplicar filtros */}
+                      <div className="filtro-item flex-grow-1">
+                        <button
+                          className="btn btn-primary w-100 d-flex align-items-center justify-content-center gap-2"
+                          onClick={handleApplyFilters}
+                          title="Aplicar filtros seleccionados"
+                        >
+                          <i className="bx bx-search"></i> Buscar
+                        </button>
+                      </div>
+                  
+                      {/* Contenedor de Limpiar y Descargas (Columna derecha) */}
+                      <div className="filtro-item d-flex flex-column align-items-end gap-2">
+                        {/* Botón limpiar filtros */}
+                        <button
+                          className="btn btn-secondary d-flex align-items-center justify-content-center gap-2"
+                          onClick={handleClearFilters}
+                          title="Limpiar todos los filtros"
+                        >
+                          <i className="bx bx-x"></i> Limpiar
+                        </button>
+                  
+                        {/* Sub-fila: Opciones secundarias de descarga */}
+                        <div className="d-flex gap-2">
+                          <button
+                            className="btn btn-sm btn-outline-danger d-flex align-items-center justify-content-center p-2"
+                            onClick={handleDescargarPDF}
+                            title="Descargar tabla en PDF"
+                            aria-label="Descargar tabla en PDF"
+                          >
+                            <i className="bx bx-file-pdf fs-5"></i>
+                          </button>
+                  
+                          <button
+                            className="btn btn-sm btn-outline-success d-flex align-items-center justify-content-center p-2"
+                            onClick={handleDescargarExcel}
+                            title="Descargar tabla en Excel"
+                            aria-label="Descargar tabla en Excel"
+                          >
+                            <i className="bx bx-file-excel fs-5"></i>
+                          </button>
+                        </div>
+                      </div>         
                   </div>
 
                   {/* Mensaje de error */}
