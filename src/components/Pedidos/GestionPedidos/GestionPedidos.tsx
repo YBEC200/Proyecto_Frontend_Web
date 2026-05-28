@@ -963,14 +963,14 @@ function GestionPedidos() {
                           onClick={handleDescargarPDF}
                           title="Descargar tabla en PDF"
                         >
-                          <i className="bx bx-file-pdf"></i> PDF
+                          <i className="bx bx-download"></i> PDF
                         </button>
                         <button
                           className="btn btn-outline-success"
                           onClick={handleDescargarExcel}
                           title="Descargar tabla en Excel"
                         >
-                          <i className="bx bx-file-excel"></i> Excel
+                          <i className="bx bx-download"></i> Excel
                         </button>
                       </div>
                     </div>         
