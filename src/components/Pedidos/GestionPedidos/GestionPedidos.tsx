@@ -933,7 +933,8 @@ function GestionPedidos() {
                         }
                       />
                     </div>
-                    {/* Aplicar filtros */}
+                    <div className="d-flex align-items-center gap-2">
+                      {/* Aplicar filtros */}
                       <div className="filtro-item flex-grow-1">
                         <button
                           className="btn btn-primary w-100 d-flex align-items-center justify-content-center gap-2"
@@ -975,7 +976,8 @@ function GestionPedidos() {
                             <i className="bx bx-file-excel fs-5"></i>
                           </button>
                         </div>
-                      </div>         
+                      </div>
+                    </div>         
                   </div>
 
                   {/* Mensaje de error */}
