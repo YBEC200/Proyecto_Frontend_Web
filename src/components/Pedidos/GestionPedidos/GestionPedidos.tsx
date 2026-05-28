@@ -623,19 +623,16 @@ function GestionPedidos() {
     return (price ?? 0).toFixed(2);
   };
 
-  // Función para descargar en PDF
+  // Función para descargar en PDF CON DETALLES
   const handleDescargarPDF = () => {
     if (ventas.length === 0) {
       alert("No hay datos para descargar");
       return;
     }
 
-    // Crear documento PDF
     const doc = new jsPDF();
-
-    // Agregar título
     doc.setFontSize(16);
-    doc.text("Reporte de Pedidos", 14, 15);
+    doc.text("Reporte de Pedidos con Detalles", 14, 15);
 
     // Agregar información de filtros
     doc.setFontSize(10);
@@ -655,7 +652,6 @@ function GestionPedidos() {
       yPosition += 5;
     }
 
-    // Fecha de generación
     doc.text(
       `Generado: ${new Date().toLocaleDateString("es-PE")}`,
       14,
@@ -663,61 +659,131 @@ function GestionPedidos() {
     );
     yPosition += 10;
 
-    // Preparar datos para la tabla
-    const tableData = ventas.map((venta) => [
-      `#${venta.id}`,
-      venta.user?.nombre || "Sin cliente",
-      formatFecha(venta.fecha),
-      venta.tipo_entrega === "Envío a Domicilio" ? "Envío" : "Recojo",
-      venta.metodo_pago,
-      `S/ ${formatPrice(venta.costo_total)}`,
-      venta.estado,
-    ]);
+    // Iterar sobre cada venta para crear una sección con sus detalles
+    ventas.forEach((venta, ventaIndex) => {
+      // Verificar si necesitamos una nueva página
+      if (yPosition > 250) {
+        doc.addPage();
+        yPosition = 15;
+      }
 
-    // Agregar tabla
-    autoTable(doc, {
-      head: [
-        [
-          "ID Venta",
-          "Cliente",
-          "Fecha",
-          "Entrega",
-          "Método Pago",
-          "Total",
-          "Estado",
-        ],
-      ],
-      body: tableData,
-      startY: yPosition,
-      styles: {
-        font: "helvetica",
-        fontSize: 9,
-        cellPadding: 3,
-      },
-      headStyles: {
-        fillColor: [63, 81, 181],
-        textColor: [255, 255, 255],
-        fontStyle: "bold",
-      },
-      alternateRowStyles: {
-        fillColor: [242, 242, 242],
-      },
-      margin: { top: 10, right: 10, bottom: 10, left: 10 },
+      // Información de la venta
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.text(`Venta #${venta.id}`, 14, yPosition);
+      yPosition += 5;
+
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Cliente: ${venta.user?.nombre || "Sin cliente"}`, 14, yPosition);
+      yPosition += 4;
+      doc.text(`Email: ${venta.user?.correo || "N/A"}`, 14, yPosition);
+      yPosition += 4;
+      doc.text(`Fecha: ${formatFecha(venta.fecha)}`, 14, yPosition);
+      yPosition += 4;
+      doc.text(
+        `Tipo Entrega: ${venta.tipo_entrega === "Envío a Domicilio" ? "Envío a Domicilio" : "Recojo en Tienda"}`,
+        14,
+        yPosition,
+      );
+      yPosition += 4;
+      doc.text(`Método Pago: ${venta.metodo_pago}`, 14, yPosition);
+      yPosition += 4;
+      doc.text(`Estado: ${venta.estado}`, 14, yPosition);
+      yPosition += 4;
+      doc.setFont("helvetica", "bold");
+      doc.text(`Total: S/ ${formatPrice(venta.costo_total)}`, 14, yPosition);
+      doc.setFont("helvetica", "normal");
+      yPosition += 6;
+
+      // Tabla de productos/detalles
+      if (venta.details && venta.details.length > 0) {
+        const tableData = venta.details.flatMap((detail) => {
+          if (!detail.detailLotes || detail.detailLotes.length === 0) {
+            return [
+              [
+                detail.product?.nombre || `Producto ID: ${detail.id_producto}`,
+                detail.cantidad.toString(),
+                formatPrice(detail.costo),
+                formatPrice(detail.costo * detail.cantidad),
+                "Sin lotes",
+                "",
+              ],
+            ];
+          }
+
+          return detail.detailLotes.map((lote, index) => [
+            index === 0
+              ? detail.product?.nombre || `Producto ID: ${detail.id_producto}`
+              : "",
+            index === 0 ? detail.cantidad.toString() : "",
+            index === 0 ? formatPrice(detail.costo) : "",
+            index === 0
+              ? formatPrice(detail.costo * detail.cantidad)
+              : "",
+            lote.lote?.nombre || lote.lote?.Lote || "N/A",
+            lote.cantidad.toString(),
+          ]);
+        });
+
+        autoTable(doc, {
+          head: [
+            [
+              "Producto",
+              "Cant. Venta",
+              "Costo Unit.",
+              "Subtotal",
+              "Lote",
+              "Cant. Lote",
+            ],
+          ],
+          body: tableData,
+          startY: yPosition,
+          styles: {
+            font: "helvetica",
+            fontSize: 8,
+            cellPadding: 2,
+          },
+          headStyles: {
+            fillColor: [63, 81, 181],
+            textColor: [255, 255, 255],
+            fontStyle: "bold",
+          },
+          alternateRowStyles: {
+            fillColor: [242, 242, 242],
+          },
+          margin: { left: 10, right: 10 },
+        });
+
+        yPosition = (doc as any).lastAutoTable.finalY + 10;
+      } else {
+        doc.text("Sin detalles de productos", 14, yPosition);
+        yPosition += 6;
+      }
+
+      // Separador entre ventas
+      if (ventaIndex < ventas.length - 1) {
+        yPosition += 5;
+        doc.setDrawColor(200);
+        doc.line(14, yPosition, 196, yPosition);
+        yPosition += 5;
+      }
     });
 
-    // Descargar PDF
-    doc.save(`pedidos_${new Date().toISOString().split("T")[0]}.pdf`);
+    doc.save(`pedidos_detalles_${new Date().toISOString().split("T")[0]}.pdf`);
   };
 
-  // Función para descargar en Excel
+  // Función para descargar en Excel CON DETALLES
   const handleDescargarExcel = () => {
     if (ventas.length === 0) {
       alert("No hay datos para descargar");
       return;
     }
 
-    // Preparar datos para la hoja de Excel
-    const excelData = ventas.map((venta) => ({
+    const workbook = XLSX.utils.book_new();
+
+    // Hoja 1: Resumen de Ventas
+    const resumenData = ventas.map((venta) => ({
       "ID Venta": `#${venta.id}`,
       Cliente: venta.user?.nombre || "Sin cliente",
       Email: venta.user?.correo || "N/A",
@@ -733,32 +799,81 @@ function GestionPedidos() {
       "Código Único": venta.codigo_unico || "N/A",
     }));
 
-    // Crear hoja de trabajo
-    const worksheet = XLSX.utils.json_to_sheet(excelData);
-
-    // Ajustar ancho de columnas
-    const columnWidths = [
-      { wch: 10 }, // ID Venta
-      { wch: 20 }, // Cliente
-      { wch: 20 }, // Email
-      { wch: 20 }, // Fecha
-      { wch: 18 }, // Tipo Entrega
-      { wch: 15 }, // Método Pago
-      { wch: 12 }, // Total
-      { wch: 12 }, // Estado
-      { wch: 15 }, // Comprobante
-      { wch: 15 }, // Código Único
+    const resumenSheet = XLSX.utils.json_to_sheet(resumenData);
+    resumenSheet["!cols"] = [
+      { wch: 10 },
+      { wch: 20 },
+      { wch: 20 },
+      { wch: 20 },
+      { wch: 18 },
+      { wch: 15 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 15 },
+      { wch: 15 },
     ];
-    worksheet["!cols"] = columnWidths;
+    XLSX.utils.book_append_sheet(workbook, resumenSheet, "Resumen");
 
-    // Crear libro de trabajo
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Pedidos");
+    // Hoja 2: Detalles de Productos
+    const detallesData: any[] = [];
 
-    // Descargar Excel
+    ventas.forEach((venta) => {
+      if (venta.details && venta.details.length > 0) {
+        venta.details.forEach((detail) => {
+          if (!detail.detailLotes || detail.detailLotes.length === 0) {
+            detallesData.push({
+              "ID Venta": venta.id,
+              Cliente: venta.user?.nombre || "Sin cliente",
+              Producto: detail.product?.nombre || `ID: ${detail.id_producto}`,
+              Descripción: detail.product?.descripcion || "N/A",
+              "Cantidad Venta": detail.cantidad,
+              "Costo Unitario": formatPrice(detail.costo),
+              Subtotal: formatPrice(detail.costo * detail.cantidad),
+              Lote: "Sin lotes",
+              "Cantidad Lote": "",
+              "Fecha Registro Lote": "",
+            });
+          } else {
+            detail.detailLotes.forEach((lote) => {
+              detallesData.push({
+                "ID Venta": venta.id,
+                Cliente: venta.user?.nombre || "Sin cliente",
+                Producto: detail.product?.nombre || `ID: ${detail.id_producto}`,
+                Descripción: detail.product?.descripcion || "N/A",
+                "Cantidad Venta": detail.cantidad,
+                "Costo Unitario": formatPrice(detail.costo),
+                Subtotal: formatPrice(detail.costo * detail.cantidad),
+                Lote: lote.lote?.nombre || lote.lote?.Lote || "N/A",
+                "Cantidad Lote": lote.cantidad,
+                "Fecha Registro Lote":
+                  lote.lote?.fecha_registro ||
+                  lote.lote?.Fecha_Registro ||
+                  "N/A",
+              });
+            });
+          }
+        });
+      }
+    });
+
+    const detallesSheet = XLSX.utils.json_to_sheet(detallesData);
+    detallesSheet["!cols"] = [
+      { wch: 10 },
+      { wch: 20 },
+      { wch: 20 },
+      { wch: 25 },
+      { wch: 15 },
+      { wch: 15 },
+      { wch: 12 },
+      { wch: 20 },
+      { wch: 15 },
+      { wch: 18 },
+    ];
+    XLSX.utils.book_append_sheet(workbook, detallesSheet, "Detalles Productos");
+
     XLSX.writeFile(
       workbook,
-      `pedidos_${new Date().toISOString().split("T")[0]}.xlsx`,
+      `pedidos_detalles_${new Date().toISOString().split("T")[0]}.xlsx`,
     );
   };
 
@@ -933,47 +1048,49 @@ function GestionPedidos() {
                         }
                       />
                     </div>
-                    <div className="d-flex align-items-center gap-2">
-                      {/* Aplicar filtros */}
-                      <div className="filtro-item d-flex flex-column align-items-end gap-2">
-                        <button
-                          className="btn btn-primary d-flex align-items-center justify-content-center gap-2"
-                          onClick={handleApplyFilters}
-                          title="Aplicar filtros seleccionados"
-                        >
-                          <i className="bx bx-search"></i> Buscar
-                        </button>
-                      </div>
-                  
-                      {/* Contenedor de Limpiar y Descargas (Columna derecha) */}
-                      <div className="filtro-item d-flex flex-column align-items-end gap-2">
-                        {/* Botón limpiar filtros */}
-                        <button
-                          className="btn btn-secondary d-flex align-items-center justify-content-center gap-2"
-                          onClick={handleClearFilters}
-                          title="Limpiar todos los filtros"
-                        >
-                          <i className="bx bx-x"></i> Limpiar
-                        </button>
-                      </div>
-                      {/* Sub-fila: Opciones secundarias de descarga */}
-                      <div className="filtro-item d-flex gap-2">
-                        <button
-                          className="btn btn-outline-danger"
-                          onClick={handleDescargarPDF}
-                          title="Descargar tabla en PDF"
-                        >
-                          <i className="bx bx-file-pdf"></i> PDF
-                        </button>
-                        <button
-                          className="btn btn-outline-success"
-                          onClick={handleDescargarExcel}
-                          title="Descargar tabla en Excel"
-                        >
-                          <i className="bx bx-file-excel"></i> Excel
-                        </button>
-                      </div>
-                    </div>         
+
+                    {/* NUEVO BOTÓN: Aplicar filtros */}
+                    <div className="filtro-item">
+                      <button
+                        className="btn btn-primary"
+                        onClick={handleApplyFilters}
+                        title="Aplicar filtros seleccionados"
+                      >
+                        <i className="bx bx-search"></i> Buscar
+                      </button>
+                    </div>
+
+                    {/* Botón limpiar filtros */}
+                    <div className="filtro-item">
+                      <button
+                        className="btn btn-outline-secondary"
+                        onClick={handleClearFilters}
+                        title="Limpiar todos los filtros"
+                      >
+                        <i className="bx bx-x"></i> Limpiar
+                      </button>
+                    </div>
+
+                    {/* Botones de descarga */}
+                    <div className="filtro-item">
+                      <button
+                        className="btn btn-outline-danger"
+                        onClick={handleDescargarPDF}
+                        title="Descargar tabla en PDF con detalles"
+                      >
+                        <i className="bx bx-file-pdf"></i> PDF
+                      </button>
+                    </div>
+
+                    <div className="filtro-item">
+                      <button
+                        className="btn btn-outline-success"
+                        onClick={handleDescargarExcel}
+                        title="Descargar tabla en Excel con detalles"
+                      >
+                        <i className="bx bx-file-excel"></i> Excel
+                      </button>
+                    </div>
                   </div>
 
                   {/* Mensaje de error */}
