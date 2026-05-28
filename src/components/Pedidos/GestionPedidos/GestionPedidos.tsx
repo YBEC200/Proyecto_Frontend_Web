@@ -933,28 +933,30 @@ function GestionPedidos() {
                         }
                       />
                     </div>
-                    <div className="d-flex align-items-center gap-2">
+                    <div className="d-flex align-items-center justify-content-between w-100 gap-2">
                       {/* Aplicar filtros */}
-                      <div className="filtro-item d-flex flex-column align-items-end gap-2">
-                        <button
-                          className="btn btn-primary d-flex align-items-center justify-content-center gap-2"
-                          onClick={handleApplyFilters}
-                          title="Aplicar filtros seleccionados"
-                        >
-                          <i className="bx bx-search"></i> Buscar
-                        </button>
-                      </div>
-                  
-                      {/* Contenedor de Limpiar y Descargas (Columna derecha) */}
-                      <div className="filtro-item d-flex flex-column align-items-end gap-2">
-                        {/* Botón limpiar filtros */}
-                        <button
-                          className="btn btn-secondary d-flex align-items-center justify-content-center gap-2"
-                          onClick={handleClearFilters}
-                          title="Limpiar todos los filtros"
-                        >
-                          <i className="bx bx-x"></i> Limpiar
-                        </button>
+                      <div className="d-flex gap-2">
+                        <div className="filtro-item d-flex flex-column align-items-end gap-2">
+                          <button
+                            className="btn btn-primary d-flex align-items-center justify-content-center gap-2"
+                            onClick={handleApplyFilters}
+                            title="Aplicar filtros seleccionados"
+                          >
+                            <i className="bx bx-search"></i> Buscar
+                          </button>
+                        </div>
+                    
+                        {/* Contenedor de Limpiar y Descargas (Columna derecha) */}
+                        <div className="filtro-item d-flex flex-column align-items-end gap-2">
+                          {/* Botón limpiar filtros */}
+                          <button
+                            className="btn btn-secondary d-flex align-items-center justify-content-center gap-2"
+                            onClick={handleClearFilters}
+                            title="Limpiar todos los filtros"
+                          >
+                            <i className="bx bx-x"></i> Limpiar
+                          </button>
+                        </div>
                       </div>
                       {/* Sub-fila: Opciones secundarias de descarga */}
                       <div className="d-flex gap-2">
