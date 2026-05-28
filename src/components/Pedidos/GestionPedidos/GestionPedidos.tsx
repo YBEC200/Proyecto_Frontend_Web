@@ -957,7 +957,7 @@ function GestionPedidos() {
                         </button>
                       </div>
                       {/* Sub-fila: Opciones secundarias de descarga */}
-                      <div className="d-flex gap-2">
+                      <div className="filtro-item d-flex gap-2">
                         <button
                           className="btn btn-outline-danger"
                           onClick={handleDescargarPDF}
