@@ -959,21 +959,18 @@ function GestionPedidos() {
                         {/* Sub-fila: Opciones secundarias de descarga */}
                         <div className="d-flex gap-2">
                           <button
-                            className="btn btn-sm btn-outline-danger d-flex align-items-center justify-content-center p-2"
+                            className="btn btn-outline-danger"
                             onClick={handleDescargarPDF}
                             title="Descargar tabla en PDF"
-                            aria-label="Descargar tabla en PDF"
                           >
-                            <i className="bx bx-file-pdf fs-5"></i>
+                            <i className="bx bx-file-pdf"></i> PDF
                           </button>
-                  
                           <button
-                            className="btn btn-sm btn-outline-success d-flex align-items-center justify-content-center p-2"
+                            className="btn btn-outline-success"
                             onClick={handleDescargarExcel}
                             title="Descargar tabla en Excel"
-                            aria-label="Descargar tabla en Excel"
                           >
-                            <i className="bx bx-file-excel fs-5"></i>
+                            <i className="bx bx-file-excel"></i> Excel
                           </button>
                         </div>
                       </div>
