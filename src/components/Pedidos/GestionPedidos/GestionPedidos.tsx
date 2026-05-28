@@ -946,7 +946,7 @@ function GestionPedidos() {
                       </div>
                   
                       {/* Contenedor de Limpiar y Descargas (Columna derecha) */}
-                      <div className="filtro-item d-flex flex-column align-items-end gap-2">
+                      <div className="filtro-item flex-grow-1">
                         {/* Botón limpiar filtros */}
                         <button
                           className="btn btn-secondary d-flex align-items-center justify-content-center gap-2"
@@ -955,24 +955,23 @@ function GestionPedidos() {
                         >
                           <i className="bx bx-x"></i> Limpiar
                         </button>
-                  
-                        {/* Sub-fila: Opciones secundarias de descarga */}
-                        <div className="d-flex gap-2">
-                          <button
-                            className="btn btn-outline-danger"
-                            onClick={handleDescargarPDF}
-                            title="Descargar tabla en PDF"
-                          >
-                            <i className="bx bx-file-pdf"></i> PDF
-                          </button>
-                          <button
-                            className="btn btn-outline-success"
-                            onClick={handleDescargarExcel}
-                            title="Descargar tabla en Excel"
-                          >
-                            <i className="bx bx-file-excel"></i> Excel
-                          </button>
-                        </div>
+                      </div>
+                      {/* Sub-fila: Opciones secundarias de descarga */}
+                      <div className="d-flex gap-2">
+                        <button
+                          className="btn btn-outline-danger"
+                          onClick={handleDescargarPDF}
+                          title="Descargar tabla en PDF"
+                        >
+                          <i className="bx bx-file-pdf"></i> PDF
+                        </button>
+                        <button
+                          className="btn btn-outline-success"
+                          onClick={handleDescargarExcel}
+                          title="Descargar tabla en Excel"
+                        >
+                          <i className="bx bx-file-excel"></i> Excel
+                        </button>
                       </div>
                     </div>         
                   </div>
