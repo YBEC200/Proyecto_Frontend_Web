@@ -95,7 +95,10 @@ interface BajaVenta {
 function GestionPedidos() {
   // Estados de filtros de entrada (UI)
   const [searchInput, setSearchInput] = useState("");
-  const [filterDateInput, setFilterDateInput] = useState({ start: "", end: "" });
+  const [filterDateInput, setFilterDateInput] = useState({
+    start: "",
+    end: "",
+  });
   const [filterStatusInput, setFilterStatusInput] = useState("");
 
   // Estado de filtros aplicados (para ejecutar la búsqueda)
@@ -110,9 +113,14 @@ function GestionPedidos() {
   const [ventas, setVentas] = useState<Venta[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  
+
   // Estadísticas
-  const [stats, setStats] = useState({ total: 0, pendientes: 0, entregados: 0, cancelados: 0 });
+  const [stats, setStats] = useState({
+    total: 0,
+    pendientes: 0,
+    entregados: 0,
+    cancelados: 0,
+  });
 
   // Estados del modal de detalles
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -160,11 +168,11 @@ function GestionPedidos() {
       return new Map();
     }
   };
-  
+
   const fetchStats = async () => {
     try {
       const token = localStorage.getItem("token");
-      
+
       // Llamada limpia a la API sin query params (trae todo)
       const response = await fetch(`${API_URL}/api/ventas`, {
         headers: {
@@ -172,28 +180,32 @@ function GestionPedidos() {
           "Content-Type": "application/json",
         },
       });
-  
+
       if (!response.ok) return;
       const data = await response.json();
       const ventasCompletas = Array.isArray(data) ? data : [];
-  
+
       // Mapeo rápido para asegurar compatibilidad de mayúsculas/minúsculas en el campo 'estado'
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const ventasNormalizadas = ventasCompletas.map((item: any) => ({
         estado: item.estado || item.Estado,
       }));
-  
+
       // Calcular y guardar los totales en el estado fijo
       setStats({
         total: ventasNormalizadas.length,
-        pendientes: ventasNormalizadas.filter((v) => v.estado === "Pendiente").length,
-        entregados: ventasNormalizadas.filter((v) => v.estado === "Entregado").length,
-        cancelados: ventasNormalizadas.filter((v) => v.estado === "Cancelado").length,
+        pendientes: ventasNormalizadas.filter((v) => v.estado === "Pendiente")
+          .length,
+        entregados: ventasNormalizadas.filter((v) => v.estado === "Entregado")
+          .length,
+        cancelados: ventasNormalizadas.filter((v) => v.estado === "Cancelado")
+          .length,
       });
     } catch (err) {
       console.error("Error al calcular estadísticas iniciales:", err);
     }
   };
-  
+
   // useEffect para ejecutar la función estadísticas SÓLO UNA VEZ al cargar la página
   useEffect(() => {
     fetchStats();
@@ -208,10 +220,13 @@ function GestionPedidos() {
       const token = localStorage.getItem("token");
       const params = new URLSearchParams();
 
-      if (appliedFilters.searchTerm) params.append("nombre_cliente", appliedFilters.searchTerm);
+      if (appliedFilters.searchTerm)
+        params.append("nombre_cliente", appliedFilters.searchTerm);
       if (appliedFilters.status) params.append("estado", appliedFilters.status);
-      if (appliedFilters.dateStart) params.append("fecha_inicio", appliedFilters.dateStart);
-      if (appliedFilters.dateEnd) params.append("fecha_fin", appliedFilters.dateEnd);
+      if (appliedFilters.dateStart)
+        params.append("fecha_inicio", appliedFilters.dateStart);
+      if (appliedFilters.dateEnd)
+        params.append("fecha_fin", appliedFilters.dateEnd);
 
       // Obtener usuarios primero para mapping
       const usuariosMap = await fetchUsuarios();
@@ -572,6 +587,8 @@ function GestionPedidos() {
 
   // NUEVA FUNCIÓN: Aplicar filtros (se ejecuta solo cuando el usuario hace clic)
   const handleApplyFilters = () => {
+    if (loading) return;
+
     setAppliedFilters({
       searchTerm: searchInput.trim(),
       status: filterStatusInput,
@@ -863,9 +880,8 @@ function GestionPedidos() {
               <div className="card-body">
                 <div className="table-responsive">
                   {/* FILTROS */}
-                  <div className="filtros-pedidos d-flex flex-wrap gap-3 align-items-end mb-4">
-                    {/* Buscar por cliente */}
-                    <div className="filtro-item flex-grow-1">
+                  <div className="filtros-pedidos row gx-3 gy-3 align-items-end mb-4">
+                    <div className="col-12 col-lg-4">
                       <label className="form-label fw-semibold text-muted mb-1">
                         Buscar cliente
                       </label>
@@ -882,8 +898,7 @@ function GestionPedidos() {
                       </div>
                     </div>
 
-                    {/* Filtrar por estado */}
-                    <div className="filtro-item">
+                    <div className="col-6 col-sm-4 col-lg-2">
                       <label className="form-label fw-semibold text-muted mb-1">
                         Estado
                       </label>
@@ -899,8 +914,7 @@ function GestionPedidos() {
                       </select>
                     </div>
 
-                    {/* Filtrar por fecha */}
-                    <div className="filtro-item">
+                    <div className="col-6 col-sm-4 col-lg-2">
                       <label className="form-label fw-semibold text-muted mb-1">
                         Desde
                       </label>
@@ -917,7 +931,7 @@ function GestionPedidos() {
                       />
                     </div>
 
-                    <div className="filtro-item">
+                    <div className="col-6 col-sm-4 col-lg-2">
                       <label className="form-label fw-semibold text-muted mb-1">
                         Hasta
                       </label>
@@ -933,33 +947,24 @@ function GestionPedidos() {
                         }
                       />
                     </div>
-                    <div className="d-flex align-items-center justify-content-between w-100 gap-2">
-                      {/* Aplicar filtros */}
-                      <div className="d-flex gap-2">
-                        <div className="filtro-item d-flex flex-column align-items-end gap-2">
-                          <button
-                            className="btn btn-primary d-flex align-items-center justify-content-center gap-2"
-                            onClick={handleApplyFilters}
-                            title="Aplicar filtros seleccionados"
-                          >
-                            <i className="bx bx-search"></i> Buscar
-                          </button>
-                        </div>
-                    
-                        {/* Contenedor de Limpiar y Descargas (Columna derecha) */}
-                        <div className="filtro-item d-flex flex-column align-items-end gap-2">
-                          {/* Botón limpiar filtros */}
-                          <button
-                            className="btn btn-secondary d-flex align-items-center justify-content-center gap-2"
-                            onClick={handleClearFilters}
-                            title="Limpiar todos los filtros"
-                          >
-                            <i className="bx bx-x"></i> Limpiar
-                          </button>
-                        </div>
-                      </div>
-                      {/* Sub-fila: Opciones secundarias de descarga */}
-                      <div className="d-flex gap-2">
+
+                    <div className="col-12 col-lg-2">
+                      <div className="filtro-acciones">
+                        <button
+                          className="btn btn-primary d-flex align-items-center justify-content-center gap-2"
+                          onClick={handleApplyFilters}
+                          title="Aplicar filtros seleccionados"
+                          disabled={loading}
+                        >
+                          <i className="bx bx-search"></i> Buscar
+                        </button>
+                        <button
+                          className="btn btn-secondary d-flex align-items-center justify-content-center gap-2"
+                          onClick={handleClearFilters}
+                          title="Limpiar todos los filtros"
+                        >
+                          <i className="bx bx-x"></i> Limpiar
+                        </button>
                         <button
                           className="btn btn-outline-danger"
                           onClick={handleDescargarPDF}
@@ -975,7 +980,7 @@ function GestionPedidos() {
                           <i className="bx bx-download"></i> Excel
                         </button>
                       </div>
-                    </div>         
+                    </div>
                   </div>
 
                   {/* Mensaje de error */}

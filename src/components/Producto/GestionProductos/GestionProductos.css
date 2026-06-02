@@ -32,7 +32,9 @@
   height: 36px;
   border: none;
   cursor: pointer;
-  transition: background-color 0.3s ease, transform 0.2s ease,
+  transition:
+    background-color 0.3s ease,
+    transform 0.2s ease,
     box-shadow 0.2s ease;
 }
 
@@ -122,21 +124,47 @@
 /* Estilos para los filtros de productos */
 
 .filtros-productos {
-  background: #f9fafc;
-  padding: 12px 18px;
-  border-radius: 10px;
-  border: 1px solid #e5e8ec;
+  background-color: #f8f9fa;
+  padding: 1.25rem;
+  border-radius: 0.75rem;
+  border: 1px solid #e9ecef;
+}
+
+.filtros-productos .col-12 {
+  min-width: 220px;
+}
+
+.filtros-productos .form-control,
+.filtros-productos .form-select {
+  min-height: 48px;
 }
 
 .filtro-item {
   display: flex;
   flex-direction: column;
-  min-width: 160px;
 }
 
 .filtro-item label {
   font-size: 0.85rem;
   color: #666;
+}
+
+.filtro-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.filtro-acciones .btn {
+  min-width: 120px;
+}
+
+@media (max-width: 767px) {
+  .filtro-acciones {
+    justify-content: flex-start;
+  }
 }
 
 .filtros-productos input,

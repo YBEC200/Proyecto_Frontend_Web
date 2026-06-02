@@ -1,5 +1,8 @@
 import { useState, useEffect } from "react";
 import "./VerLotes.css";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import * as XLSX from "xlsx";
 const API_URL = import.meta.env.VITE_API_URL;
 interface Lote {
   Id: string;
@@ -280,18 +283,118 @@ export default function VerLotes({
     }
   }, [lotes]);
 
-  // Handler para Enter en inputs: aplica filtro correspondiente
+  const handleApplyFilters = () => {
+    setSearchTerm(searchInput.trim());
+    setCantidadRange({
+      min: minCantidadInput,
+      max: maxCantidadInput,
+    });
+    setEstadoFilter(estadoFilterInput);
+  };
+
+  // Handler para Enter en inputs: aplicar los filtros al presionar Enter
   const handleKeyDownApply = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key !== "Enter") return;
     e.preventDefault();
-    const name = (e.currentTarget as HTMLInputElement).name;
-    if (name === "search") {
-      setSearchTerm(searchInput.trim());
-    } else if (name === "min") {
-      setCantidadRange((prev) => ({ ...prev, min: minCantidadInput }));
-    } else if (name === "max") {
-      setCantidadRange((prev) => ({ ...prev, max: maxCantidadInput }));
+    handleApplyFilters();
+  };
+
+  // Función para descargar en PDF
+  const handleDescargarPDF = () => {
+    if (lotes.length === 0) {
+      alert("No hay datos para descargar");
+      return;
     }
+
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text("Reporte de Lotes", 14, 15);
+    doc.setFontSize(10);
+    let yPosition = 24;
+
+    doc.text(`Producto: ${productoNombre}`, 14, yPosition);
+    yPosition += 5;
+    doc.text(`Producto ID: ${productoId}`, 14, yPosition);
+    yPosition += 5;
+
+    if (searchTerm) {
+      doc.text(`Filtro Lote: ${searchTerm}`, 14, yPosition);
+      yPosition += 5;
+    }
+    if (estadoFilter) {
+      doc.text(`Filtro Estado: ${estadoFilter}`, 14, yPosition);
+      yPosition += 5;
+    }
+    if (cantidadRange.min || cantidadRange.max) {
+      const cantidadTexto = `${cantidadRange.min || "Min"} - ${cantidadRange.max || "Max"}`;
+      doc.text(`Filtro Cantidad: ${cantidadTexto}`, 14, yPosition);
+      yPosition += 5;
+    }
+    doc.text(
+      `Generado: ${new Date().toLocaleDateString("es-PE")}`,
+      14,
+      yPosition,
+    );
+    yPosition += 10;
+
+    const tableData = lotes.map((lote) => [
+      lote.Lote,
+      formatFecha(lote.Fecha_Registro),
+      lote.Cantidad.toString(),
+      lote.Estado,
+    ]);
+
+    autoTable(doc, {
+      head: [["Lote ID", "Fecha Registro", "Cantidad", "Estado"]],
+      body: tableData,
+      startY: yPosition,
+      styles: { fontSize: 9, cellPadding: 3 },
+      headStyles: {
+        fillColor: [63, 81, 181],
+        textColor: [255, 255, 255],
+        fontStyle: "bold",
+      },
+      alternateRowStyles: { fillColor: [242, 242, 242] },
+      margin: { left: 10, right: 10, top: 10, bottom: 10 },
+    });
+
+    doc.save(
+      `lotes_${productoId}_${new Date().toISOString().split("T")[0]}.pdf`,
+    );
+  };
+
+  // Función para descargar en Excel
+  const handleDescargarExcel = () => {
+    if (lotes.length === 0) {
+      alert("No hay datos para descargar");
+      return;
+    }
+
+    const excelData = lotes.map((lote) => ({
+      "Producto ID": productoId,
+      Producto: productoNombre,
+      "Lote ID": lote.Lote,
+      "Fecha Registro": formatFecha(lote.Fecha_Registro),
+      Cantidad: lote.Cantidad,
+      Estado: lote.Estado,
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+    worksheet["!cols"] = [
+      { wch: 14 },
+      { wch: 30 },
+      { wch: 18 },
+      { wch: 22 },
+      { wch: 10 },
+      { wch: 14 },
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Lotes");
+    XLSX.writeFile(
+      workbook,
+      `lotes_${productoId}_${new Date().toISOString().split("T")[0]}.xlsx`,
+    );
   };
 
   // Limpiar filtros: limpiar inputs y filtros aplicados luego recarga automática por useEffect
@@ -414,86 +517,113 @@ export default function VerLotes({
 
         <div className="card-body">
           {/* Filtros */}
-          <div className="filtros-productos d-flex flex-wrap gap-3 align-items-end mb-4">
-            {/* Buscar por lote */}
-            <div className="filtro-item flex-grow-1 position-relative">
-              <label className="form-label fw-semibold text-muted mb-1">
-                Buscar lote
-              </label>
-              <div className="input-icon-wrapper">
-                <i className="bx bx-search search-icon"></i>
+          <div className="row g-3 align-items-end mb-4 filtros-productos">
+            <div className="col-12 col-lg-4">
+              <div className="filtro-item position-relative">
+                <label className="form-label fw-semibold text-muted mb-1">
+                  Buscar lote
+                </label>
+                <div className="input-icon-wrapper">
+                  <i className="bx bx-search search-icon"></i>
+                  <input
+                    name="search"
+                    type="search"
+                    className="form-control ps-5 radius-30"
+                    placeholder="Presione 'Enter' para buscar"
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                    onKeyDown={handleKeyDownApply}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="col-6 col-sm-4 col-lg-2">
+              <div className="filtro-item">
+                <label className="form-label fw-semibold text-muted mb-1">
+                  Cantidad mín.
+                </label>
                 <input
-                  name="search"
-                  type="search"
-                  className="form-control ps-5 radius-30"
-                  placeholder="Presione 'Enter' para buscar"
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
+                  name="min"
+                  type="number"
+                  className="form-control radius-30"
+                  placeholder="Mínimo"
+                  value={minCantidadInput}
+                  onChange={(e) => setMinCantidadInput(e.target.value)}
                   onKeyDown={handleKeyDownApply}
                 />
               </div>
             </div>
 
-            {/* Cantidad mínima */}
-            <div className="filtro-item">
-              <label className="form-label fw-semibold text-muted mb-1">
-                Cantidad mín.
-              </label>
-              <input
-                name="min"
-                type="number"
-                className="form-control radius-30"
-                placeholder="Mínimo"
-                value={minCantidadInput}
-                onChange={(e) => setMinCantidadInput(e.target.value)}
-                onKeyDown={handleKeyDownApply}
-              />
+            <div className="col-6 col-sm-4 col-lg-2">
+              <div className="filtro-item">
+                <label className="form-label fw-semibold text-muted mb-1">
+                  Cantidad máx.
+                </label>
+                <input
+                  name="max"
+                  type="number"
+                  className="form-control radius-30"
+                  placeholder="Máximo"
+                  value={maxCantidadInput}
+                  onChange={(e) => setMaxCantidadInput(e.target.value)}
+                  onKeyDown={handleKeyDownApply}
+                />
+              </div>
             </div>
 
-            {/* Cantidad máxima */}
-            <div className="filtro-item">
-              <label className="form-label fw-semibold text-muted mb-1">
-                Cantidad máx.
-              </label>
-              <input
-                name="max"
-                type="number"
-                className="form-control radius-30"
-                placeholder="Máximo"
-                value={maxCantidadInput}
-                onChange={(e) => setMaxCantidadInput(e.target.value)}
-                onKeyDown={handleKeyDownApply}
-              />
+            <div className="col-6 col-sm-4 col-lg-2">
+              <div className="filtro-item">
+                <label className="form-label fw-semibold text-muted mb-1">
+                  Estado
+                </label>
+                <select
+                  className="form-select radius-30"
+                  value={estadoFilterInput}
+                  onChange={(e) => setEstadoFilterInput(e.target.value)}
+                >
+                  <option value="">Todos</option>
+                  <option value="Activo">Activo</option>
+                  <option value="Inactivo">Inactivo</option>
+                </select>
+              </div>
             </div>
 
-            {/* Estado */}
-            <div className="filtro-item">
-              <label className="form-label fw-semibold text-muted mb-1">
-                Estado
-              </label>
-              <select
-                className="form-select radius-30"
-                value={estadoFilterInput}
-                onChange={(e) => {
-                  setEstadoFilterInput(e.target.value);
-                  setEstadoFilter(e.target.value);
-                }}
-              >
-                <option value="">Todos</option>
-                <option value="Activo">Activo</option>
-                <option value="Inactivo">Inactivo</option>
-              </select>
-            </div>
-
-            {/* Botón limpiar filtros */}
-            <div className="filtro-item">
-              <button
-                className="btn btn-outline-secondary"
-                onClick={clearFilters}
-                title="Limpiar filtros"
-              >
-                <i className="bx bx-x"></i> Limpiar
-              </button>
+            <div className="col-12 col-lg-2">
+              <div className="filtro-acciones">
+                <button
+                  className="btn btn-primary d-flex align-items-center justify-content-center gap-2"
+                  onClick={handleApplyFilters}
+                  disabled={loading}
+                  title="Aplicar filtros"
+                >
+                  <i className="bx bx-search"></i> Buscar
+                </button>
+                <button
+                  className="btn btn-secondary d-flex align-items-center justify-content-center gap-2"
+                  onClick={clearFilters}
+                  disabled={loading}
+                  title="Limpiar filtros"
+                >
+                  <i className="bx bx-x"></i> Limpiar
+                </button>
+                <button
+                  className="btn btn-outline-danger"
+                  onClick={handleDescargarPDF}
+                  title="Descargar tabla en PDF"
+                  disabled={loading}
+                >
+                  <i className="bx bx-download"></i> PDF
+                </button>
+                <button
+                  className="btn btn-outline-success"
+                  onClick={handleDescargarExcel}
+                  title="Descargar tabla en Excel"
+                  disabled={loading}
+                >
+                  <i className="bx bx-download"></i> Excel
+                </button>
+              </div>
             </div>
           </div>
 

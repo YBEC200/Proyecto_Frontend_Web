@@ -95,13 +95,44 @@
   border: 1px solid #e9ecef;
 }
 
-.filtro-item {
-  min-width: 200px;
+.filtros-pedidos .col-12 {
+  min-width: 220px;
 }
 
-.filtro-item.flex-grow-1 {
-  flex-grow: 1 !important;
-  min-width: 300px;
+.filtros-pedidos .form-control,
+.filtros-pedidos .form-select {
+  min-height: 48px;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+.filtros-pedidos input,
+.filtros-pedidos select {
+  border-radius: 8px;
+}
+
+.filtros-pedidos .form-control:focus,
+.filtros-pedidos .form-select:focus {
+  border-color: #36a2e0;
+  box-shadow: 0 0 0 0.15rem rgba(54, 162, 224, 0.25);
+}
+
+.filtro-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.filtro-acciones .btn {
+  min-width: 120px;
+}
+
+@media (max-width: 767px) {
+  .filtro-acciones {
+    justify-content: flex-start;
+  }
 }
 
 .input-icon-wrapper {

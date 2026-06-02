@@ -4,6 +4,9 @@ import Sidebar from "../../Layout/Sidebar";
 import VerLotes from "./VerLotes";
 import "./GestionProductos.css";
 import "./VerLotes.css";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import * as XLSX from "xlsx";
 const API_URL = import.meta.env.VITE_API_URL;
 interface Producto {
   id: string;
@@ -48,6 +51,8 @@ export default function GestionProductos() {
   const [maxInput, setMaxInput] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [appliedCategoryFilter, setAppliedCategoryFilter] = useState("");
+  const [appliedStatusFilter, setAppliedStatusFilter] = useState("");
   // Modales
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Producto | null>(null);
@@ -126,8 +131,9 @@ export default function GestionProductos() {
     if (searchTerm) params.append("nombre", searchTerm);
     if (priceRange.min) params.append("precio_min", priceRange.min);
     if (priceRange.max) params.append("precio_max", priceRange.max);
-    if (categoryFilter) params.append("categoria", categoryFilter);
-    if (statusFilter) params.append("estado", statusFilter);
+    if (appliedCategoryFilter)
+      params.append("categoria", appliedCategoryFilter);
+    if (appliedStatusFilter) params.append("estado", appliedStatusFilter);
 
     try {
       const response = await fetch(
@@ -189,6 +195,8 @@ export default function GestionProductos() {
 
   // Aplicar filtros
   const applyFilters = () => {
+    if (loading) return;
+
     // Sólo aplicar si hay cambios (evita re-fetch innecesario)
     if (searchTerm !== searchInput.trim()) {
       setSearchTerm(searchInput.trim());
@@ -199,7 +207,8 @@ export default function GestionProductos() {
     ) {
       setPriceRange({ min: minInput ?? "", max: maxInput ?? "" });
     }
-    // categoryFilter y statusFilter se mantienen como antes (si quieres, puedes hacerlos pendientes igual)
+    setAppliedCategoryFilter(categoryFilter);
+    setAppliedStatusFilter(statusFilter);
   };
 
   const clearFilters = () => {
@@ -208,6 +217,8 @@ export default function GestionProductos() {
     setMaxInput("");
     setCategoryFilter("");
     setStatusFilter("");
+    setAppliedCategoryFilter("");
+    setAppliedStatusFilter("");
     setSearchTerm("");
     setPriceRange({ min: "", max: "" });
   };
@@ -218,6 +229,131 @@ export default function GestionProductos() {
       e.preventDefault();
       applyFilters();
     }
+  };
+
+  // Función para descargar en PDF
+  const handleDescargarPDF = () => {
+    if (productos.length === 0) {
+      alert("No hay datos para descargar");
+      return;
+    }
+
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text("Reporte de Productos", 14, 15);
+    doc.setFontSize(10);
+    let yPosition = 25;
+
+    if (searchTerm) {
+      doc.text(`Filtro Producto: ${searchTerm}`, 14, yPosition);
+      yPosition += 5;
+    }
+    if (appliedCategoryFilter) {
+      const selectedCategory = categorias.find(
+        (cat) => cat.id === appliedCategoryFilter,
+      )?.nombre;
+      doc.text(
+        `Filtro Categoría: ${selectedCategory ?? appliedCategoryFilter}`,
+        14,
+        yPosition,
+      );
+      yPosition += 5;
+    }
+    if (appliedStatusFilter) {
+      doc.text(`Filtro Estado: ${appliedStatusFilter}`, 14, yPosition);
+      yPosition += 5;
+    }
+    if (priceRange.min || priceRange.max) {
+      const rangeText = `${priceRange.min || "Mínimo"} - ${priceRange.max || "Máximo"}`;
+      doc.text(`Rango Precio: ${rangeText}`, 14, yPosition);
+      yPosition += 5;
+    }
+    doc.text(
+      `Generado: ${new Date().toLocaleDateString("es-PE")}`,
+      14,
+      yPosition,
+    );
+    yPosition += 10;
+
+    const tableData = productos.map((producto) => [
+      producto.id,
+      producto.nombre,
+      producto.marca,
+      `S/ ${formatPrice(producto.costo_unit)}`,
+      producto.estado,
+      producto.lotes.toString(),
+      getCategoryName(producto),
+      producto.fecha_ultimo_lote
+        ? formatFecha(producto.fecha_ultimo_lote)
+        : "N/A",
+    ]);
+
+    autoTable(doc, {
+      head: [
+        [
+          "ID",
+          "Nombre",
+          "Marca",
+          "Precio",
+          "Estado",
+          "Lotes",
+          "Categoría",
+          "Último Lote",
+        ],
+      ],
+      body: tableData,
+      startY: yPosition,
+      styles: { fontSize: 9, cellPadding: 3 },
+      headStyles: {
+        fillColor: [63, 81, 181],
+        textColor: [255, 255, 255],
+        fontStyle: "bold",
+      },
+      alternateRowStyles: { fillColor: [242, 242, 242] },
+      margin: { left: 10, right: 10, top: 10, bottom: 10 },
+    });
+
+    doc.save(`productos_${new Date().toISOString().split("T")[0]}.pdf`);
+  };
+
+  // Función para descargar en Excel
+  const handleDescargarExcel = () => {
+    if (productos.length === 0) {
+      alert("No hay datos para descargar");
+      return;
+    }
+
+    const excelData = productos.map((producto) => ({
+      ID: producto.id,
+      Nombre: producto.nombre,
+      Marca: producto.marca,
+      Precio: parseFloat(formatPrice(producto.costo_unit)),
+      Estado: producto.estado,
+      Lotes: producto.lotes,
+      Categoría: getCategoryName(producto),
+      "Último Lote": producto.fecha_ultimo_lote
+        ? formatFecha(producto.fecha_ultimo_lote)
+        : "N/A",
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+    worksheet["!cols"] = [
+      { wch: 10 },
+      { wch: 25 },
+      { wch: 16 },
+      { wch: 12 },
+      { wch: 14 },
+      { wch: 8 },
+      { wch: 20 },
+      { wch: 20 },
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Productos");
+    XLSX.writeFile(
+      workbook,
+      `productos_${new Date().toISOString().split("T")[0]}.xlsx`,
+    );
   };
 
   // Handlers
@@ -578,10 +714,10 @@ export default function GestionProductos() {
               </div>
               <div className="card-body">
                 <div className="table-responsive">
-                  <div className="filtros-productos d-flex flex-wrap gap-3 align-items-end mb-4">
+                  <div className="filtros-productos row gx-3 gy-3 align-items-end mb-4">
                     {/* === FILTROS PRINCIPALES === */}
                     {/* Buscar */}
-                    <div className="filtro-item flex-grow-1 position-relative">
+                    <div className="col-12 col-lg-4">
                       <label className="form-label fw-semibold text-muted mb-1">
                         Buscar producto
                       </label>
@@ -599,7 +735,7 @@ export default function GestionProductos() {
                     </div>
 
                     {/* Precio mínimo */}
-                    <div className="filtro-item">
+                    <div className="col-6 col-sm-4 col-lg-2">
                       <label className="form-label fw-semibold text-muted mb-1">
                         Precio mínimo
                       </label>
@@ -614,7 +750,7 @@ export default function GestionProductos() {
                     </div>
 
                     {/* Precio máximo */}
-                    <div className="filtro-item">
+                    <div className="col-6 col-sm-4 col-lg-2">
                       <label className="form-label fw-semibold text-muted mb-1">
                         Precio máximo
                       </label>
@@ -629,7 +765,7 @@ export default function GestionProductos() {
                     </div>
 
                     {/* Categoría */}
-                    <div className="filtro-item">
+                    <div className="col-6 col-sm-4 col-lg-2">
                       <label className="form-label fw-semibold text-muted mb-1">
                         Categoría
                       </label>
@@ -648,7 +784,7 @@ export default function GestionProductos() {
                     </div>
 
                     {/* Estado */}
-                    <div className="filtro-item">
+                    <div className="col-6 col-sm-4 col-lg-2">
                       <label className="form-label fw-semibold text-muted mb-1">
                         Estado
                       </label>
@@ -662,15 +798,39 @@ export default function GestionProductos() {
                         <option value="Agotado">Agotado</option>
                       </select>
                     </div>
-                    {/* Botón limpiar filtros */}
-                    <div className="filtro-item">
-                      <button
-                        className="btn btn-outline-secondary"
-                        onClick={clearFilters}
-                        title="Limpiar filtros"
-                      >
-                        <i className="bx bx-x"></i> Limpiar
-                      </button>
+
+                    <div className="col-12 col-lg-2">
+                      <div className="filtro-acciones">
+                        <button
+                          className="btn btn-primary d-flex align-items-center justify-content-center gap-2"
+                          onClick={applyFilters}
+                          title="Aplicar filtros seleccionados"
+                          disabled={loading}
+                        >
+                          <i className="bx bx-search"></i> Buscar
+                        </button>
+                        <button
+                          className="btn btn-secondary d-flex align-items-center justify-content-center gap-2"
+                          onClick={clearFilters}
+                          title="Limpiar filtros"
+                        >
+                          <i className="bx bx-x"></i> Limpiar
+                        </button>
+                        <button
+                          className="btn btn-outline-danger"
+                          onClick={handleDescargarPDF}
+                          title="Descargar tabla en PDF"
+                        >
+                          <i className="bx bx-download"></i> PDF
+                        </button>
+                        <button
+                          className="btn btn-outline-success"
+                          onClick={handleDescargarExcel}
+                          title="Descargar tabla en Excel"
+                        >
+                          <i className="bx bx-download"></i> Excel
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
