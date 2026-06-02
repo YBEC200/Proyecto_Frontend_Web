@@ -3,7 +3,9 @@ import Nav from "../../Layout/Nav";
 import Sidebar from "../../Layout/Sidebar";
 import "./Analisis.css";
 import { Bar, Doughnut, Line } from "react-chartjs-2";
-const API_URL = import.meta.env.VITE_API_URL;
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import * as XLSX from "xlsx";
 import {
   Chart,
   CategoryScale,
@@ -15,6 +17,13 @@ import {
   Tooltip,
   Legend,
 } from "chart.js";
+
+interface ChartDatasetItem {
+  label?: string;
+  data: Array<number>;
+}
+
+const API_URL = import.meta.env.VITE_API_URL;
 
 Chart.register(
   CategoryScale,
@@ -635,6 +644,233 @@ function Analisis() {
     },
   };
 
+  const exportTableToPDF = (
+    title: string,
+    headers: string[],
+    rows: Array<Array<string | number>>,
+    filename: string,
+  ) => {
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text(title, 14, 15);
+    doc.setFontSize(10);
+    doc.text(`Generado: ${new Date().toLocaleDateString("es-PE")}`, 14, 22);
+    autoTable(doc, {
+      head: [headers],
+      body: rows,
+      startY: 28,
+      styles: { fontSize: 9, cellPadding: 3 },
+      headStyles: {
+        fillColor: [63, 81, 181],
+        textColor: [255, 255, 255],
+        fontStyle: "bold",
+      },
+      alternateRowStyles: { fillColor: [242, 242, 242] },
+      margin: { left: 10, right: 10, top: 10, bottom: 10 },
+    });
+    doc.save(filename);
+  };
+
+  const exportTableToExcel = (
+    headers: string[],
+    rows: Array<Array<string | number>>,
+    filename: string,
+  ) => {
+    const data = rows.map((row) =>
+      row.reduce(
+        (obj, value, index) => ({
+          ...obj,
+          [headers[index]]: value,
+        }),
+        {} as Record<string, string | number>,
+      ),
+    );
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    worksheet["!cols"] = headers.map(() => ({ wch: 18 }));
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Datos");
+    XLSX.writeFile(workbook, filename);
+  };
+
+  const exportLotesData = () => {
+    if (!lotes?.labels || !lotes?.data) return;
+    const headers = ["Producto", "Unidades Disponibles"];
+    const rows = lotes.labels.map((label: string, index: number) => [
+      label,
+      lotes.data[index] ?? 0,
+    ]);
+    exportTableToPDF(
+      "Inventario: Lotes Activos por Producto",
+      headers,
+      rows,
+      `lotes_por_producto_${new Date().toISOString().split("T")[0]}.pdf`,
+    );
+  };
+
+  const exportLotesDataExcel = () => {
+    if (!lotes?.labels || !lotes?.data) return;
+    const headers = ["Producto", "Unidades Disponibles"];
+    const rows = lotes.labels.map((label: string, index: number) => [
+      label,
+      lotes.data[index] ?? 0,
+    ]);
+    exportTableToExcel(
+      headers,
+      rows,
+      `lotes_por_producto_${new Date().toISOString().split("T")[0]}.xlsx`,
+    );
+  };
+
+  const exportClientesData = () => {
+    if (!clientesChartData.labels || !clientesChartData.datasets[0]?.data)
+      return;
+    const headers = ["Cliente", "Compras"];
+    const rows = clientesChartData.labels.map(
+      (label: string, index: number) => [
+        label,
+        clientesChartData.datasets[0].data[index] ?? 0,
+      ],
+    );
+    exportTableToPDF(
+      "Clientes Top",
+      headers,
+      rows,
+      `clientes_top_${new Date().toISOString().split("T")[0]}.pdf`,
+    );
+  };
+
+  const exportClientesDataExcel = () => {
+    if (!clientesChartData.labels || !clientesChartData.datasets[0]?.data)
+      return;
+    const headers = ["Cliente", "Compras"];
+    const rows = clientesChartData.labels.map(
+      (label: string, index: number) => [
+        label,
+        clientesChartData.datasets[0].data[index] ?? 0,
+      ],
+    );
+    exportTableToExcel(
+      headers,
+      rows,
+      `clientes_top_${new Date().toISOString().split("T")[0]}.xlsx`,
+    );
+  };
+
+  const exportCategoriasData = () => {
+    if (
+      !productosCompradosData.labels ||
+      !productosCompradosData.datasets[0]?.data
+    )
+      return;
+    const headers = ["Categoría", "Ventas"];
+    const rows = productosCompradosData.labels.map(
+      (label: string, index: number) => [
+        label,
+        productosCompradosData.datasets[0].data[index] ?? 0,
+      ],
+    );
+    exportTableToPDF(
+      "Categorías Líderes",
+      headers,
+      rows,
+      `categorias_lideres_${new Date().toISOString().split("T")[0]}.pdf`,
+    );
+  };
+
+  const exportCategoriasDataExcel = () => {
+    if (
+      !productosCompradosData.labels ||
+      !productosCompradosData.datasets[0]?.data
+    )
+      return;
+    const headers = ["Categoría", "Ventas"];
+    const rows = productosCompradosData.labels.map(
+      (label: string, index: number) => [
+        label,
+        productosCompradosData.datasets[0].data[index] ?? 0,
+      ],
+    );
+    exportTableToExcel(
+      headers,
+      rows,
+      `categorias_lideres_${new Date().toISOString().split("T")[0]}.xlsx`,
+    );
+  };
+
+  const exportPagosData = () => {
+    if (!tiposPagoData.labels || !tiposPagoData.datasets[0]?.data) return;
+    const headers = ["Método de Pago", "Cantidad"];
+    const rows = tiposPagoData.labels.map((label: string, index: number) => [
+      label,
+      tiposPagoData.datasets[0].data[index] ?? 0,
+    ]);
+    exportTableToPDF(
+      "Métodos de Pago",
+      headers,
+      rows,
+      `metodos_de_pago_${new Date().toISOString().split("T")[0]}.pdf`,
+    );
+  };
+
+  const exportPagosDataExcel = () => {
+    if (!tiposPagoData.labels || !tiposPagoData.datasets[0]?.data) return;
+    const headers = ["Método de Pago", "Cantidad"];
+    const rows = tiposPagoData.labels.map((label: string, index: number) => [
+      label,
+      tiposPagoData.datasets[0].data[index] ?? 0,
+    ]);
+    exportTableToExcel(
+      headers,
+      rows,
+      `metodos_de_pago_${new Date().toISOString().split("T")[0]}.xlsx`,
+    );
+  };
+
+  const exportVentasPorMesData = () => {
+    if (!ventasPorMesData?.labels || !ventasPorMesData?.datasets) return;
+    const headers = [
+      "Mes",
+      ...ventasPorMesData.datasets.map(
+        (ds: ChartDatasetItem, index: number) =>
+          ds.label || `Serie ${index + 1}`,
+      ),
+    ];
+    const rows = ventasPorMesData.labels.map((label: string, index: number) => [
+      label,
+      ...ventasPorMesData.datasets.map(
+        (ds: ChartDatasetItem) => ds.data[index] ?? 0,
+      ),
+    ]);
+    exportTableToPDF(
+      "Ventas por Mes",
+      headers,
+      rows,
+      `ventas_por_mes_${new Date().toISOString().split("T")[0]}.pdf`,
+    );
+  };
+
+  const exportVentasPorMesDataExcel = () => {
+    if (!ventasPorMesData?.labels || !ventasPorMesData?.datasets) return;
+    const headers = [
+      "Mes",
+      ...ventasPorMesData.datasets.map(
+        (ds: ChartDatasetItem, index: number) =>
+          ds.label || `Serie ${index + 1}`,
+      ),
+    ];
+    const rows = ventasPorMesData.labels.map((label: string, index: number) => [
+      label,
+      ...ventasPorMesData.datasets.map(
+        (ds: ChartDatasetItem) => ds.data[index] ?? 0,
+      ),
+    ]);
+    exportTableToExcel(
+      headers,
+      rows,
+      `ventas_por_mes_${new Date().toISOString().split("T")[0]}.xlsx`,
+    );
+  };
+
   // Datos para gráfico de categorías más vendidas (desde API)
   const coloresProductos = [
     "#0d6efd",
@@ -838,6 +1074,26 @@ function Analisis() {
                                 </small>
                               )}
                             </div>
+                            <div className="d-flex gap-2">
+                              <button
+                                className="btn btn-outline-danger btn-sm"
+                                onClick={exportLotesData}
+                                disabled={
+                                  loadingProductos || !lotes?.labels?.length
+                                }
+                              >
+                                <i className="bx bx-download"></i> PDF
+                              </button>
+                              <button
+                                className="btn btn-outline-success btn-sm"
+                                onClick={exportLotesDataExcel}
+                                disabled={
+                                  loadingProductos || !lotes?.labels?.length
+                                }
+                              >
+                                Excel
+                              </button>
+                            </div>
                           </div>
                           <div className="card-body p-4">
                             <div className="row mb-4">
@@ -979,6 +1235,28 @@ function Analisis() {
                                   </small>
                                 )}
                               </div>
+                              <div className="d-flex gap-2">
+                                <button
+                                  className="btn btn-outline-danger btn-sm"
+                                  onClick={exportClientesData}
+                                  disabled={
+                                    loadingClientes ||
+                                    datosClientesTop.length === 0
+                                  }
+                                >
+                                  <i className="bx bx-download"></i> PDF
+                                </button>
+                                <button
+                                  className="btn btn-outline-success btn-sm"
+                                  onClick={exportClientesDataExcel}
+                                  disabled={
+                                    loadingClientes ||
+                                    datosClientesTop.length === 0
+                                  }
+                                >
+                                  Excel
+                                </button>
+                              </div>
                             </div>
                             <div className="card-body p-4">
                               {loadingClientes ? (
@@ -1071,6 +1349,28 @@ function Analisis() {
                                       Distribución de ventas
                                     </small>
                                   )}
+                              </div>
+                              <div className="d-flex gap-2">
+                                <button
+                                  className="btn btn-outline-danger btn-sm"
+                                  onClick={exportCategoriasData}
+                                  disabled={
+                                    loadingProductosComprados ||
+                                    !(productosComprados?.labels?.length > 0)
+                                  }
+                                >
+                                  <i className="bx bx-download"></i> PDF
+                                </button>
+                                <button
+                                  className="btn btn-outline-success btn-sm"
+                                  onClick={exportCategoriasDataExcel}
+                                  disabled={
+                                    loadingProductosComprados ||
+                                    !(productosComprados?.labels?.length > 0)
+                                  }
+                                >
+                                  Excel
+                                </button>
                               </div>
                             </div>
                             <div className="card-body p-4">
@@ -1232,6 +1532,26 @@ function Analisis() {
                                   </small>
                                 )}
                               </div>
+                              <div className="d-flex gap-2">
+                                <button
+                                  className="btn btn-outline-danger btn-sm"
+                                  onClick={exportPagosData}
+                                  disabled={
+                                    loadingPagos || datosTiposPago.length === 0
+                                  }
+                                >
+                                  <i className="bx bx-download"></i> PDF
+                                </button>
+                                <button
+                                  className="btn btn-outline-success btn-sm"
+                                  onClick={exportPagosDataExcel}
+                                  disabled={
+                                    loadingPagos || datosTiposPago.length === 0
+                                  }
+                                >
+                                  Excel
+                                </button>
+                              </div>
                             </div>
                             <div className="card-body p-4">
                               {loadingPagos ? (
@@ -1378,7 +1698,7 @@ function Analisis() {
                         <div className="col-md-6">
                           <div className="card radius-10 border-0 shadow-sm h-100">
                             <div className="card-header bg-white border-bottom">
-                              <div className="d-flex justify-content-between align-items-center gap-3">
+                              <div className="d-flex justify-content-between align-items-center gap-3 flex-wrap">
                                 <div className="flex-grow-1">
                                   <h6 className="mb-0 fw-bold text-dark">
                                     📈 Ventas por Mes
@@ -1387,26 +1707,48 @@ function Analisis() {
                                     Tendencia de ingresos
                                   </small>
                                 </div>
-                                <select
-                                  className="form-select form-select-sm"
-                                  style={{
-                                    width: "110px",
-                                    borderRadius: "0.375rem",
-                                    flexShrink: 0,
-                                  }}
-                                  value={selectedYear}
-                                  onChange={(e) =>
-                                    setSelectedYear(Number(e.target.value))
-                                  }
-                                >
-                                  {[2022, 2023, 2024, 2025, 2026].map(
-                                    (year) => (
-                                      <option key={year} value={year}>
-                                        {year}
-                                      </option>
-                                    ),
-                                  )}
-                                </select>
+                                <div className="d-flex gap-2 align-items-center flex-wrap">
+                                  <select
+                                    className="form-select form-select-sm"
+                                    style={{
+                                      width: "110px",
+                                      borderRadius: "0.375rem",
+                                      flexShrink: 0,
+                                    }}
+                                    value={selectedYear}
+                                    onChange={(e) =>
+                                      setSelectedYear(Number(e.target.value))
+                                    }
+                                  >
+                                    {[2022, 2023, 2024, 2025, 2026].map(
+                                      (year) => (
+                                        <option key={year} value={year}>
+                                          {year}
+                                        </option>
+                                      ),
+                                    )}
+                                  </select>
+                                  <button
+                                    className="btn btn-outline-danger btn-sm"
+                                    onClick={exportVentasPorMesData}
+                                    disabled={
+                                      loadingVentasPorMes ||
+                                      !(ventasPorMesData?.labels?.length > 0)
+                                    }
+                                  >
+                                    <i className="bx bx-download"></i> PDF
+                                  </button>
+                                  <button
+                                    className="btn btn-outline-success btn-sm"
+                                    onClick={exportVentasPorMesDataExcel}
+                                    disabled={
+                                      loadingVentasPorMes ||
+                                      !(ventasPorMesData?.labels?.length > 0)
+                                    }
+                                  >
+                                    Excel
+                                  </button>
+                                </div>
                               </div>
                             </div>
                             <div className="card-body p-4">
