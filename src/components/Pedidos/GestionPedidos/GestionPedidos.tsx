@@ -640,6 +640,136 @@ function GestionPedidos() {
     return (price ?? 0).toFixed(2);
   };
 
+  // Función auxiliar para agregar página de detalles al PDF
+  const addDetailPageToPDF = (doc: jsPDF, venta: Venta, pageNumber: number) => {
+    // Agregar nueva página si no es la primera
+    if (pageNumber > 1) {
+      doc.addPage();
+    }
+
+    // Título de la venta
+    doc.setFontSize(14);
+    doc.setTextColor(63, 81, 181);
+    doc.text(`Detalle de Venta #${venta.id}`, 14, 15);
+
+    // Información general
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    let yPosition = 25;
+
+    doc.text(`Cliente: ${venta.user?.nombre || "Sin cliente"}`, 14, yPosition);
+    yPosition += 5;
+    doc.text(`Email: ${venta.user?.correo || "N/A"}`, 14, yPosition);
+    yPosition += 5;
+    doc.text(`Fecha: ${formatFecha(venta.fecha)}`, 14, yPosition);
+    yPosition += 5;
+    doc.text(`Estado: ${venta.estado}`, 14, yPosition);
+    yPosition += 5;
+    doc.text(
+      `Método de Pago: ${venta.metodo_pago}`,
+      14,
+      yPosition,
+    );
+    yPosition += 5;
+    doc.text(
+      `Tipo de Entrega: ${venta.tipo_entrega === "Envío a Domicilio" ? "Envío a Domicilio" : "Recojo en Tienda"}`,
+      14,
+      yPosition,
+    );
+    yPosition += 10;
+
+    // Dirección si existe
+    if (venta.direction) {
+      doc.setFontSize(11);
+      doc.setTextColor(63, 81, 181);
+      doc.text("Dirección de Entrega:", 14, yPosition);
+      doc.setFontSize(10);
+      doc.setTextColor(0, 0, 0);
+      yPosition += 5;
+      doc.text(`Ciudad: ${venta.direction.ciudad || "N/A"}`, 14, yPosition);
+      yPosition += 4;
+      doc.text(`Calle: ${venta.direction.calle || "N/A"}`, 14, yPosition);
+      yPosition += 4;
+      doc.text(
+        `Referencia: ${venta.direction.referencia || "N/A"}`,
+        14,
+        yPosition,
+      );
+      yPosition += 10;
+    }
+
+    // Tabla de productos
+    if (venta.details && venta.details.length > 0) {
+      doc.setFontSize(11);
+      doc.setTextColor(63, 81, 181);
+      doc.text("Productos y Lotes:", 14, yPosition);
+      yPosition += 5;
+
+      const tableData: string[][] = [];
+
+      venta.details.forEach((detail) => {
+        if (!detail.detailLotes || detail.detailLotes.length === 0) {
+          // Sin lotes
+          tableData.push([
+            detail.product?.nombre || `Producto ID: ${detail.id_producto}`,
+            String(detail.cantidad),
+            `S/ ${formatPrice(detail.costo)}`,
+            `S/ ${formatPrice(detail.costo * detail.cantidad)}`,
+            "Sin lotes",
+            "",
+          ]);
+        } else {
+          // Con lotes
+          detail.detailLotes.forEach((lote, idx) => {
+            tableData.push([
+              idx === 0
+                ? detail.product?.nombre || `Producto ID: ${detail.id_producto}`
+                : "",
+              idx === 0 ? String(detail.cantidad) : "",
+              idx === 0 ? `S/ ${formatPrice(detail.costo)}` : "",
+              idx === 0
+                ? `S/ ${formatPrice(detail.costo * detail.cantidad)}`
+                : "",
+              lote.lote?.nombre || lote.lote?.Lote || "N/A",
+              String(lote.cantidad),
+            ]);
+          });
+        }
+      });
+
+      autoTable(doc, {
+        head: [["Producto", "Cant. Venta", "Costo Unit.", "Subtotal", "Lote", "Cant. Lote"]],
+        body: tableData,
+        startY: yPosition,
+        styles: {
+          font: "helvetica",
+          fontSize: 8,
+          cellPadding: 2,
+        },
+        headStyles: {
+          fillColor: [63, 81, 181],
+          textColor: [255, 255, 255],
+          fontStyle: "bold",
+        },
+        alternateRowStyles: {
+          fillColor: [242, 242, 242],
+        },
+        margin: { top: 10, right: 10, bottom: 10, left: 10 },
+      });
+    }
+
+    // Total al final
+    const finalY = (doc as any).lastAutoTable.finalY || yPosition + 20;
+    doc.setFontSize(12);
+    doc.setTextColor(63, 81, 181);
+    doc.setFont("helvetica", "bold");
+    doc.text(
+      `Total: S/ ${formatPrice(venta.costo_total)}`,
+      14,
+      finalY + 10,
+    );
+  };
+
   // Función para descargar en PDF
   const handleDescargarPDF = () => {
     if (ventas.length === 0) {
@@ -650,12 +780,14 @@ function GestionPedidos() {
     // Crear documento PDF
     const doc = new jsPDF();
 
-    // Agregar título
+    // PÁGINA 1: Resumen de Pedidos
     doc.setFontSize(16);
+    doc.setTextColor(63, 81, 181);
     doc.text("Reporte de Pedidos", 14, 15);
 
     // Agregar información de filtros
     doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
     let yPosition = 25;
 
     if (appliedFilters.searchTerm) {
@@ -722,6 +854,11 @@ function GestionPedidos() {
       margin: { top: 10, right: 10, bottom: 10, left: 10 },
     });
 
+    // PÁGINAS SIGUIENTES: Detalle de cada venta
+    ventas.forEach((venta, index) => {
+      addDetailPageToPDF(doc, venta, index + 2);
+    });
+
     // Descargar PDF
     doc.save(`pedidos_${new Date().toISOString().split("T")[0]}.pdf`);
   };
@@ -733,7 +870,10 @@ function GestionPedidos() {
       return;
     }
 
-    // Preparar datos para la hoja de Excel
+    // Crear libro de trabajo con múltiples hojas
+    const workbook = XLSX.utils.book_new();
+
+    // HOJA 1: Resumen de Pedidos
     const excelData = ventas.map((venta) => ({
       "ID Venta": `#${venta.id}`,
       Cliente: venta.user?.nombre || "Sin cliente",
@@ -768,9 +908,65 @@ function GestionPedidos() {
     ];
     worksheet["!cols"] = columnWidths;
 
-    // Crear libro de trabajo
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Pedidos");
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Resumen");
+
+    // HOJAS ADICIONALES: Detalle de cada venta
+    ventas.forEach((venta) => {
+      const detailData = venta.details && venta.details.length > 0
+        ? venta.details.flatMap((detail) => {
+            if (!detail.detailLotes || detail.detailLotes.length === 0) {
+              return [{
+                "ID Venta": venta.id,
+                Cliente: venta.user?.nombre || "Sin cliente",
+                Producto: detail.product?.nombre || `Producto ID: ${detail.id_producto}`,
+                "Cantidad Venta": detail.cantidad,
+                "Costo Unitario": parseFloat(formatPrice(detail.costo)),
+                Subtotal: parseFloat(formatPrice(detail.costo * detail.cantidad)),
+                Lote: "Sin lotes",
+                "Cantidad Lote": "",
+              }];
+            } else {
+              return detail.detailLotes.map((lote) => ({
+                "ID Venta": venta.id,
+                Cliente: venta.user?.nombre || "Sin cliente",
+                Producto: detail.product?.nombre || `Producto ID: ${detail.id_producto}`,
+                "Cantidad Venta": detail.cantidad,
+                "Costo Unitario": parseFloat(formatPrice(detail.costo)),
+                Subtotal: parseFloat(formatPrice(detail.costo * detail.cantidad)),
+                Lote: lote.lote?.nombre || lote.lote?.Lote || "N/A",
+                "Cantidad Lote": lote.cantidad,
+              }));
+            }
+          })
+        : [{
+          "ID Venta": venta.id,
+          Cliente: venta.user?.nombre || "Sin cliente",
+          Producto: "Sin productos",
+          "Cantidad Venta": "",
+          "Costo Unitario": "",
+          Subtotal: "",
+          Lote: "",
+          "Cantidad Lote": "",
+        }];
+
+      const detailSheet = XLSX.utils.json_to_sheet(detailData);
+      detailSheet["!cols"] = [
+        { wch: 10 },
+        { wch: 20 },
+        { wch: 25 },
+        { wch: 15 },
+        { wch: 15 },
+        { wch: 12 },
+        { wch: 20 },
+        { wch: 15 },
+      ];
+
+      XLSX.utils.book_append_sheet(
+        workbook,
+        detailSheet,
+        `Venta #${venta.id}`,
+      );
+    });
 
     // Descargar Excel
     XLSX.writeFile(
