@@ -49,7 +49,7 @@ export default function AsignarPedidos() {
     "San Agustín de Cajas",
     "Sapallanga",
   ];
-  const [idDireccion, setIdDireccion] = useState<string | null>(null);
+  const [idDireccion, setIdDireccion] = useState<number | null>(null);
   const [rows, setRows] = useState<DetalleRow[]>([
     {
       id: "r1",
@@ -364,7 +364,7 @@ export default function AsignarPedidos() {
     // Validar tipo de entrega y dirección
     if (
       tipoEntrega === "Envío a Domicilio" &&
-      (!idDireccion || idDireccion.toString().trim() === "")
+      (!idDireccion || idDireccion <= 0)
     ) {
       errores.push("⚠️ Debes guardar una dirección para envíos a domicilio");
     }
@@ -452,7 +452,7 @@ export default function AsignarPedidos() {
       comprobante: selectedComprobante || null,
       ruc: selectedComprobante === "Factura" ? ruc : null,
       id_direccion:
-        tipoEntrega === "Recojo en Tienda" ? null : Number(idDireccion),
+        tipoEntrega === "Recojo en Tienda" ? null : idDireccion,
       tipo_entrega: tipoEntrega,
       costo_total: Number(total),
       estado: estadoFinal,
@@ -678,19 +678,15 @@ export default function AsignarPedidos() {
 
       if (res.ok) {
         const direccionId = Number(body.id ?? body.Id);
+        
+        // ✅ Guardar la dirección como número (no string)
+        setIdDireccion(direccionId);
+        setDireccionTexto(
+          `${ciudadInput}${calleInput ? ", " + calleInput : ""}`,
+        );
         setCiudad(ciudadInput);
         setCalle(calleInput);
         setReferencia(referenciaInput);
-        setIdDireccion(String(direccionId));
-        setDireccionTexto(
-          `${ciudadInput}${calleInput ? ", " + calleInput : ""}`,
-        );
-
-        // ✅ Establecer ID de dirección PRIMERO
-        setIdDireccion(String(direccionId));
-        setDireccionTexto(
-          `${ciudadInput}${calleInput ? ", " + calleInput : ""}`,
-        );
 
         // Mostrar modal de éxito
         setDireccionExitoData({
@@ -907,9 +903,6 @@ export default function AsignarPedidos() {
                                 placeholder="Dirección registrada"
                                 value={direccionTexto}
                                 readOnly
-                                onChange={(e) =>
-                                  setIdDireccion(e.target.value || null)
-                                }
                               />
                               <button
                                 type="button"
