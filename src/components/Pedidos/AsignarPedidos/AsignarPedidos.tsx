@@ -678,13 +678,18 @@ export default function AsignarPedidos() {
 
       if (res.ok) {
         const direccionId = Number(body.id ?? body.Id);
+        if (!direccionId || isNaN(direccionId) || direccionId <= 0) {
+          console.error("ID de dirección inválido:", {...});
+          alert("❌ Error: No se recibió un ID válido...");
+          return;
+        }
+        if (!body) {
+          alert("Error: El servidor no devolvió datos válidos.");
+          return;
+        }
         setCiudad(ciudadInput);
         setCalle(calleInput);
         setReferencia(referenciaInput);
-        setIdDireccion(String(direccionId));
-        setDireccionTexto(
-          `${ciudadInput}${calleInput ? ", " + calleInput : ""}`,
-        );
 
         // ✅ Establecer ID de dirección PRIMERO
         setIdDireccion(String(direccionId));
