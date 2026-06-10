@@ -38,6 +38,46 @@ const sampleComprobantes = [
   { id: "Factura", nombre: "Factura" },
 ];
 
+// Validador para ID de dirección
+interface ValidadorDireccionID {
+  isValid: (id: any) => boolean;
+  getError: (id: any) => string;
+}
+
+const validadorDireccionID: ValidadorDireccionID = {
+  isValid(id: any): boolean {
+    // Validar que sea un número entero positivo
+    if (id === null || id === undefined || id === "") return false;
+    const numId = Number(id);
+    return (
+      Number.isInteger(numId) &&
+      numId > 0 &&
+      !isNaN(numId) &&
+      isFinite(numId)
+    );
+  },
+
+  getError(id: any): string {
+    if (id === null || id === undefined || id === "") {
+      return "ID de dirección está vacío";
+    }
+    const numId = Number(id);
+    if (isNaN(numId)) {
+      return `ID debe ser un número, recibido: ${typeof id} (${id})`;
+    }
+    if (!Number.isInteger(numId)) {
+      return `ID debe ser un entero, recibido: ${numId}`;
+    }
+    if (numId <= 0) {
+      return `ID debe ser positivo, recibido: ${numId}`;
+    }
+    if (!isFinite(numId)) {
+      return `ID no es un número válido: ${numId}`;
+    }
+    return "ID de dirección inválido";
+  },
+};
+
 export default function AsignarPedidos() {
   // Estados
   const DISTRITOS_HUANCAYO = [
@@ -637,7 +677,7 @@ export default function AsignarPedidos() {
     }
   }
 
-  // Guardar dirección a través del backend
+  // Guardar dirección a través del backend CON VALIDADOR
   async function guardarDireccionSimulada() {
     const ciudadInput = ciudad;
     const calleInput =
@@ -677,16 +717,36 @@ export default function AsignarPedidos() {
       const body = await res.json().catch(() => null);
 
       if (res.ok) {
-        const direccionId = Number(body.id ?? body.Id);
+        // 🔍 VALIDAR ID DE DIRECCIÓN CON EL VALIDADOR
+        const direccionIdRaw = body.id ?? body.Id;
+        
+        console.log("=== VALIDACIÓN DE ID DE DIRECCIÓN ===");
+        console.log("Valor recibido del backend:", {
+          valor: direccionIdRaw,
+          tipo: typeof direccionIdRaw,
+        });
+
+        // Verificar si el ID es válido
+        if (!validadorDireccionID.isValid(direccionIdRaw)) {
+          const errorMsg = validadorDireccionID.getError(direccionIdRaw);
+          console.error("❌ ID DE DIRECCIÓN INVÁLIDO:", errorMsg);
+          
+          alert(
+            `❌ Error al guardar dirección:\n\n${errorMsg}\n\nContacta al administrador si el problema persiste.`,
+          );
+          return;
+        }
+
+        const direccionId = Number(direccionIdRaw);
+        console.log("✅ ID VALIDADO:", {
+          id: direccionId,
+          esValido: validadorDireccionID.isValid(direccionId),
+        });
+
+        // Establecer ID de dirección CON VALIDACIÓN EXITOSA
         setCiudad(ciudadInput);
         setCalle(calleInput);
         setReferencia(referenciaInput);
-        setIdDireccion(String(direccionId));
-        setDireccionTexto(
-          `${ciudadInput}${calleInput ? ", " + calleInput : ""}`,
-        );
-
-        // ✅ Establecer ID de dirección PRIMERO
         setIdDireccion(String(direccionId));
         setDireccionTexto(
           `${ciudadInput}${calleInput ? ", " + calleInput : ""}`,
