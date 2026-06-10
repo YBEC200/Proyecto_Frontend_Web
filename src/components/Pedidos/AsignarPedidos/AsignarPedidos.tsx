@@ -49,7 +49,7 @@ export default function AsignarPedidos() {
     "San Agustín de Cajas",
     "Sapallanga",
   ];
-  const [idDireccion, setIdDireccion] = useState<number | null>(null);
+  const [idDireccion, setIdDireccion] = useState<string | null>(null);
   const [rows, setRows] = useState<DetalleRow[]>([
     {
       id: "r1",
@@ -678,17 +678,16 @@ export default function AsignarPedidos() {
 
       if (res.ok) {
         const direccionId = Number(body.id ?? body.Id);
-        // ✅ Validar que sea un número válido
-        if (isNaN(direccionId) || direccionId <= 0) {
-          alert("❌ Error: ID de dirección inválido");
-          return;
-        }
         setCiudad(ciudadInput);
         setCalle(calleInput);
         setReferencia(referenciaInput);
+        setIdDireccion(String(direccionId));
+        setDireccionTexto(
+          `${ciudadInput}${calleInput ? ", " + calleInput : ""}`,
+        );
 
         // ✅ Establecer ID de dirección PRIMERO
-        setIdDireccion(direccionId);
+        setIdDireccion(String(direccionId));
         setDireccionTexto(
           `${ciudadInput}${calleInput ? ", " + calleInput : ""}`,
         );
@@ -908,6 +907,9 @@ export default function AsignarPedidos() {
                                 placeholder="Dirección registrada"
                                 value={direccionTexto}
                                 readOnly
+                                onChange={(e) =>
+                                  setIdDireccion(e.target.value || null)
+                                }
                               />
                               <button
                                 type="button"
