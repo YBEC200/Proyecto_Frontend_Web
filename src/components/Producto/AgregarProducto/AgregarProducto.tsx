@@ -25,7 +25,7 @@ export default function AgregarProducto() {
   // Estados del formulario de productos
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
-  const [costoUnit, setCostoUnit] = useState<number | "">("");
+  const [costoUnit, setCostoUnit] = useState<string>("");
   const [idCategoria, setIdCategoria] = useState("");
   const [marca, setMarca] = useState("");
   // Estado automático: siempre "Agotado" al crear
@@ -121,9 +121,10 @@ export default function AgregarProducto() {
   };
 
   // Función para limpiar y validar números
-  const validarNumeroPositivo = (valor: number | ""): boolean => {
-    if (valor === "") return false;
-    const num = Number(valor);
+  const validarNumeroPositivo = (valor: string): boolean => {
+    const texto = valor.trim();
+    if (texto === "") return false;
+    const num = Number(texto.replace(",", "."));
     return !isNaN(num) && num > 0;
   };
 
@@ -148,11 +149,12 @@ export default function AgregarProducto() {
     }
 
     // Validar costo unitario (sin permitir 0 ni negativos)
+    const costoNumerico = Number(String(costoUnit).replace(",", "."));
     if (costoUnit === "") {
       nuevosErrores.costoUnit = "El costo unitario es requerido";
     } else if (!validarNumeroPositivo(costoUnit)) {
       nuevosErrores.costoUnit = "El costo unitario debe ser mayor a S/ 0.00";
-    } else if (Number(costoUnit) > 999999.99) {
+    } else if (costoNumerico > 999999.99) {
       nuevosErrores.costoUnit = "El costo unitario es demasiado grande";
     }
 
@@ -207,7 +209,7 @@ export default function AgregarProducto() {
         marca: marca.trim() || null,
         id_categoria: parseInt(idCategoria),
         estado: estado,
-        costo_unit: parseFloat(String(costoUnit)),
+        costo_unit: parseFloat(String(costoUnit).replace(",", ".")),
         fecha_registro: new Date().toISOString(),
       };
 
@@ -456,33 +458,42 @@ export default function AgregarProducto() {
                           <div className="input-group">
                             <span className="input-group-text">S/</span>
                             <input
-                              type="number"
+                              type="text"
+                              inputMode="decimal"
+                              pattern="[0-9]*[.,]?[0-9]*"
                               step="0.01"
                               min="0.01"
                               max="999999.99"
                               className={`form-control ${
                                 errores.costoUnit ? "is-invalid" : ""
                               }`}
-                              value={costoUnit === "" ? "" : String(costoUnit)}
+                              value={costoUnit}
                               onChange={(e) => {
                                 const v = e.target.value;
-                                if (v === "") {
-                                  setCostoUnit("");
-                                } else {
-                                  const num = parseFloat(v);
-                                  // Solo aceptar números positivos mayores a 0
-                                  if (!isNaN(num) && num >= 0.01) {
-                                    setCostoUnit(num);
-                                  }
+                                const regex = /^\d*([.,]\d{0,2})?$/;
+
+                                if (v === "" || regex.test(v)) {
+                                  setCostoUnit(v);
                                 }
+
                                 // Limpiar error si es válido
                                 if (
                                   errores.costoUnit &&
-                                  validarNumeroPositivo(parseFloat(v || "0"))
+                                  validarNumeroPositivo(v)
                                 ) {
                                   const nuevosErrores = { ...errores };
                                   delete nuevosErrores.costoUnit;
                                   setErrores(nuevosErrores);
+                                }
+                              }}
+                              onBlur={() => {
+                                if (costoUnit) {
+                                  const valorNumerico = Number(
+                                    costoUnit.replace(",", "."),
+                                  );
+                                  if (!isNaN(valorNumerico)) {
+                                    setCostoUnit(valorNumerico.toFixed(2));
+                                  }
                                 }
                               }}
                               placeholder="0.01"
