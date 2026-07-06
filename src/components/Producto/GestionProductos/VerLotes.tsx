@@ -655,6 +655,7 @@ export default function VerLotes({
                     <th>Fecha Registro</th>
                     <th>Cantidad</th>
                     <th>Estado</th>
+                    <th>Costo Compra</th>
                     <th>Acciones</th>
                   </tr>
                 </thead>
