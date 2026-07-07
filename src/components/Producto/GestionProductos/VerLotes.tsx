@@ -8,6 +8,7 @@ interface Lote {
   Id: string;
   Lote: string;
   Id_Producto: string;
+  Precio_Compra: string;
   Fecha_Registro: string;
   Cantidad: number;
   Estado: string;
@@ -49,12 +50,18 @@ export default function VerLotes({
 
   // inputs (controlados)
   const [searchInput, setSearchInput] = useState("");
+  const [minPrecioInput, setMinPrecioInput] = useState("");
+  const [maxPrecioInput, setMaxPrecioInput] = useState("");
+  const [startDateInput, setStartDateInput] = useState("");
+  const [endDateInput, setEndDateInput] = useState("");
   const [minCantidadInput, setMinCantidadInput] = useState("");
   const [maxCantidadInput, setMaxCantidadInput] = useState("");
   const [estadoFilterInput, setEstadoFilterInput] = useState("");
 
   // filtros aplicados (se usan para construir la query al backend)
   const [searchTerm, setSearchTerm] = useState("");
+  const [precioRange, setPrecioRange] = useState({ min: "", max: "" });
+  const [dateRange, setDateRange] = useState({ start: "", end: "" });
   const [cantidadRange, setCantidadRange] = useState({ min: "", max: "" });
   const [estadoFilter, setEstadoFilter] = useState("");
 
@@ -83,8 +90,38 @@ export default function VerLotes({
     const formData = new FormData(form);
     const loteNombre = String(formData.get("Lote") ?? "").trim();
     const cantidad = Number(String(formData.get("Cantidad") ?? 0));
+    const precioCompraString = String(
+      formData.get("Precio_Compra") ?? "",
+    ).trim();
+    const precioCompra =
+      precioCompraString === "" ? null : Number(precioCompraString);
     const estado = String(formData.get("Estado") ?? "");
+
+    if (precioCompraString !== "") {
+      if (
+        precioCompra === null ||
+        Number.isNaN(precioCompra) ||
+        precioCompra < 0
+      ) {
+        setErrorMessage(
+          "El precio de compra debe ser un número válido mayor o igual a 0.",
+        );
+        setShowErrorModal(true);
+        return;
+      }
+    }
+
     const token = localStorage.getItem("token");
+    const payload: Record<string, unknown> = {
+      Lote: loteNombre,
+      Cantidad: cantidad,
+      Estado: estado,
+    };
+
+    if (precioCompraString !== "") {
+      payload.Precio_Compra = precioCompra;
+    }
+
     try {
       const res = await fetch(`${API_URL}/api/lotes/${selectedLote.Id}`, {
         method: "PUT",
@@ -92,11 +129,7 @@ export default function VerLotes({
           Authorization: token ? `Bearer ${token}` : "",
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          Lote: loteNombre,
-          Cantidad: cantidad,
-          Estado: estado,
-        }),
+        body: JSON.stringify(payload),
       });
       const body = await res.json().catch(() => null);
       if (res.ok) {
@@ -211,6 +244,10 @@ export default function VerLotes({
       const params = new URLSearchParams();
       params.set("product_id", productoId);
       if (searchTerm) params.set("lote", searchTerm);
+      if (precioRange.min) params.set("min_precio", precioRange.min);
+      if (precioRange.max) params.set("max_precio", precioRange.max);
+      if (dateRange.start) params.set("start_date", dateRange.start);
+      if (dateRange.end) params.set("end_date", dateRange.end);
       if (cantidadRange.min) params.set("min_cantidad", cantidadRange.min);
       if (cantidadRange.max) params.set("max_cantidad", cantidadRange.max);
       if (estadoFilter) params.set("estado", estadoFilter);
@@ -268,6 +305,10 @@ export default function VerLotes({
   }, [
     productoId,
     searchTerm,
+    precioRange.min,
+    precioRange.max,
+    dateRange.start,
+    dateRange.end,
     cantidadRange.min,
     cantidadRange.max,
     estadoFilter,
@@ -285,6 +326,14 @@ export default function VerLotes({
 
   const handleApplyFilters = () => {
     setSearchTerm(searchInput.trim());
+    setPrecioRange({
+      min: minPrecioInput,
+      max: maxPrecioInput,
+    });
+    setDateRange({
+      start: startDateInput,
+      end: endDateInput,
+    });
     setCantidadRange({
       min: minCantidadInput,
       max: maxCantidadInput,
@@ -400,10 +449,16 @@ export default function VerLotes({
   // Limpiar filtros: limpiar inputs y filtros aplicados luego recarga automática por useEffect
   const clearFilters = () => {
     setSearchInput("");
+    setMinPrecioInput("");
+    setMaxPrecioInput("");
+    setStartDateInput("");
+    setEndDateInput("");
     setMinCantidadInput("");
     setMaxCantidadInput("");
     setEstadoFilterInput("");
     setSearchTerm("");
+    setPrecioRange({ min: "", max: "" });
+    setDateRange({ start: "", end: "" });
     setCantidadRange({ min: "", max: "" });
     setEstadoFilter("");
   };
@@ -538,6 +593,76 @@ export default function VerLotes({
               </div>
             </div>
 
+            {/* Precio de compra */}
+            <div className="col-6 col-sm-4 col-lg-2">
+              <div className="filtro-item">
+                <label className="form-label fw-semibold text-muted mb-1">
+                  Precio compra mínimo
+                </label>
+                <input
+                  name="precio_min"
+                  type="number"
+                  className="form-control radius-30"
+                  placeholder="Mínimo"
+                  value={minPrecioInput}
+                  onChange={(e) => setMinPrecioInput(e.target.value)}
+                  onKeyDown={handleKeyDownApply}
+                />
+              </div>
+            </div>
+
+            <div className="col-6 col-sm-4 col-lg-2">
+              <div className="filtro-item">
+                <label className="form-label fw-semibold text-muted mb-1">
+                  Precio compra máximo
+                </label>
+                <input
+                  name="precio_max"
+                  type="number"
+                  className="form-control radius-30"
+                  placeholder="Máximo"
+                  value={maxPrecioInput}
+                  onChange={(e) => setMaxPrecioInput(e.target.value)}
+                  onKeyDown={handleKeyDownApply}
+                />
+              </div>
+            </div>
+
+            {/* Fecha de registro */}
+
+            <div className="col-6 col-sm-4 col-lg-2">
+              <div className="filtro-item">
+                <label className="form-label fw-semibold text-muted mb-1">
+                  Fecha registro inicio
+                </label>
+                <input
+                  name="start_date"
+                  type="date"
+                  className="form-control radius-30"
+                  value={startDateInput}
+                  onChange={(e) => setStartDateInput(e.target.value)}
+                  onKeyDown={handleKeyDownApply}
+                />
+              </div>
+            </div>
+
+            <div className="col-6 col-sm-4 col-lg-2">
+              <div className="filtro-item">
+                <label className="form-label fw-semibold text-muted mb-1">
+                  Fecha registro fin
+                </label>
+                <input
+                  name="end_date"
+                  type="date"
+                  className="form-control radius-30"
+                  value={endDateInput}
+                  onChange={(e) => setEndDateInput(e.target.value)}
+                  onKeyDown={handleKeyDownApply}
+                />
+              </div>
+            </div>
+
+            {/* Cantidad mín. y máx. */}
             <div className="col-6 col-sm-4 col-lg-2">
               <div className="filtro-item">
                 <label className="form-label fw-semibold text-muted mb-1">
@@ -571,6 +696,8 @@ export default function VerLotes({
                 />
               </div>
             </div>
+
+            {/* Estado */}
 
             <div className="col-6 col-sm-4 col-lg-2">
               <div className="filtro-item">
@@ -655,7 +782,7 @@ export default function VerLotes({
                     <th>Fecha Registro</th>
                     <th>Cantidad</th>
                     <th>Estado</th>
-                    <th>Costo Compra</th>
+                    <th>Precio Compra</th>
                     <th>Acciones</th>
                   </tr>
                 </thead>
@@ -670,6 +797,7 @@ export default function VerLotes({
                           {lote.Estado}
                         </span>
                       </td>
+                      <td>{lote.Precio_Compra}</td>
                       <td>
                         <div className="acciones-lote">
                           <button
@@ -743,6 +871,27 @@ export default function VerLotes({
                               defaultValue={selectedLote.Lote}
                               required
                             />
+                          </div>
+
+                          <div className="mb-3">
+                            <label className="form-label">
+                              Precio de compra
+                            </label>
+                            <div className="input-group">
+                              <span className="input-group-text">S/</span>
+                              <input
+                                name="Precio_Compra"
+                                type="number"
+                                className="form-control"
+                                min="0"
+                                step="0.01"
+                                placeholder="0.00"
+                                defaultValue={selectedLote.Precio_Compra || ""}
+                              />
+                            </div>
+                            <small className="text-muted d-block mt-1">
+                              Opcional. No permite valores negativos.
+                            </small>
                           </div>
 
                           <div className="mb-3">

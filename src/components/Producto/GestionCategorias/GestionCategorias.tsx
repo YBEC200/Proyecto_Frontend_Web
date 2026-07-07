@@ -20,6 +20,7 @@ export default function GestionCategorias() {
   const [productoSeleccionado, setProductoSeleccionado] = useState("");
   const [productoNombreInput, setProductoNombreInput] = useState("");
   const [loteCantidad, setLoteCantidad] = useState<number | "">("");
+  const [precioCompra, setPrecioCompra] = useState("");
   const [showSuccessLote, setShowSuccessLote] = useState(false);
   const [showErrorLote, setShowErrorLote] = useState(false);
   const [messageLote, setMessageLote] = useState("");
@@ -250,11 +251,28 @@ export default function GestionCategorias() {
       return;
     }
 
-    const payload = {
+    // Validar precio de compra
+    const precioCompraTrimmed = precioCompra.trim();
+    if (precioCompraTrimmed !== "") {
+      const precioCompraNumber = Number(precioCompraTrimmed);
+      if (Number.isNaN(precioCompraNumber) || precioCompraNumber < 0) {
+        setMessageLote(
+          "El precio de compra debe ser un número válido mayor o igual a 0.",
+        );
+        setShowErrorLote(true);
+        return;
+      }
+    }
+
+    const payload: Record<string, unknown> = {
       Lote: loteNombre.trim(),
       Id_Producto: productoSeleccionado,
       Cantidad: loteCantidad,
     };
+
+    if (precioCompraTrimmed !== "") {
+      payload.Precio_Compra = Number(precioCompraTrimmed);
+    }
 
     try {
       const response = await fetch(`${API_URL}/api/lotes`, {
@@ -273,6 +291,7 @@ export default function GestionCategorias() {
         setProductoSeleccionado("");
         setProductoNombreInput("");
         setLoteCantidad("");
+        setPrecioCompra("");
       } else {
         const errorData = await response.json().catch(() => ({}));
         setMessageLote(errorData.message || `Error ${response.status}`);
@@ -566,6 +585,26 @@ export default function GestionCategorias() {
                         </div>
                         <small className="text-muted d-block mt-1">
                           Debe ser un número entero mayor a 0
+                        </small>
+                      </div>
+
+                      <div className="mb-3">
+                        <label className="form-label">Precio de compra</label>
+                        <div className="input-group">
+                          <span className="input-group-text">S/</span>
+                          <input
+                            type="number"
+                            className="form-control"
+                            min="0"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={precioCompra}
+                            onChange={(e) => setPrecioCompra(e.target.value)}
+                            title="El precio debe ser mayor o igual a 0"
+                          />
+                        </div>
+                        <small className="text-muted d-block mt-1">
+                          Opcional. No permite valores negativos.
                         </small>
                       </div>
 
