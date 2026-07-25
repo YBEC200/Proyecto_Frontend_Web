@@ -520,9 +520,19 @@ function Analisis() {
     fetchLotesActivosPorCategoria();
   }, [fetchLotesActivosPorCategoria]);
 
+  // Agregar esta función antes de la función Analisis
+  const truncateLabel = (label: string, maxLength: number = 5): string => {
+    if (label && label.length > maxLength) {
+      return label.substring(0, maxLength) + "...";
+    }
+    return label || "";
+  };
+
   // Datos para gráfico de lotes activos (desde API)
   const lotesPorProducto = {
-    labels: lotes?.labels || [],
+    labels: (lotes?.labels || []).map((label: string) =>
+      truncateLabel(label, 5),
+    ),
     datasets: [
       {
         label: "Unidades Disponibles",
@@ -903,7 +913,7 @@ function Analisis() {
     maintainAspectRatio: true,
     plugins: {
       legend: {
-        position: "top" as const,
+        position: "right" as const,
       },
       tooltip: {
         callbacks: {
