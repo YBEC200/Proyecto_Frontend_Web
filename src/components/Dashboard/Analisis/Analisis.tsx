@@ -528,11 +528,13 @@ function Analisis() {
     return label || "";
   };
 
+  const lotesLabelsCompletos = (lotes?.labels || []).map(
+    (label: string) => label || "",
+  );
+
   // Datos para gráfico de lotes activos (desde API)
   const lotesPorProducto = {
-    labels: (lotes?.labels || []).map((label: string) =>
-      truncateLabel(label, 5),
-    ),
+    labels: lotesLabelsCompletos,
     datasets: [
       {
         label: "Unidades Disponibles",
@@ -551,8 +553,22 @@ function Analisis() {
       legend: {
         position: "top" as const,
       },
+      tooltip: {
+        callbacks: {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          label: (context: any) => {
+            const label = context.label ?? "";
+            return `${label}: ${context.parsed.y ?? context.parsed}`;
+          },
+        },
+      },
     },
     scales: {
+      x: {
+        ticks: {
+          callback: (value: string | number) => truncateLabel(String(value), 5),
+        },
+      },
       y: {
         beginAtZero: true,
         max: Math.max(...(lotes?.data || [10]), 10),
