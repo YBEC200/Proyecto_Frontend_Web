@@ -110,7 +110,8 @@ export default function AsignarPedidos() {
   const [errorDetails, setErrorDetails] = useState<Record<string, string>>({});
   const [mensajeDuplicado, setMensajeDuplicado] = useState("");
   const [qrToken, setQrToken] = useState<string | null>(null);
-  const [direccionTexto, setDireccionTexto] = useState<string>("");
+  const [, setDireccionTexto] = useState<string>("");
+  const [pendingVentaPayload, setPendingVentaPayload] = useState<any>(null);
 
   const [direccionExitoData, setDireccionExitoData] = useState<
     Record<string, string>
@@ -361,14 +362,6 @@ export default function AsignarPedidos() {
       }
     }
 
-    // Validar tipo de entrega y dirección
-    if (
-      tipoEntrega === "Envío a Domicilio" &&
-      (!idDireccion || idDireccion.toString().trim() === "")
-    ) {
-      errores.push("⚠️ Debes guardar una dirección para envíos a domicilio");
-    }
-
     // Validar que haya productos en la venta
     if (!rows || rows.length === 0) {
       errores.push("⚠️ Agrega al menos un producto a la venta");
@@ -419,9 +412,7 @@ export default function AsignarPedidos() {
     if (e) e.preventDefault();
 
     // Ejecutar validación completa
-    if (!validarFormularioVenta()) {
-      return;
-    }
+    if (!validarFormularioVenta()) return;
 
     // Construir detalles con nombres en snake_case
     const details = rows.map((r) => ({
@@ -433,17 +424,6 @@ export default function AsignarPedidos() {
     // Determinar el estado correcto según tipo de entrega
     const estadoFinal =
       tipoEntrega === "Recojo en Tienda" ? "Entregado" : "Pendiente";
-
-    // Validar que tipoEntrega tenga un valor válido
-    if (
-      tipoEntrega !== "Envío a Domicilio" &&
-      tipoEntrega !== "Recojo en Tienda"
-    ) {
-      alert(
-        "❌ El tipo de entrega debe ser 'Envío a Domicilio' o 'Recojo en Tienda'",
-      );
-      return;
-    }
 
     const payload = {
       id_usuario: Number(selectedUsuario),
@@ -459,7 +439,139 @@ export default function AsignarPedidos() {
       details,
     };
 
+    if (tipoEntrega === "Envío a Domicilio" && !idDireccion) {
+      setPendingVentaPayload(payload);
+      setShowModalDireccion(true);
+      return;
+    }
+
+    await enviarVenta(payload);
+  }
+
+  function handleComprobanteChange(id: string) {
+    setSelectedComprobante(id);
+    const comp = sampleComprobantes.find((c) => c.id === id);
+    const isFactura = comp?.nombre?.toLowerCase() === "factura";
+    if (!isFactura) {
+      setRuc("");
+    }
+  }
+
+  // Guardar dirección a través del backend
+  async function guardarDireccionSimulada() {
+    const ciudadInput = ciudad;
+    const calleInput =
+      (document.getElementById("calleInput") as HTMLInputElement)?.value || "";
+    const referenciaInput =
+      (document.getElementById("refInput") as HTMLTextAreaElement)?.value || "";
+
+    // ✅ Validación mejorada
+    if (!ciudadInput.trim()) {
+      alert("La ciudad es obligatoria.");
+      return;
+    }
+    if (!calleInput.trim()) {
+      alert("La calle es obligatoria.");
+      return;
+    }
+
     const token = localStorage.getItem("token");
+    const payload = {
+      ciudad: ciudadInput,
+      calle: calleInput,
+      referencia: referenciaInput || null,
+    };
+
+    console.log("Enviando dirección:", payload);
+
+    try {
+      const res = await fetch(`${API_URL}/api/directions`, {
+        method: "POST",
+        headers: {
+          Authorization: token ? `Bearer ${token}` : "",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const body = await res.json().catch(() => null);
+
+      if (res.ok) {
+        const direccionId = Number(body.id ?? body.Id);
+        setCiudad(ciudadInput);
+        setCalle(calleInput);
+        setReferencia(referenciaInput);
+
+        // ✅ Establecer ID de dirección PRIMERO
+        setIdDireccion(String(direccionId));
+        setDireccionTexto(
+          `${ciudadInput}${calleInput ? ", " + calleInput : ""}`,
+        );
+
+        // Mostrar modal de éxito
+        setDireccionExitoData({
+          ciudad: ciudadInput,
+          calle: calleInput,
+          referencia: referenciaInput,
+          id: String(direccionId),
+        });
+        if (pendingVentaPayload) {
+          const payloadFinal = {
+            ...pendingVentaPayload,
+            id_direccion: direccionId,
+          };
+
+          await enviarVenta(payloadFinal);
+          setPendingVentaPayload(null);
+        }
+
+        // Cerrar modal de dirección
+        setShowModalDireccion(false);
+        setShowModalDireccionExito(true);
+
+        // ✅ Limpiar inputs del modal
+        (document.getElementById("calleInput") as HTMLInputElement).value = "";
+        (document.getElementById("refInput") as HTMLTextAreaElement).value = "";
+        setCiudad("");
+
+        // Cerrar modal de éxito después de 3 segundos
+        setTimeout(() => {
+          setShowModalDireccionExito(false);
+        }, 3000);
+      } else {
+        console.error("Error guardar dirección:", {
+          status: res.status,
+          statusText: res.statusText,
+          body,
+        });
+
+        let errorMsg =
+          body?.message ||
+          body?.error ||
+          `Error ${res.status}: ${res.statusText}`;
+
+        if (res.status === 404) {
+          errorMsg =
+            "El endpoint de direcciones no existe. Verifica que el backend esté configurado correctamente.";
+        } else if (res.status === 422) {
+          errorMsg =
+            "Datos de validación inválidos: " +
+            JSON.stringify(body?.errors || body);
+        }
+
+        alert(errorMsg);
+      }
+    } catch (err) {
+      console.error("Fetch error guardar dirección:", err);
+      alert(
+        "Error de conexión al guardar la dirección. Verifica que el servidor esté en ${API_URL}",
+      );
+    }
+  }
+
+  async function enviarVenta(payload: Record<string, unknown>) {
+    const token = localStorage.getItem("token");
+
     try {
       const res = await fetch(`${API_URL}/api/ventas`, {
         method: "POST",
@@ -628,122 +740,6 @@ export default function AsignarPedidos() {
     }
   }
 
-  function handleComprobanteChange(id: string) {
-    setSelectedComprobante(id);
-    const comp = sampleComprobantes.find((c) => c.id === id);
-    const isFactura = comp?.nombre?.toLowerCase() === "factura";
-    if (!isFactura) {
-      setRuc("");
-    }
-  }
-
-  // Guardar dirección a través del backend
-  async function guardarDireccionSimulada() {
-    const ciudadInput = ciudad;
-    const calleInput =
-      (document.getElementById("calleInput") as HTMLInputElement)?.value || "";
-    const referenciaInput =
-      (document.getElementById("refInput") as HTMLTextAreaElement)?.value || "";
-
-    // ✅ Validación mejorada
-    if (!ciudadInput.trim()) {
-      alert("La ciudad es obligatoria.");
-      return;
-    }
-    if (!calleInput.trim()) {
-      alert("La calle es obligatoria.");
-      return;
-    }
-
-    const token = localStorage.getItem("token");
-    const payload = {
-      ciudad: ciudadInput,
-      calle: calleInput,
-      referencia: referenciaInput || null,
-    };
-
-    console.log("Enviando dirección:", payload);
-
-    try {
-      const res = await fetch(`${API_URL}/api/directions`, {
-        method: "POST",
-        headers: {
-          Authorization: token ? `Bearer ${token}` : "",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const body = await res.json().catch(() => null);
-
-      if (res.ok) {
-        const direccionId = Number(body.id ?? body.Id);
-        setCiudad(ciudadInput);
-        setCalle(calleInput);
-        setReferencia(referenciaInput);
-        setIdDireccion(String(direccionId));
-        setDireccionTexto(
-          `${ciudadInput}${calleInput ? ", " + calleInput : ""}`,
-        );
-
-        // ✅ Establecer ID de dirección PRIMERO
-        setIdDireccion(String(direccionId));
-        setDireccionTexto(
-          `${ciudadInput}${calleInput ? ", " + calleInput : ""}`,
-        );
-
-        // Mostrar modal de éxito
-        setDireccionExitoData({
-          ciudad: ciudadInput,
-          calle: calleInput,
-          referencia: referenciaInput,
-          id: String(direccionId),
-        });
-
-        // Cerrar modal de dirección
-        setShowModalDireccion(false);
-        setShowModalDireccionExito(true);
-
-        // ✅ Limpiar inputs del modal
-        (document.getElementById("calleInput") as HTMLInputElement).value = "";
-        (document.getElementById("refInput") as HTMLTextAreaElement).value = "";
-        setCiudad("");
-
-        // Cerrar modal de éxito después de 3 segundos
-        setTimeout(() => {
-          setShowModalDireccionExito(false);
-        }, 3000);
-      } else {
-        console.error("Error guardar dirección:", {
-          status: res.status,
-          statusText: res.statusText,
-          body,
-        });
-
-        let errorMsg =
-          body?.message ||
-          body?.error ||
-          `Error ${res.status}: ${res.statusText}`;
-
-        if (res.status === 404) {
-          errorMsg =
-            "El endpoint de direcciones no existe. Verifica que el backend esté configurado correctamente.";
-        } else if (res.status === 422) {
-          errorMsg =
-            "Datos de validación inválidos: " +
-            JSON.stringify(body?.errors || body);
-        }
-
-        alert(errorMsg);
-      }
-    } catch (err) {
-      console.error("Fetch error guardar dirección:", err);
-      alert(
-        "Error de conexión al guardar la dirección. Verifica que el servidor esté en ${API_URL}",
-      );
-    }
-  }
-
   return (
     <div className="dashboard-layout">
       <Sidebar />
@@ -897,7 +893,7 @@ export default function AsignarPedidos() {
                           </small>
                         </div>
 
-                        {tipoEntrega === "Envío a Domicilio" && (
+                        {/* {tipoEntrega === "Envío a Domicilio" && (
                           <div className="col-md-6">
                             <label className="form-label">Dirección</label>
                             <div className="d-flex gap-2">
@@ -920,7 +916,7 @@ export default function AsignarPedidos() {
                               </button>
                             </div>
                           </div>
-                        )}
+                        )}*/}
 
                         <div className="col-md-6">
                           <label className="form-label">
