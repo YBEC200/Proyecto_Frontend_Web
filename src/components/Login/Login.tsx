@@ -20,12 +20,51 @@ export default function Login() {
     return re.test(email);
   };
 
+  const loginWithCredentials = async (correo: string, password: string) => {
+    try {
+      const response = await fetch(`${API_URL}/api/admin/login`, {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + localStorage.getItem("token"),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ correo, password }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("user", JSON.stringify(data.user));
+        localStorage.setItem("isAuthenticated", "true");
+        window.location.href = "/dashboard";
+        return true;
+      }
+
+      if (response.ok && data.correo) {
+        setVerificationEmail(data.correo);
+        setIsVerificationModalOpen(true);
+        setErrorMessage(data.message || "Tu cuenta aún no ha sido verificada.");
+        return false;
+      }
+
+      setErrorMessage(
+        data.message || "Correo electrónico y/o contraseña incorrectos.",
+      );
+      return false;
+    } catch {
+      setErrorMessage("Error al conectar con el servidor. Inténtalo de nuevo.");
+      return false;
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setEmailError("");
     setPasswordError("");
     setErrorMessage("");
     setSuccessMessage("");
+
     let valido = true;
 
     if (email === "") {
@@ -43,42 +82,15 @@ export default function Login() {
 
     if (!valido) return;
 
-    try {
-      const response = await fetch(`${API_URL}/api/admin/login`, {
-        method: "POST",
-        headers: {
-          Authorization: "Bearer " + localStorage.getItem("token"),
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ correo: email, password }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("user", JSON.stringify(data.user));
-        localStorage.setItem("isAuthenticated", "true");
-        window.location.href = "/dashboard";
-      } else if (response.ok && data.correo) {
-        setVerificationEmail(data.correo);
-        setIsVerificationModalOpen(true);
-        setErrorMessage(data.message || "Tu cuenta aún no ha sido verificada.");
-      } else {
-        setErrorMessage(
-          data.message || "Correo electrónico y/o contraseña incorrectos.",
-        );
-      }
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    } catch (error) {
-      setErrorMessage("Error al conectar con el servidor. Inténtalo de nuevo.");
-    }
+    await loginWithCredentials(email, password);
   };
 
-  const handleVerificationSuccess = (message: string) => {
+  const handleVerificationSuccess = async (message: string) => {
     setSuccessMessage(message);
-    setIsVerificationModalOpen(false);
     setErrorMessage("");
+    setIsVerificationModalOpen(false);
+
+    await loginWithCredentials(email, password);
   };
 
   return (
@@ -91,6 +103,7 @@ export default function Login() {
           onClose={() => setIsVerificationModalOpen(false)}
           onVerified={handleVerificationSuccess}
         />
+
         <div className="section-authentication-signin d-flex align-items-center justify-content-center my-5 my-lg-0">
           <div className="container">
             <div className="row row-cols-1 row-cols-lg-2 row-cols-xl-3">
@@ -111,6 +124,7 @@ export default function Login() {
                           Por favor, inicie sesión en su cuenta
                         </p>
                       </div>
+
                       <div className="form-body">
                         <form className="row g-3" onSubmit={handleSubmit}>
                           <div className="col-12">
@@ -134,6 +148,7 @@ export default function Login() {
                               </div>
                             )}
                           </div>
+
                           <div className="col-12">
                             <label
                               htmlFor="inputChoosePassword"
@@ -171,6 +186,7 @@ export default function Login() {
                               </div>
                             )}
                           </div>
+
                           <div className="col-md-6">
                             <div className="form-check form-switch">
                               <input
@@ -186,12 +202,14 @@ export default function Login() {
                               </label>
                             </div>
                           </div>
+
                           <div className="col-12">
                             <div className="d-grid">
                               <button type="submit" className="btn btn-primary">
                                 Iniciar sesión
                               </button>
                             </div>
+
                             {errorMessage && (
                               <div
                                 style={{
@@ -203,6 +221,7 @@ export default function Login() {
                                 {errorMessage}
                               </div>
                             )}
+
                             {successMessage && (
                               <div
                                 style={{

@@ -4,7 +4,7 @@ type LoginVerificationModalProps = {
   isOpen: boolean;
   email: string;
   onClose: () => void;
-  onVerified: (message: string) => void;
+  onVerified: (message: string) => Promise<void> | void;
 };
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -61,7 +61,7 @@ export default function LoginVerificationModal({
       const data = await response.json();
 
       if (response.ok) {
-        onVerified(data.message || "Cuenta verificada correctamente.");
+        await onVerified(data.message || "Cuenta verificada correctamente.");
         onClose();
       } else {
         setCodeError(data.message || "El código es incorrecto o ya expiró.");
@@ -146,7 +146,6 @@ export default function LoginVerificationModal({
           />
 
           {codeError && <div className="login-modal-error">{codeError}</div>}
-
           {infoMessage && <div className="login-modal-info">{infoMessage}</div>}
 
           <div className="d-grid gap-2 mt-3">
