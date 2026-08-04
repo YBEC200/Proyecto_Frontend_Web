@@ -1,6 +1,9 @@
 import { useState } from "react";
+import LoginVerificationModal from "./LoginVerificationModal";
 import "./Login.css";
+
 const API_URL = import.meta.env.VITE_API_URL;
+
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -8,6 +11,9 @@ export default function Login() {
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+  const [verificationEmail, setVerificationEmail] = useState("");
+  const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false);
 
   const validarEmail = (email: string) => {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -19,6 +25,7 @@ export default function Login() {
     setEmailError("");
     setPasswordError("");
     setErrorMessage("");
+    setSuccessMessage("");
     let valido = true;
 
     if (email === "") {
@@ -53,6 +60,10 @@ export default function Login() {
         localStorage.setItem("user", JSON.stringify(data.user));
         localStorage.setItem("isAuthenticated", "true");
         window.location.href = "/dashboard";
+      } else if (response.ok && data.correo) {
+        setVerificationEmail(data.correo);
+        setIsVerificationModalOpen(true);
+        setErrorMessage(data.message || "Tu cuenta aún no ha sido verificada.");
       } else {
         setErrorMessage(
           data.message || "Correo electrónico y/o contraseña incorrectos.",
@@ -64,10 +75,22 @@ export default function Login() {
     }
   };
 
+  const handleVerificationSuccess = (message: string) => {
+    setSuccessMessage(message);
+    setIsVerificationModalOpen(false);
+    setErrorMessage("");
+  };
+
   return (
     <>
       <div className="background"></div>
       <div className="wrapper">
+        <LoginVerificationModal
+          isOpen={isVerificationModalOpen}
+          email={verificationEmail}
+          onClose={() => setIsVerificationModalOpen(false)}
+          onVerified={handleVerificationSuccess}
+        />
         <div className="section-authentication-signin d-flex align-items-center justify-content-center my-5 my-lg-0">
           <div className="container">
             <div className="row row-cols-1 row-cols-lg-2 row-cols-xl-3">
@@ -178,6 +201,17 @@ export default function Login() {
                                 }}
                               >
                                 {errorMessage}
+                              </div>
+                            )}
+                            {successMessage && (
+                              <div
+                                style={{
+                                  color: "green",
+                                  marginTop: "10px",
+                                  textAlign: "center",
+                                }}
+                              >
+                                {successMessage}
                               </div>
                             )}
                           </div>
