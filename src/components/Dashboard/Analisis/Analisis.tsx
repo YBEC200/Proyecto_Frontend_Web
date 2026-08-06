@@ -202,6 +202,9 @@ function Analisis() {
 
       const data = await response.json();
 
+      // ✅ CORREGIDO: Extraer 'data' del objeto de respuesta
+      const productsArray = Array.isArray(data?.data) ? data.data : [];
+      
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const normalized = (data || []).map((p: any) => ({
         ...p,
