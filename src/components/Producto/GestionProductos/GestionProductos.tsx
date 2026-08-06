@@ -90,6 +90,17 @@ export default function GestionProductos() {
   const [productosEliminables, setProductosEliminables] = useState<Set<string>>(
     new Set(),
   );
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const [paginationData, setPaginationData] = useState({
+    current_page: 1,
+    per_page: 10,
+    total: 0,
+    total_pages: 1,
+    has_next: false,
+    has_prev: false,
+  });
 
   // Obtener nombre de categoría
   const getCategoryName = (producto: Producto) =>
@@ -134,6 +145,8 @@ export default function GestionProductos() {
     if (appliedCategoryFilter)
       params.append("categoria", appliedCategoryFilter);
     if (appliedStatusFilter) params.append("estado", appliedStatusFilter);
+    // AGREGAR PARÁMETRO DE PÁGINA
+    params.append("page", currentPage.toString());
 
     try {
       const response = await fetch(
@@ -152,7 +165,11 @@ export default function GestionProductos() {
       }
 
       const data = await response.json();
-      setProductos(data || []);
+      // CAPTURAR DATOS Y METADATOS DE PAGINACIÓN
+      setProductos(data.data || []);
+      setPaginationData(data.pagination || {});
+      setTotalPages(data.pagination?.total_pages || 1);
+      setTotalProducts(data.pagination?.total || 0);
     } catch (error) {
       console.error("Error fetching productos:", error);
       setProductos([]);
@@ -197,6 +214,8 @@ export default function GestionProductos() {
   const applyFilters = () => {
     if (loading) return;
 
+    setCurrentPage(1); // Reset
+
     // Sólo aplicar si hay cambios (evita re-fetch innecesario)
     if (searchTerm !== searchInput.trim()) {
       setSearchTerm(searchInput.trim());
@@ -212,6 +231,7 @@ export default function GestionProductos() {
   };
 
   const clearFilters = () => {
+    setCurrentPage(1); // Reset
     setSearchInput("");
     setMinInput("");
     setMaxInput("");
@@ -574,6 +594,7 @@ export default function GestionProductos() {
     priceRange.max,
     categoryFilter,
     statusFilter,
+    currentPage, // Paginacion cargada
   ]);
 
   // Verificar eliminabilidad de cada producto cuando se cargan
@@ -952,6 +973,53 @@ export default function GestionProductos() {
                       ))}
                     </tbody>
                   </table>
+                )}
+                {!loading && productos.length > 0 && (
+                  <div className="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+                    <div className="text-muted small">
+                      Mostrando <strong>{(currentPage - 1) * 10 + 1}</strong> a <strong>{Math.min(currentPage * 10, totalProducts)}</strong> de <strong>{totalProducts}</strong> productos
+                    </div>
+                    <nav aria-label="Paginación">
+                      <ul className="pagination mb-0">
+                        <li className={`page-item ${!paginationData.has_prev ? "disabled" : ""}`}>
+                          <button
+                            className="page-link"
+                            onClick={() => setCurrentPage(currentPage - 1)}
+                            disabled={!paginationData.has_prev || loading}
+                          >
+                            Anterior
+                          </button>
+                        </li>
+                        
+                        {/* Números de página */}
+                        {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                          const pageNum = Math.max(1, currentPage - 2) + i;
+                          if (pageNum > totalPages) return null;
+                          return (
+                            <li key={pageNum} className={`page-item ${currentPage === pageNum ? "active" : ""}`}>
+                              <button
+                                className="page-link"
+                                onClick={() => setCurrentPage(pageNum)}
+                                disabled={loading}
+                              >
+                                {pageNum}
+                              </button>
+                            </li>
+                          );
+                        })}
+                        
+                        <li className={`page-item ${!paginationData.has_next ? "disabled" : ""}`}>
+                          <button
+                            className="page-link"
+                            onClick={() => setCurrentPage(currentPage + 1)}
+                            disabled={!paginationData.has_next || loading}
+                          >
+                            Siguiente
+                          </button>
+                        </li>
+                      </ul>
+                    </nav>
+                  </div>
                 )}
               </div>
             </div>
