@@ -76,6 +76,16 @@ export default function VerLotes({
     new Set(),
   );
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const [paginationData, setPaginationData] = useState({
+    current_page: 1,
+    per_page: 10,
+    total: 0,
+    total_pages: 1,
+    has_next: false,
+    has_prev: false,
+  });
+
   // Abrir modal editar
   const handleEditLote = (lote: Lote) => {
     setSelectedLote(lote);
@@ -235,6 +245,14 @@ export default function VerLotes({
     // no hacer nada si no hay producto seleccionado
     if (!productoId) {
       setLotes([]);
+      setPaginationData({
+        current_page: 1,
+        per_page: 10,
+        total: 0,
+        total_pages: 1,
+        has_next: false,
+        has_prev: false,
+      });
       setLoading(false);
       return;
     }
@@ -243,6 +261,8 @@ export default function VerLotes({
     try {
       const params = new URLSearchParams();
       params.set("product_id", productoId);
+      params.set("page", currentPage.toString());
+
       if (searchTerm) params.set("lote", searchTerm);
       if (precioRange.min) params.set("min_precio", precioRange.min);
       if (precioRange.max) params.set("max_precio", precioRange.max);
@@ -266,17 +286,31 @@ export default function VerLotes({
       });
 
       if (!response.ok) {
-        if (response.status === 404) {
-          setLotes([]);
-        } else {
-          setLotes([]);
-        }
+        setLotes([]);
+        setPaginationData({
+          current_page: 1,
+          per_page: 10,
+          total: 0,
+          total_pages: 1,
+          has_next: false,
+          has_prev: false,
+        });
         return;
       }
 
       const data = await response.json();
-      console.debug("fetchLotes result:", data);
-      setLotes(Array.isArray(data) ? data : []);
+
+      setLotes(Array.isArray(data?.data) ? data.data : []);
+      setPaginationData(
+        data?.pagination || {
+          current_page: 1,
+          per_page: 10,
+          total: 0,
+          total_pages: 1,
+          has_next: false,
+          has_prev: false,
+        },
+      );
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       if (error?.name === "AbortError") {
@@ -304,6 +338,7 @@ export default function VerLotes({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     productoId,
+    currentPage,
     searchTerm,
     precioRange.min,
     precioRange.max,
@@ -325,6 +360,7 @@ export default function VerLotes({
   }, [lotes]);
 
   const handleApplyFilters = () => {
+    setCurrentPage(1);
     setSearchTerm(searchInput.trim());
     setPrecioRange({
       min: minPrecioInput,
@@ -448,6 +484,7 @@ export default function VerLotes({
 
   // Limpiar filtros: limpiar inputs y filtros aplicados luego recarga automática por useEffect
   const clearFilters = () => {
+    setCurrentPage(1);
     setSearchInput("");
     setMinPrecioInput("");
     setMaxPrecioInput("");
@@ -556,7 +593,9 @@ export default function VerLotes({
         <div className="card-header">
           <div className="d-flex align-items-center justify-content-between w-100">
             <div>
-              <h6 className="mb-0">Lotes - {productoNombre}</h6>
+              <h6 className="mb-0">
+                Lotes - {productoNombre} (ID: {productoId})
+              </h6>
             </div>
             <div className="d-flex gap-2 align-items-center">
               <button
@@ -833,6 +872,84 @@ export default function VerLotes({
                   ))}
                 </tbody>
               </table>
+              {!loading && lotes.length > 0 && (
+                <div className="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+                  <div className="text-muted small">
+                    Mostrando{" "}
+                    <strong>
+                      {paginationData.total === 0
+                        ? 0
+                        : (paginationData.current_page - 1) *
+                            paginationData.per_page +
+                          1}
+                    </strong>{" "}
+                    a{" "}
+                    <strong>
+                      {Math.min(
+                        paginationData.current_page * paginationData.per_page,
+                        paginationData.total,
+                      )}
+                    </strong>{" "}
+                    de <strong>{paginationData.total}</strong> lotes
+                  </div>
+
+                  <nav aria-label="Paginación">
+                    <ul className="pagination mb-0">
+                      <li
+                        className={`page-item ${!paginationData.has_prev ? "disabled" : ""}`}
+                      >
+                        <button
+                          className="page-link"
+                          onClick={() => setCurrentPage((prev) => prev - 1)}
+                          disabled={!paginationData.has_prev || loading}
+                        >
+                          Anterior
+                        </button>
+                      </li>
+
+                      {Array.from(
+                        { length: Math.min(paginationData.total_pages, 5) },
+                        (_, i) => {
+                          const pageNum =
+                            Math.max(1, paginationData.current_page - 2) + i;
+                          if (pageNum > paginationData.total_pages) return null;
+
+                          return (
+                            <li
+                              key={pageNum}
+                              className={`page-item ${
+                                paginationData.current_page === pageNum
+                                  ? "active"
+                                  : ""
+                              }`}
+                            >
+                              <button
+                                className="page-link"
+                                onClick={() => setCurrentPage(pageNum)}
+                                disabled={loading}
+                              >
+                                {pageNum}
+                              </button>
+                            </li>
+                          );
+                        },
+                      )}
+
+                      <li
+                        className={`page-item ${!paginationData.has_next ? "disabled" : ""}`}
+                      >
+                        <button
+                          className="page-link"
+                          onClick={() => setCurrentPage((prev) => prev + 1)}
+                          disabled={!paginationData.has_next || loading}
+                        >
+                          Siguiente
+                        </button>
+                      </li>
+                    </ul>
+                  </nav>
+                </div>
+              )}
 
               {lotes.length === 0 && (
                 <div

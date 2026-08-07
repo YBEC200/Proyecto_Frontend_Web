@@ -200,13 +200,17 @@ function Analisis() {
         return;
       }
 
-      const data = await response.json();
+      const payload = await response.json();
 
       // ✅ CORREGIDO: Extraer 'data' del objeto de respuesta
-      const productsArray = Array.isArray(data?.data) ? data.data : [];
-      
+      const productsArray = Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload?.data)
+          ? payload.data
+          : [];
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const normalized = (data || []).map((p: any) => ({
+      const normalized = productsArray.map((p: any) => ({
         ...p,
         lotes: typeof p.lotes !== "undefined" ? Number(p.lotes) : 0,
         fecha_registro: p.fecha_registro ?? p.fechaRegistro ?? "",

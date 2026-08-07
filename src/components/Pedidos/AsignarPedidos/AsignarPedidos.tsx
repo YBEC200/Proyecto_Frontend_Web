@@ -144,26 +144,30 @@ export default function AsignarPedidos() {
     (async () => {
       try {
         const [pRes, uRes] = await Promise.all([
-          fetch(`${API_URL}/api/productos`, {
+          fetch(`${API_URL}/api/productos?page=1`, {
             headers,
           }),
           fetch(`${API_URL}/api/usuarios`, {
             headers,
           }),
         ]);
+
         if (pRes.ok) {
           const pData = await pRes.json();
-          // Normalizar id/nombre
+
+          // Los productos ahora vienen dentro de "data"
           setProductos(
-            (pData || []).map((p: any) => ({
+            (pData.data || []).map((p: any) => ({
               id: Number(p.id ?? p.Id ?? p.id_producto),
               nombre: p.nombre ?? p.Nombre,
               costo_unit: Number(p.costo_unit ?? p.Costo_unit ?? 0),
             })),
           );
         }
+
         if (uRes.ok) {
           const uData = await uRes.json();
+
           setUsuarios(
             (uData || []).map((u: any) => ({
               id: Number(u.id ?? u.Id ?? u.IdUsuario),
@@ -177,21 +181,34 @@ export default function AsignarPedidos() {
     })();
   }, []);
 
-  // Obtener lotes para un producto
   const fetchLotesForProduct = async (productId: number) => {
     if (!productId) return;
-    if (lotesByProduct[productId]) return; // ya cargado
+
+    // Ya cargados
+    if (lotesByProduct[productId]) return;
+
     const token = localStorage.getItem("token");
+
     try {
-      const res = await fetch(`${API_URL}/api/lotes?product_id=${productId}`, {
-        headers: {
-          Authorization: token ? `Bearer ${token}` : "",
-          "Content-Type": "application/json",
+      const res = await fetch(
+        `${API_URL}/api/lotes?product_id=${productId}&page=1`,
+        {
+          headers: {
+            Authorization: token ? `Bearer ${token}` : "",
+            "Content-Type": "application/json",
+          },
         },
-      });
+      );
+
       if (!res.ok) return;
-      const data = await res.json();
-      setLotesByProduct((s) => ({ ...s, [productId]: data }));
+
+      const response = await res.json();
+
+      // Los lotes ahora vienen dentro de "data"
+      setLotesByProduct((s) => ({
+        ...s,
+        [productId]: response.data || [],
+      }));
     } catch (err) {
       console.error("Error fetching lotes:", err);
     }

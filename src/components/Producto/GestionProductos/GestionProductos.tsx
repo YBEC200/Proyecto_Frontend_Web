@@ -16,6 +16,7 @@ interface Producto {
   costo_unit: number;
   estado: "Abastecido" | "Agotado" | "Inactivo";
   lotes: number;
+  cantidad_product?: number | string;
   id_categoria: string;
   categoria_nombre?: string;
   fecha_registro: string;
@@ -302,6 +303,7 @@ export default function GestionProductos() {
       `S/ ${formatPrice(producto.costo_unit)}`,
       producto.estado,
       producto.lotes.toString(),
+      producto.cantidad_product?.toString() ?? "0",
       getCategoryName(producto),
       producto.fecha_ultimo_lote
         ? formatFecha(producto.fecha_ultimo_lote)
@@ -317,6 +319,7 @@ export default function GestionProductos() {
           "Precio",
           "Estado",
           "Lotes",
+          "Cantidad",
           "Categoría",
           "Último Lote",
         ],
@@ -350,6 +353,7 @@ export default function GestionProductos() {
       Precio: parseFloat(formatPrice(producto.costo_unit)),
       Estado: producto.estado,
       Lotes: producto.lotes,
+      Cantidad: producto.cantidad_product ?? 0,
       Categoría: getCategoryName(producto),
       "Último Lote": producto.fecha_ultimo_lote
         ? formatFecha(producto.fecha_ultimo_lote)
@@ -364,6 +368,7 @@ export default function GestionProductos() {
       { wch: 12 },
       { wch: 14 },
       { wch: 8 },
+      { wch: 10 },
       { wch: 20 },
       { wch: 20 },
     ];
@@ -898,6 +903,7 @@ export default function GestionProductos() {
                         <th>Precio</th>
                         <th>Estado</th>
                         <th>Lotes</th>
+                        <th>Cantidad</th>
                         <th>Categoría</th>
                         <th>Último Abastecimiento</th>
                         <th>Acciones</th>
@@ -918,6 +924,7 @@ export default function GestionProductos() {
                             </span>
                           </td>
                           <td>{producto.lotes ?? 0}</td>
+                          <td>{producto.cantidad_product ?? 0}</td>
                           <td>{getCategoryName(producto)}</td>
                           <td>
                             {formatFecha(
@@ -977,11 +984,17 @@ export default function GestionProductos() {
                 {!loading && productos.length > 0 && (
                   <div className="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
                     <div className="text-muted small">
-                      Mostrando <strong>{(currentPage - 1) * 10 + 1}</strong> a <strong>{Math.min(currentPage * 10, totalProducts)}</strong> de <strong>{totalProducts}</strong> productos
+                      Mostrando <strong>{(currentPage - 1) * 10 + 1}</strong> a{" "}
+                      <strong>
+                        {Math.min(currentPage * 10, totalProducts)}
+                      </strong>{" "}
+                      de <strong>{totalProducts}</strong> productos
                     </div>
                     <nav aria-label="Paginación">
                       <ul className="pagination mb-0">
-                        <li className={`page-item ${!paginationData.has_prev ? "disabled" : ""}`}>
+                        <li
+                          className={`page-item ${!paginationData.has_prev ? "disabled" : ""}`}
+                        >
                           <button
                             className="page-link"
                             onClick={() => setCurrentPage(currentPage - 1)}
@@ -990,25 +1003,33 @@ export default function GestionProductos() {
                             Anterior
                           </button>
                         </li>
-                        
+
                         {/* Números de página */}
-                        {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-                          const pageNum = Math.max(1, currentPage - 2) + i;
-                          if (pageNum > totalPages) return null;
-                          return (
-                            <li key={pageNum} className={`page-item ${currentPage === pageNum ? "active" : ""}`}>
-                              <button
-                                className="page-link"
-                                onClick={() => setCurrentPage(pageNum)}
-                                disabled={loading}
+                        {Array.from(
+                          { length: Math.min(totalPages, 5) },
+                          (_, i) => {
+                            const pageNum = Math.max(1, currentPage - 2) + i;
+                            if (pageNum > totalPages) return null;
+                            return (
+                              <li
+                                key={pageNum}
+                                className={`page-item ${currentPage === pageNum ? "active" : ""}`}
                               >
-                                {pageNum}
-                              </button>
-                            </li>
-                          );
-                        })}
-                        
-                        <li className={`page-item ${!paginationData.has_next ? "disabled" : ""}`}>
+                                <button
+                                  className="page-link"
+                                  onClick={() => setCurrentPage(pageNum)}
+                                  disabled={loading}
+                                >
+                                  {pageNum}
+                                </button>
+                              </li>
+                            );
+                          },
+                        )}
+
+                        <li
+                          className={`page-item ${!paginationData.has_next ? "disabled" : ""}`}
+                        >
                           <button
                             className="page-link"
                             onClick={() => setCurrentPage(currentPage + 1)}
