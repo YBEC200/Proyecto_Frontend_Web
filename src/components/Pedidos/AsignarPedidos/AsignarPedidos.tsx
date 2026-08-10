@@ -17,7 +17,10 @@ interface DetalleRow {
 interface ProductoAPI {
   id: number;
   nombre: string;
+  estado?: string;
   costo_unit?: number;
+  precio?: number;
+  cantidad?: number;
 }
 
 interface LoteAPI {
@@ -143,31 +146,12 @@ export default function AsignarPedidos() {
 
     (async () => {
       try {
-        const [pRes, uRes] = await Promise.all([
-          fetch(`${API_URL}/api/productos?page=1`, {
-            headers,
-          }),
-          fetch(`${API_URL}/api/usuarios`, {
-            headers,
-          }),
+        const [uRes] = await Promise.all([
+          fetch(`${API_URL}/api/usuarios`, { headers }),
         ]);
-
-        if (pRes.ok) {
-          const pData = await pRes.json();
-
-          // Los productos ahora vienen dentro de "data"
-          setProductos(
-            (pData.data || []).map((p: any) => ({
-              id: Number(p.id ?? p.Id ?? p.id_producto),
-              nombre: p.nombre ?? p.Nombre,
-              costo_unit: Number(p.costo_unit ?? p.Costo_unit ?? 0),
-            })),
-          );
-        }
 
         if (uRes.ok) {
           const uData = await uRes.json();
-
           setUsuarios(
             (uData || []).map((u: any) => ({
               id: Number(u.id ?? u.Id ?? u.IdUsuario),
@@ -180,6 +164,58 @@ export default function AsignarPedidos() {
       }
     })();
   }, []);
+
+  async function buscarProductosVenta(texto: string, rowId: string) {
+    const valor = texto.trim();
+
+    if (!valor) {
+      setProductoSuggestions((s) => ({ ...s, [rowId]: [] }));
+      return;
+    }
+
+    const token = localStorage.getItem("token");
+
+    try {
+      const res = await fetch(
+        `${API_URL}/api/productos/buscar-para-venta?nombre=${encodeURIComponent(valor)}&limit=8`,
+        {
+          headers: {
+            Authorization: token ? `Bearer ${token}` : "",
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      if (!res.ok) {
+        setProductoSuggestions((s) => ({ ...s, [rowId]: [] }));
+        return;
+      }
+
+      const data = await res.json();
+
+      const lista = (data.data || []).map((p: any) => ({
+        id: Number(p.id),
+        nombre: p.nombre,
+        estado: p.estado ?? "disponible",
+        costo_unit: Number(p.precio ?? p.costo_unit ?? 0),
+        cantidad: Number(p.cantidad ?? 0),
+      }));
+
+      setProductos((prev) => {
+        const map = new Map(
+          prev.map((producto: ProductoAPI) => [producto.id, producto]),
+        );
+        lista.forEach((producto: ProductoAPI) =>
+          map.set(producto.id, producto),
+        );
+        return Array.from(map.values());
+      });
+
+      setProductoSuggestions((s) => ({ ...s, [rowId]: lista }));
+    } catch (err) {
+      console.error("Error buscando productos:", err);
+    }
+  }
 
   const fetchLotesForProduct = async (productId: number) => {
     if (!productId) return;
@@ -231,39 +267,50 @@ export default function AsignarPedidos() {
     setRows((r) => r.filter((x) => x.id !== id));
   }
   function updateRowProducto(id: string, productoId: string) {
-    // Validar que el producto no esté duplicado en otras filas
     const productoDuplicado = rows.some(
       (row) =>
         row.id !== id && row.productoId === productoId && productoId !== "",
     );
 
     if (productoDuplicado) {
-      // Mostrar modal si el producto ya existe
       setMensajeDuplicado(
-        `Este producto ya fue agregado. Aumenta la cantidad en esa fila en lugar de crear una nueva.`,
+        "Este producto ya fue agregado. Aumenta la cantidad en esa fila en lugar de crear una nueva.",
       );
       setShowModalDuplicado(true);
       return;
     }
 
     const prod = productos.find((p) => String(p.id) === productoId);
-    const pid = prod ? prod.id : 0;
-    // cargar lotes del producto
-    if (pid) fetchLotesForProduct(pid);
+
+    if (!prod) return;
+
+    if (prod.id) {
+      fetchLotesForProduct(prod.id);
+    }
+
+    const stockDisponible = Number(prod.cantidad ?? 0);
+
+    const agotado = prod.estado === "agotado" || stockDisponible <= 0;
+
+    if (agotado) {
+      setMensajeDuplicado(
+        "Este producto está agotado y no puede seleccionarse.",
+      );
+      setShowModalDuplicado(true);
+      return;
+    }
+
     setRows((r) =>
       r.map((row) =>
         row.id === id
           ? {
               ...row,
-              productoId: productoId,
-              productoName: prod ? String(prod.nombre) : "",
-              precioUnit: prod
-                ? Number(prod.costo_unit ?? prod.costo_unit ?? 0)
-                : 0,
+              productoId: String(prod.id),
+              productoName: prod.nombre,
+              precioUnit: Number(prod.costo_unit ?? prod.precio ?? 0),
+              cantidad: 1,
               subtotal: Number(
-                (
-                  (prod ? Number(prod.costo_unit ?? 0) : 0) * row.cantidad
-                ).toFixed(2),
+                ((prod.costo_unit ?? prod.precio ?? 0) * 1).toFixed(2),
               ),
             }
           : row,
@@ -271,19 +318,28 @@ export default function AsignarPedidos() {
     );
   }
   function updateRowCantidad(id: string, cantidad: number) {
-    // Validar que la cantidad sea un número positivo mayor a 0
-    const cantidadValida =
-      isNaN(cantidad) || cantidad < 1 ? 1 : Math.floor(cantidad);
+    const row = rows.find((r) => r.id === id);
+    const producto = productos.find((p) => String(p.id) === row?.productoId);
+
+    const stockDisponible = Number(producto?.cantidad ?? 1);
+
+    const cantidadSegura = Number.isFinite(cantidad) ? Math.floor(cantidad) : 1;
+    const cantidadValida = Math.min(
+      Math.max(1, cantidadSegura),
+      stockDisponible,
+    );
 
     setRows((r) =>
-      r.map((row) =>
-        row.id === id
+      r.map((rowItem) =>
+        rowItem.id === id
           ? {
-              ...row,
+              ...rowItem,
               cantidad: cantidadValida,
-              subtotal: Number((row.precioUnit * cantidadValida).toFixed(2)),
+              subtotal: Number(
+                (rowItem.precioUnit * cantidadValida).toFixed(2),
+              ),
             }
-          : row,
+          : rowItem,
       ),
     );
   }
@@ -292,19 +348,8 @@ export default function AsignarPedidos() {
     setRows((r) =>
       r.map((row) => (row.id === rowId ? { ...row, productoName: text } : row)),
     );
-    if (!text) {
-      setProductoSuggestions((s) => ({ ...s, [rowId]: [] }));
-      return;
-    }
-    const q = text.toLowerCase();
-    const matches = productos
-      .filter((p) => String(p.nombre).toLowerCase().includes(q))
-      .slice(0, 8);
-    setProductoSuggestions((s) => ({ ...s, [rowId]: matches }));
-    const exact = productos.find((p) => String(p.nombre).toLowerCase() === q);
-    if (exact) {
-      updateRowProducto(rowId, String(exact.id));
-    }
+
+    buscarProductosVenta(text, rowId);
   }
 
   function selectProductoSuggestion(rowId: string, prod: ProductoAPI) {
@@ -385,6 +430,17 @@ export default function AsignarPedidos() {
     } else {
       // Validar cada fila de producto
       rows.forEach((row, index) => {
+        const prod = productos.find((p) => String(p.id) === row.productoId);
+
+        if (prod) {
+          const maximo = Number(prod.cantidad ?? 0);
+
+          if (row.cantidad > maximo) {
+            errores.push(
+              `⚠️ Fila ${index + 1}: la cantidad supera el stock disponible de ${prod.nombre} (${maximo}).`,
+            );
+          }
+        }
         if (!row.productoId || row.productoId.toString().trim() === "") {
           errores.push(`⚠️ Fila ${index + 1}: Selecciona un producto`);
         }
@@ -1031,15 +1087,40 @@ export default function AsignarPedidos() {
                                             <li
                                               key={p.id}
                                               className="list-group-item list-group-item-action"
-                                              style={{ cursor: "pointer" }}
-                                              onClick={() =>
+                                              style={{
+                                                cursor:
+                                                  Number(p.cantidad ?? 0) <=
+                                                    0 || p.estado === "agotado"
+                                                    ? "not-allowed"
+                                                    : "pointer",
+                                                color:
+                                                  Number(p.cantidad ?? 0) <=
+                                                    0 || p.estado === "agotado"
+                                                    ? "red"
+                                                    : "inherit",
+                                                opacity:
+                                                  Number(p.cantidad ?? 0) <=
+                                                    0 || p.estado === "agotado"
+                                                    ? 0.7
+                                                    : 1,
+                                              }}
+                                              onClick={() => {
+                                                if (
+                                                  Number(p.cantidad ?? 0) <=
+                                                    0 ||
+                                                  p.estado === "agotado"
+                                                )
+                                                  return;
                                                 selectProductoSuggestion(
                                                   row.id,
                                                   p,
-                                                )
-                                              }
+                                                );
+                                              }}
                                             >
-                                              {p.nombre}
+                                              {p.nombre}{" "}
+                                              {Number(p.cantidad ?? 0) <= 0
+                                                ? " - Agotado"
+                                                : `- ${p.cantidad} disponibles`}
                                             </li>
                                           ),
                                         )}
@@ -1054,20 +1135,19 @@ export default function AsignarPedidos() {
                                   step="1"
                                   className="form-control"
                                   value={row.cantidad}
+                                  max={Number(
+                                    productos.find(
+                                      (p) => String(p.id) === row.productoId,
+                                    )?.cantidad ?? 1,
+                                  )}
                                   onChange={(e) => {
                                     const val = e.target.value;
                                     if (val === "" || isNaN(Number(val))) {
                                       updateRowCantidad(row.id, 1);
                                     } else {
-                                      const num = Math.max(
-                                        1,
-                                        Math.floor(Number(val)),
-                                      );
-                                      updateRowCantidad(row.id, num);
+                                      updateRowCantidad(row.id, Number(val));
                                     }
                                   }}
-                                  title="Cantidad debe ser mayor a 0"
-                                  placeholder="1"
                                 />
                               </td>
                               <td>
