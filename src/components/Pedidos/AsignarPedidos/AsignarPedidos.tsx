@@ -483,42 +483,58 @@ export default function AsignarPedidos() {
   // Crear venta y enviar al backend
   async function handleCrearVenta(e?: React.FormEvent<HTMLFormElement>) {
     if (e) e.preventDefault();
-
-    // Ejecutar validación completa
+  
     if (!validarFormularioVenta()) return;
-
-    // Construir detalles con nombres en snake_case
+  
     const details = rows.map((r) => ({
       id_producto: Number(r.productoId),
       cantidad: Number(r.cantidad),
       costo: Number(r.precioUnit),
     }));
-
-    // Determinar el estado correcto según tipo de entrega
+  
     const estadoFinal =
       tipoEntrega === "Recojo en Tienda" ? "Entregado" : "Pendiente";
-
-    const payload = {
+  
+    // Payload base SIN id_direccion para evitar capturar un id inválido
+    const payloadBase: Record<string, unknown> = {
       id_usuario: Number(selectedUsuario),
       fecha: getFechaActual(),
       metodo_pago: selectedMetodoPago || null,
       comprobante: selectedComprobante || null,
       ruc: selectedComprobante === "Factura" ? ruc : null,
-      id_direccion:
-        tipoEntrega === "Recojo en Tienda" ? null : Number(idDireccion),
       tipo_entrega: tipoEntrega,
       costo_total: Number(total),
       estado: estadoFinal,
       details,
     };
-
+  
+    // Si es recojo, no necesitamos id_direccion
+    if (tipoEntrega === "Recojo en Tienda") {
+      const payload = { ...payloadBase, id_direccion: null };
+      await enviarVenta(payload);
+      return;
+    }
+  
+    // Si es envío y NO hay dirección aún, guardamos el payload base (sin id_direccion)
+    // para enviarlo después de crear la dirección en el modal
     if (tipoEntrega === "Envío a Domicilio" && !idDireccion) {
-      setPendingVentaPayload(payload);
+      setPendingVentaPayload(payloadBase);
       setShowModalDireccion(true);
       return;
     }
-
-    await enviarVenta(payload);
+  
+    // Si ya tenemos idDireccion (string), convertirla a número y enviarla
+    const dirIdNum =
+      idDireccion !== null && idDireccion !== undefined
+        ? Number(idDireccion)
+        : null;
+  
+    const payloadFinal = {
+      ...payloadBase,
+      id_direccion: dirIdNum,
+    };
+  
+    await enviarVenta(payloadFinal);
   }
 
   function handleComprobanteChange(id: string) {
@@ -537,8 +553,7 @@ export default function AsignarPedidos() {
       (document.getElementById("calleInput") as HTMLInputElement)?.value || "";
     const referenciaInput =
       (document.getElementById("refInput") as HTMLTextAreaElement)?.value || "";
-
-    // ✅ Validación mejorada
+  
     if (!ciudadInput.trim()) {
       alert("La ciudad es obligatoria.");
       return;
@@ -547,16 +562,14 @@ export default function AsignarPedidos() {
       alert("La calle es obligatoria.");
       return;
     }
-
+  
     const token = localStorage.getItem("token");
     const payload = {
       ciudad: ciudadInput,
       calle: calleInput,
       referencia: referenciaInput || null,
     };
-
-    console.log("Enviando dirección:", payload);
-
+  
     try {
       const res = await fetch(`${API_URL}/api/directions`, {
         method: "POST",
@@ -566,48 +579,60 @@ export default function AsignarPedidos() {
         },
         body: JSON.stringify(payload),
       });
-
+  
       const body = await res.json().catch(() => null);
-
+  
       if (res.ok) {
-        const direccionId = Number(body.id ?? body.Id);
-        setCiudad(ciudadInput);
-        setCalle(calleInput);
-        setReferencia(referenciaInput);
-
-        // ✅ Establecer ID de dirección PRIMERO
+        // Extraer id robustamente. Tu controlador devuelve 'id'
+        const posibleId =
+          body?.id ??
+          body?.Id ??
+          body?.data?.id ??
+          body?.data?.Id ??
+          body?.direccion?.id ??
+          null;
+  
+        const direccionId = Number(posibleId);
+  
+        if (!Number.isFinite(direccionId) || direccionId <= 0) {
+          console.error("No se pudo extraer un id válido de la respuesta:", body);
+          alert("La dirección se creó pero no se devolvió un id válido desde el servidor.");
+          return;
+        }
+  
+        // Actualizar estado del componente (puede ser asíncrono)
         setIdDireccion(String(direccionId));
-        setDireccionTexto(
-          `${ciudadInput}${calleInput ? ", " + calleInput : ""}`,
-        );
-
-        // Mostrar modal de éxito
+        setDireccionTexto(`${ciudadInput}${calleInput ? ", " + calleInput : ""}`);
+  
+        // Mostrar modal de éxito con la info
         setDireccionExitoData({
           ciudad: ciudadInput,
           calle: calleInput,
           referencia: referenciaInput,
           id: String(direccionId),
         });
+  
+        // Aquí NO dependemos de idDireccion en estado (porque setState es async).
+        // Si hay una venta pendiente, la armamos usando el id recién obtenido.
         if (pendingVentaPayload) {
           const payloadFinal = {
             ...pendingVentaPayload,
             id_direccion: direccionId,
           };
-
+          // Intentamos enviar la venta con el id correcto
           await enviarVenta(payloadFinal);
+          // Limpiamos el payload pendiente
           setPendingVentaPayload(null);
         }
-
-        // Cerrar modal de dirección
+  
+        // Cerrar modal y limpiar inputs
         setShowModalDireccion(false);
         setShowModalDireccionExito(true);
-
-        // ✅ Limpiar inputs del modal
+  
         (document.getElementById("calleInput") as HTMLInputElement).value = "";
         (document.getElementById("refInput") as HTMLTextAreaElement).value = "";
         setCiudad("");
-
-        // Cerrar modal de éxito después de 3 segundos
+  
         setTimeout(() => {
           setShowModalDireccionExito(false);
         }, 3000);
@@ -617,12 +642,12 @@ export default function AsignarPedidos() {
           statusText: res.statusText,
           body,
         });
-
+  
         let errorMsg =
           body?.message ||
           body?.error ||
           `Error ${res.status}: ${res.statusText}`;
-
+  
         if (res.status === 404) {
           errorMsg =
             "El endpoint de direcciones no existe. Verifica que el backend esté configurado correctamente.";
@@ -631,13 +656,13 @@ export default function AsignarPedidos() {
             "Datos de validación inválidos: " +
             JSON.stringify(body?.errors || body);
         }
-
+  
         alert(errorMsg);
       }
     } catch (err) {
       console.error("Fetch error guardar dirección:", err);
       alert(
-        "Error de conexión al guardar la dirección. Verifica que el servidor esté en ${API_URL}",
+        `Error de conexión al guardar la dirección. Verifica que el servidor esté en ${API_URL}`,
       );
     }
   }
