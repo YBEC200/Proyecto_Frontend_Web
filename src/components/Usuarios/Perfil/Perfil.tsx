@@ -4,6 +4,8 @@ import Nav from "../../Layout/Nav";
 import Sidebar from "../../Layout/Sidebar";
 import "./Perfil.css";
 
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+
 interface UserData {
   id: number;
   nombre: string;
@@ -13,8 +15,6 @@ interface UserData {
 
 export default function Perfil() {
   const [formData, setFormData] = useState<Partial<UserData>>({});
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [userData, setUserData] = useState<UserData>({
     id: 0,
@@ -22,6 +22,7 @@ export default function Perfil() {
     correo: "usuario@example.com",
     rol: "Administrador",
   });
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     // Obtener datos del localStorage
@@ -36,6 +37,18 @@ export default function Perfil() {
     }
   }, []);
 
+  // Prefill formData when entering edit mode
+  useEffect(() => {
+    if (isEditing) {
+      setFormData({
+        nombre: userData.nombre,
+        correo: userData.correo,
+      });
+    } else {
+      setFormData({});
+    }
+  }, [isEditing, userData]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
       ...formData,
@@ -44,64 +57,98 @@ export default function Perfil() {
   };
 
   const handleUpdate = async () => {
+    // Solo enviar nombre y correo (no password desde aquí)
     try {
-      const token = localStorage.getItem("token");
+      // Validación mínima en cliente
+      const nombre = String(formData.nombre ?? "").trim();
+      const correo = String(formData.correo ?? "").trim();
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const dataToSend: any = {};
-
-      // Solo enviar campos modificados
-      Object.keys(formData).forEach((key) => {
-        if (
-          formData[key as keyof UserData] !== userData[key as keyof UserData]
-        ) {
-          dataToSend[key] = formData[key as keyof UserData];
-        }
-      });
-
-      if (password) {
-        dataToSend.password = password;
-        dataToSend.password_confirmation = confirmPassword;
+      if (!nombre) {
+        alert("El nombre es obligatorio.");
+        return;
       }
+      if (!correo) {
+        alert("El correo es obligatorio.");
+        return;
+      }
+
+      // Construir payload con solo campos cambiados respecto a userData
+      const dataToSend: Partial<UserData> = {};
+      if (nombre !== userData.nombre) dataToSend.nombre = nombre;
+      if (correo !== userData.correo) dataToSend.correo = correo;
 
       if (Object.keys(dataToSend).length === 0) {
         alert("No hay cambios para actualizar.");
         return;
       }
 
+      const token = localStorage.getItem("token") || "";
+
+      setSaving(true);
+
       const response = await fetch(
-        `http://localhost:8000/api/usuarios/${userData.id}`,
+        `${API_URL}/api/usuarios/${userData.id}`,
         {
           method: "PATCH",
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: token ? `Bearer ${token}` : "",
             "Content-Type": "application/json",
+            Accept: "application/json",
           },
           body: JSON.stringify(dataToSend),
         },
       );
 
-      const result = await response.json();
+      // Intentar leer JSON (si hay body)
+      const result = await response.json().catch(() => null);
 
       if (!response.ok) {
-        throw new Error(result.message || "Error al actualizar");
+        // Manejo de validación 422
+        if (response.status === 422 && result?.errors) {
+          const firstErrorField = Object.keys(result.errors)[0];
+          const firstErrorMsg = result.errors[firstErrorField][0];
+          alert(`Error de validación: ${firstErrorMsg}`);
+          console.error("Validation errors:", result.errors);
+        } else if (response.status === 404) {
+          alert(result?.message || "Usuario no encontrado.");
+        } else if (response.status === 401 || response.status === 403) {
+          alert("No autorizado. Por favor inicia sesión nuevamente.");
+        } else {
+          // Fallback
+          alert(result?.message || `Error al actualizar (${response.status}).`);
+        }
+        throw new Error("HTTP error " + response.status);
       }
 
-      const updatedUser = { ...userData, ...dataToSend };
+      // Si el backend devuelve el usuario actualizado en result.usuario o result.data, úsalo
+      const updatedFromServer = result?.usuario ?? result?.data ?? result;
+      const updatedUser = {
+        ...userData,
+        ...dataToSend,
+        ...(typeof updatedFromServer === "object" ? updatedFromServer : {}),
+      };
 
-      setUserData(updatedUser);
+      setUserData(updatedUser as UserData);
       localStorage.setItem("user", JSON.stringify(updatedUser));
 
       setIsEditing(false);
-      setPassword("");
-      setConfirmPassword("");
       setFormData({});
-
       alert("Perfil actualizado correctamente");
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
-      console.error(error);
-      alert(error.message);
+      console.error("Error actualizando usuario:", error);
+      if (
+        error?.message &&
+        String(error.message).includes("Failed to fetch")
+      ) {
+        alert(
+          "Error de conexión: Failed to fetch. Revisa VITE_API_URL, CORS y que el backend esté levantado.",
+        );
+      } else {
+        // ya mostramos mensajes específicos arriba; aquí solo log
+        console.error(error);
+      }
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -155,8 +202,9 @@ export default function Perfil() {
                               type="text"
                               name="nombre"
                               className="form-control"
-                              defaultValue={userData.nombre}
+                              value={String(formData.nombre ?? "")}
                               onChange={handleChange}
+                              disabled={saving}
                             />
                           ) : (
                             <p className="form-control-plaintext">
@@ -173,8 +221,9 @@ export default function Perfil() {
                               type="email"
                               name="correo"
                               className="form-control"
-                              defaultValue={userData.correo}
+                              value={String(formData.correo ?? "")}
                               onChange={handleChange}
+                              disabled={saving}
                             />
                           ) : (
                             <p className="form-control-plaintext">
@@ -191,35 +240,6 @@ export default function Perfil() {
                           </p>
                         </div>
 
-                        {/* Password */}
-                        {isEditing && (
-                          <>
-                            <div className="mb-3">
-                              <label className="form-label">
-                                Nueva contraseña
-                              </label>
-                              <input
-                                type="password"
-                                className="form-control"
-                                onChange={(e) => setPassword(e.target.value)}
-                              />
-                            </div>
-
-                            <div className="mb-3">
-                              <label className="form-label">
-                                Confirmar contraseña
-                              </label>
-                              <input
-                                type="password"
-                                className="form-control"
-                                onChange={(e) =>
-                                  setConfirmPassword(e.target.value)
-                                }
-                              />
-                            </div>
-                          </>
-                        )}
-
                         {/* Botones */}
                         <div className="d-flex justify-content-between">
                           {isEditing ? (
@@ -227,23 +247,42 @@ export default function Perfil() {
                               <button
                                 className="btn btn-success"
                                 onClick={handleUpdate}
+                                disabled={saving}
                               >
-                                Guardar
+                                {saving ? "Guardando..." : "Guardar"}
                               </button>
                               <button
                                 className="btn btn-secondary"
-                                onClick={() => setIsEditing(false)}
+                                onClick={() => {
+                                  setIsEditing(false);
+                                  setFormData({});
+                                }}
+                                disabled={saving}
                               >
                                 Cancelar
                               </button>
                             </>
                           ) : (
-                            <button
-                              className="btn btn-primary w-100"
-                              onClick={() => setIsEditing(true)}
-                            >
-                              Editar Perfil
-                            </button>
+                            <div style={{ width: "100%" }}>
+                              <button
+                                className="btn btn-primary w-100"
+                                onClick={() => setIsEditing(true)}
+                              >
+                                Editar Perfil
+                              </button>
+
+                              {/* Botón para cambio de contraseña — abrir modal/route aparte */}
+                              <button
+                                className="btn btn-outline-secondary w-100 mt-2"
+                                onClick={() =>
+                                  alert(
+                                    "Para cambiar la contraseña usa la opción 'Cambiar contraseña' (implementa modal o página separada).",
+                                  )
+                                }
+                              >
+                                Cambiar contraseña
+                              </button>
+                            </div>
                           )}
                         </div>
                       </div>
@@ -325,7 +364,7 @@ export default function Perfil() {
             </div>
           </div>
         </div>
-      </div>
+      </div> 
     </div>
   );
 }
