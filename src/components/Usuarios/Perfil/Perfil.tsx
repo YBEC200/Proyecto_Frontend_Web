@@ -89,7 +89,7 @@ export default function Perfil() {
       const response = await fetch(
         `${API_URL}/api/usuarios/${userData.id}`,
         {
-          method: "PATCH",
+          method: "PUT",
           headers: {
             Authorization: token ? `Bearer ${token}` : "",
             "Content-Type": "application/json",
