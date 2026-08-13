@@ -139,6 +139,17 @@ function GestionPedidos() {
   const [selectedBaja, setSelectedBaja] = useState<BajaVenta | null>(null);
   const [loadingBaja, setLoadingBaja] = useState(false);
   const [errorBaja, setErrorBaja] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalVentas, setTotalVentas] = useState(0);
+  const [paginationData, setPaginationData] = useState({
+    current_page: 1,
+    per_page: 10,
+    total: 0,
+    total_pages: 1,
+    has_next: false,
+    has_prev: false,
+  });
 
   // Función para obtener usuarios y crear un mapa de lookup
   const fetchUsuarios = async (): Promise<Map<number, string>> => {
@@ -215,11 +226,11 @@ function GestionPedidos() {
   const fetchVentas = async () => {
     setLoading(true);
     setError("");
-
+  
     try {
       const token = localStorage.getItem("token");
       const params = new URLSearchParams();
-
+  
       if (appliedFilters.searchTerm)
         params.append("nombre_cliente", appliedFilters.searchTerm);
       if (appliedFilters.status) params.append("estado", appliedFilters.status);
@@ -227,10 +238,14 @@ function GestionPedidos() {
         params.append("fecha_inicio", appliedFilters.dateStart);
       if (appliedFilters.dateEnd)
         params.append("fecha_fin", appliedFilters.dateEnd);
-
+  
+      // enviar la página actual
+      params.append("page", String(currentPage));
+      // opcional: params.append("per_page","10");
+  
       // Obtener usuarios primero para mapping
       const usuariosMap = await fetchUsuarios();
-
+  
       const response = await fetch(
         `${API_URL}/api/ventas?${params.toString()}`,
         {
@@ -240,73 +255,78 @@ function GestionPedidos() {
           },
         },
       );
-
+  
       if (!response.ok) {
         setVentas([]);
         setError("Error al cargar las ventas");
         return;
       }
-
+  
       const data = await response.json();
-
-      // Normalizar estructura de datos desde el backend
-      const normalizedData = (Array.isArray(data) ? data : []).map(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (item: any) => {
-          const userId = item.id_usuario || item.Id_Usuario;
-          const userName = usuariosMap.get(userId) || "Sin cliente";
-
-          return {
-            id: item.id || item.Id,
-            id_usuario: userId,
-            metodo_pago: item.metodo_pago || item.Metodo_Pago,
-            comprobante: item.comprobante || item.Comprobante,
-
-            // 👇 CAMPOS NUBEFACT (FALTABAN)
-            codigo_unico: item.codigo_unico || item.Codigo_Unico || null,
-            serie: item.serie || item.Serie || null,
-            numero_comprobante:
-              item.numero_comprobante || item.Numero_Comprobante || null,
-            enlace_pdf: item.enlace_pdf || item.Enlace_PDF || null,
-
-            id_direccion: item.id_direccion || item.Id_Direccion,
-            fecha: item.Fecha || item.fecha,
-            costo_total:
-              typeof (item.Costo_Total || item.costo_total) === "string"
-                ? parseFloat(item.Costo_Total || item.costo_total || "0")
-                : Number(item.Costo_Total || item.costo_total || 0),
-            estado: item.estado || item.Estado,
-            tipo_entrega: item.tipo_entrega || item.Tipo_Entrega,
-            qr_token: item.qr_token || item.QR_Token || null,
-            // Relaciones
-            user: {
-              id: userId,
-              nombre: userName,
-              correo:
-                item.user?.correo ||
-                item.user?.Correo ||
-                item.user?.email ||
-                "",
-              rol: item.user?.rol || item.user?.Rol || "",
-              estado: item.user?.estado || item.user?.Estado || "",
-            },
-            direction: item.direction
-              ? {
-                  id: item.direction.id || item.direction.Id,
-                  ciudad: item.direction.ciudad || item.direction.Ciudad,
-                  calle: item.direction.calle || item.direction.Calle,
-                  referencia:
-                    item.direction.referencia ||
-                    item.direction.Referencia ||
-                    "",
-                }
-              : null,
-            details: Array.isArray(item.details) ? item.details : [],
-          };
-        },
-      );
-
+  
+      // data puede ser array (legacy) o objeto paginado { data, pagination }
+      const items = Array.isArray(data) ? data : Array.isArray(data.data) ? data.data : [];
+  
+      const normalizedData = items.map((item: any) => {
+        const userId = item.id_usuario || item.Id_Usuario;
+        const userName = usuariosMap.get(userId) || "Sin cliente";
+  
+        return {
+          id: item.id || item.Id,
+          id_usuario: userId,
+          metodo_pago: item.metodo_pago || item.Metodo_Pago,
+          comprobante: item.comprobante || item.Comprobante,
+          codigo_unico: item.codigo_unico || item.Codigo_Unico || null,
+          serie: item.serie || item.Serie || null,
+          numero_comprobante:
+            item.numero_comprobante || item.Numero_Comprobante || null,
+          enlace_pdf: item.enlace_pdf || item.Enlace_PDF || null,
+          id_direccion: item.id_direccion || item.Id_Direccion,
+          fecha: item.Fecha || item.fecha,
+          costo_total:
+            typeof (item.Costo_Total || item.costo_total) === "string"
+              ? parseFloat(item.Costo_Total || item.costo_total || "0")
+              : Number(item.Costo_Total || item.costo_total || 0),
+          estado: item.estado || item.Estado,
+          tipo_entrega: item.tipo_entrega || item.Tipo_Entrega,
+          qr_token: item.qr_token || item.QR_Token || null,
+          user: {
+            id: userId,
+            nombre: userName,
+            correo:
+              item.user?.correo ||
+              item.user?.Correo ||
+              item.user?.email ||
+              "",
+            rol: item.user?.rol || item.user?.Rol || "",
+            estado: item.user?.estado || item.user?.Estado || "",
+          },
+          direction: item.direction ? { /* normalizar si necesitas */ } : null,
+          details: Array.isArray(item.details) ? item.details : [],
+        };
+      });
+  
       setVentas(normalizedData);
+  
+      // si la respuesta trae paginación, úsala
+      if (!Array.isArray(data) && data.pagination) {
+        setPaginationData(data.pagination);
+        setTotalPages(data.pagination.total_pages || 1);
+        setTotalVentas(data.pagination.total || 0);
+        setCurrentPage(data.pagination.current_page || currentPage);
+      } else {
+        // caso legacy: inferir counts mínimos
+        setPaginationData({
+          current_page: 1,
+          per_page: normalizedData.length,
+          total: normalizedData.length,
+          total_pages: 1,
+          has_next: false,
+          has_prev: false,
+        });
+        setTotalPages(1);
+        setTotalVentas(normalizedData.length);
+      }
     } catch (err) {
       console.error("Error fetching ventas:", err);
       setError("Error de conexión al cargar las ventas");
@@ -588,7 +608,9 @@ function GestionPedidos() {
   // NUEVA FUNCIÓN: Aplicar filtros (se ejecuta solo cuando el usuario hace clic)
   const handleApplyFilters = () => {
     if (loading) return;
-
+  
+    setCurrentPage(1); // resetear a la primera página al aplicar filtros
+  
     setAppliedFilters({
       searchTerm: searchInput.trim(),
       status: filterStatusInput,
@@ -622,7 +644,7 @@ function GestionPedidos() {
   useEffect(() => {
     fetchVentas();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appliedFilters]);
+  }, [appliedFilters, currentPage])
 
   // Función para formatear fecha
   const formatFecha = (fecha: string) => {
@@ -1115,6 +1137,53 @@ function GestionPedidos() {
                         ))}
                       </tbody>
                     </table>
+                  )}
+                  {!loading && ventas.length > 0 && (
+                    <div className="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+                      <div className="text-muted small">
+                        Mostrando <strong>{(paginationData.current_page - 1) * paginationData.per_page + 1}</strong> a{" "}
+                        <strong>{Math.min(paginationData.current_page * paginationData.per_page, paginationData.total)}</strong> de <strong>{paginationData.total}</strong> ventas
+                      </div>
+                      <nav aria-label="Paginación">
+                        <ul className="pagination mb-0">
+                          <li className={`page-item ${!paginationData.has_prev ? "disabled" : ""}`}>
+                            <button
+                              className="page-link"
+                              onClick={() => setCurrentPage(currentPage - 1)}
+                              disabled={!paginationData.has_prev || loading}
+                            >
+                              Anterior
+                            </button>
+                          </li>
+                  
+                          {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                            const pageNum = Math.max(1, currentPage - 2) + i;
+                            if (pageNum > totalPages) return null;
+                            return (
+                              <li key={pageNum} className={`page-item ${currentPage === pageNum ? "active" : ""}`}>
+                                <button
+                                  className="page-link"
+                                  onClick={() => setCurrentPage(pageNum)}
+                                  disabled={loading}
+                                >
+                                  {pageNum}
+                                </button>
+                              </li>
+                            );
+                          })}
+                  
+                          <li className={`page-item ${!paginationData.has_next ? "disabled" : ""}`}>
+                            <button
+                              className="page-link"
+                              onClick={() => setCurrentPage(currentPage + 1)}
+                              disabled={!paginationData.has_next || loading}
+                            >
+                              Siguiente
+                            </button>
+                          </li>
+                        </ul>
+                      </nav>
+                    </div>
                   )}
                 </div>
               </div>
