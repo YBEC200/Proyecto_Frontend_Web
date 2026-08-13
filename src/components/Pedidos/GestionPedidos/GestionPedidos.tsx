@@ -183,34 +183,16 @@ function GestionPedidos() {
   const fetchStats = async () => {
     try {
       const token = localStorage.getItem("token");
-
-      // Llamada limpia a la API sin query params (trae todo)
-      const response = await fetch(`${API_URL}/api/ventas`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
+      const res = await fetch(`${API_URL}/api/ventas/stats`, {
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
       });
-
-      if (!response.ok) return;
-      const data = await response.json();
-      const ventasCompletas = Array.isArray(data) ? data : [];
-
-      // Mapeo rápido para asegurar compatibilidad de mayúsculas/minúsculas en el campo 'estado'
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const ventasNormalizadas = ventasCompletas.map((item: any) => ({
-        estado: item.estado || item.Estado,
-      }));
-
-      // Calcular y guardar los totales en el estado fijo
+      if (!res.ok) return;
+      const d = await res.json();
       setStats({
-        total: ventasNormalizadas.length,
-        pendientes: ventasNormalizadas.filter((v) => v.estado === "Pendiente")
-          .length,
-        entregados: ventasNormalizadas.filter((v) => v.estado === "Entregado")
-          .length,
-        cancelados: ventasNormalizadas.filter((v) => v.estado === "Cancelado")
-          .length,
+        total: d.total || 0,
+        pendientes: d.pendientes || 0,
+        entregados: d.entregados || 0,
+        cancelados: d.cancelados || 0,
       });
     } catch (err) {
       console.error("Error al calcular estadísticas iniciales:", err);
