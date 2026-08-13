@@ -188,18 +188,30 @@ export default function GestionCategorias() {
   const fetchProductos = useCallback(async () => {
     try {
       const token = getToken();
+      // Opcional: añadir ?page=1&per_page=1000 si quieres traer muchos items para autocomplete
       const response = await fetch(`${API_URL}/api/productos`, {
         headers: {
           Authorization: token ? `Bearer ${token}` : "",
         },
       });
-
+  
       if (!response.ok) throw new Error("Error al cargar productos");
-
-      const data = await response.json();
-      setProductos(Array.isArray(data) ? data : []);
+  
+      const json = await response.json();
+  
+      // Soportar ambas formas: array directo o { data: [...] , pagination: {...} }
+      const items = Array.isArray(json) ? json : Array.isArray(json.data) ? json.data : [];
+  
+      // Normalizar shape al que usa el componente: { id: string, nombre: string }
+      const normalized: Producto[] = items.map((p: any) => ({
+        id: String(p.id ?? p.Id ?? p.ID ?? ""),
+        nombre: String(p.nombre ?? p.Nombre ?? ""),
+      }));
+  
+      setProductos(normalized);
     } catch (error) {
       console.error("Error fetching productos:", error);
+      setProductos([]);
     }
   }, []);
 
