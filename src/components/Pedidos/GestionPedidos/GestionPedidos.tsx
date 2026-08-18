@@ -141,7 +141,7 @@ function GestionPedidos() {
   const [errorBaja, setErrorBaja] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [totalVentas, setTotalVentas] = useState(0);
+  const [, setTotalVentas] = useState(0);
   const [paginationData, setPaginationData] = useState({
     current_page: 1,
     per_page: 10,
