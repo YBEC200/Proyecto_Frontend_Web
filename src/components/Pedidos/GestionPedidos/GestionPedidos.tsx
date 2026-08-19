@@ -184,7 +184,10 @@ function GestionPedidos() {
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(`${API_URL}/api/ventas/stats`, {
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
       });
       if (!res.ok) return;
       const d = await res.json();
@@ -208,11 +211,11 @@ function GestionPedidos() {
   const fetchVentas = async () => {
     setLoading(true);
     setError("");
-  
+
     try {
       const token = localStorage.getItem("token");
       const params = new URLSearchParams();
-  
+
       if (appliedFilters.searchTerm)
         params.append("nombre_cliente", appliedFilters.searchTerm);
       if (appliedFilters.status) params.append("estado", appliedFilters.status);
@@ -220,14 +223,14 @@ function GestionPedidos() {
         params.append("fecha_inicio", appliedFilters.dateStart);
       if (appliedFilters.dateEnd)
         params.append("fecha_fin", appliedFilters.dateEnd);
-  
+
       // enviar la página actual
       params.append("page", String(currentPage));
       // opcional: params.append("per_page","10");
-  
+
       // Obtener usuarios primero para mapping
       const usuariosMap = await fetchUsuarios();
-  
+
       const response = await fetch(
         `${API_URL}/api/ventas?${params.toString()}`,
         {
@@ -237,22 +240,27 @@ function GestionPedidos() {
           },
         },
       );
-  
+
       if (!response.ok) {
         setVentas([]);
         setError("Error al cargar las ventas");
         return;
       }
-  
+
       const data = await response.json();
-  
+
       // data puede ser array (legacy) o objeto paginado { data, pagination }
-      const items = Array.isArray(data) ? data : Array.isArray(data.data) ? data.data : [];
-  
+      const items = Array.isArray(data)
+        ? data
+        : Array.isArray(data.data)
+          ? data.data
+          : [];
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const normalizedData = items.map((item: any) => {
         const userId = item.id_usuario || item.Id_Usuario;
         const userName = usuariosMap.get(userId) || "Sin cliente";
-  
+
         return {
           id: item.id || item.Id,
           id_usuario: userId,
@@ -276,20 +284,21 @@ function GestionPedidos() {
             id: userId,
             nombre: userName,
             correo:
-              item.user?.correo ||
-              item.user?.Correo ||
-              item.user?.email ||
-              "",
+              item.user?.correo || item.user?.Correo || item.user?.email || "",
             rol: item.user?.rol || item.user?.Rol || "",
             estado: item.user?.estado || item.user?.Estado || "",
           },
-          direction: item.direction ? { /* normalizar si necesitas */ } : null,
+          direction: item.direction
+            ? {
+                /* normalizar si necesitas */
+              }
+            : null,
           details: Array.isArray(item.details) ? item.details : [],
         };
       });
-  
+
       setVentas(normalizedData);
-  
+
       // si la respuesta trae paginación, úsala
       if (!Array.isArray(data) && data.pagination) {
         setPaginationData(data.pagination);
@@ -590,9 +599,9 @@ function GestionPedidos() {
   // NUEVA FUNCIÓN: Aplicar filtros (se ejecuta solo cuando el usuario hace clic)
   const handleApplyFilters = () => {
     if (loading) return;
-  
+
     setCurrentPage(1); // resetear a la primera página al aplicar filtros
-  
+
     setAppliedFilters({
       searchTerm: searchInput.trim(),
       status: filterStatusInput,
@@ -626,7 +635,7 @@ function GestionPedidos() {
   useEffect(() => {
     fetchVentas();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appliedFilters, currentPage])
+  }, [appliedFilters, currentPage]);
 
   // Función para formatear fecha
   const formatFecha = (fecha: string) => {
@@ -1123,12 +1132,27 @@ function GestionPedidos() {
                   {!loading && ventas.length > 0 && (
                     <div className="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
                       <div className="text-muted small">
-                        Mostrando <strong>{(paginationData.current_page - 1) * paginationData.per_page + 1}</strong> a{" "}
-                        <strong>{Math.min(paginationData.current_page * paginationData.per_page, paginationData.total)}</strong> de <strong>{paginationData.total}</strong> ventas
+                        Mostrando{" "}
+                        <strong>
+                          {(paginationData.current_page - 1) *
+                            paginationData.per_page +
+                            1}
+                        </strong>{" "}
+                        a{" "}
+                        <strong>
+                          {Math.min(
+                            paginationData.current_page *
+                              paginationData.per_page,
+                            paginationData.total,
+                          )}
+                        </strong>{" "}
+                        de <strong>{paginationData.total}</strong> ventas
                       </div>
                       <nav aria-label="Paginación">
                         <ul className="pagination mb-0">
-                          <li className={`page-item ${!paginationData.has_prev ? "disabled" : ""}`}>
+                          <li
+                            className={`page-item ${!paginationData.has_prev ? "disabled" : ""}`}
+                          >
                             <button
                               className="page-link"
                               onClick={() => setCurrentPage(currentPage - 1)}
@@ -1137,24 +1161,32 @@ function GestionPedidos() {
                               Anterior
                             </button>
                           </li>
-                  
-                          {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-                            const pageNum = Math.max(1, currentPage - 2) + i;
-                            if (pageNum > totalPages) return null;
-                            return (
-                              <li key={pageNum} className={`page-item ${currentPage === pageNum ? "active" : ""}`}>
-                                <button
-                                  className="page-link"
-                                  onClick={() => setCurrentPage(pageNum)}
-                                  disabled={loading}
+
+                          {Array.from(
+                            { length: Math.min(totalPages, 5) },
+                            (_, i) => {
+                              const pageNum = Math.max(1, currentPage - 2) + i;
+                              if (pageNum > totalPages) return null;
+                              return (
+                                <li
+                                  key={pageNum}
+                                  className={`page-item ${currentPage === pageNum ? "active" : ""}`}
                                 >
-                                  {pageNum}
-                                </button>
-                              </li>
-                            );
-                          })}
-                  
-                          <li className={`page-item ${!paginationData.has_next ? "disabled" : ""}`}>
+                                  <button
+                                    className="page-link"
+                                    onClick={() => setCurrentPage(pageNum)}
+                                    disabled={loading}
+                                  >
+                                    {pageNum}
+                                  </button>
+                                </li>
+                              );
+                            },
+                          )}
+
+                          <li
+                            className={`page-item ${!paginationData.has_next ? "disabled" : ""}`}
+                          >
                             <button
                               className="page-link"
                               onClick={() => setCurrentPage(currentPage + 1)}

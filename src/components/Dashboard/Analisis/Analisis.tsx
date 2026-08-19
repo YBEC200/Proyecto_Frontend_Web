@@ -70,6 +70,9 @@ function Analisis() {
   const [totalClientes, setTotalClientes] = useState<number>(0);
   const [gananciasMes, setGananciasMes] = useState<number>(0);
   const [gananciasMesNombre, setGananciasMesNombre] = useState<string>("");
+  const [tiposPago, setTiposPago] = useState<
+    { metodo: string; count: number }[]
+  >([]);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -233,70 +236,67 @@ function Analisis() {
     }
   }, [selectedCategoryId, fetchLotesActivosPorCategoria]);
 
-  // Obtener ventas (para gráficos de clientes y tipo de pago)
-  const fetchVentas = useCallback(async () => {
-    setLoadingClientes(true);
-    setLoadingPagos(true);
+  const fetchVentasEntregadas = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(`${API_URL}/api/ventas`, {
-        headers: {
-          Authorization: token ? `Bearer ${token}` : "",
-          "Content-Type": "application/json",
+
+      const response = await fetch(
+        `${API_URL}/api/estadisticas/ventas-entregadas?year=${selectedYear}`,
+        {
+          headers: {
+            Authorization: token ? `Bearer ${token}` : "",
+            "Content-Type": "application/json",
+          },
         },
-      });
+      );
 
       if (!response.ok) {
-        setVentas([]);
-        setLoadingClientes(false);
-        setLoadingPagos(false);
+        setVentasEntregadasAnio(0);
         return;
       }
 
       const data = await response.json();
+      setVentasEntregadasAnio(Number(data.cantidad ?? 0));
+    } catch (error) {
+      console.error("Error obteniendo ventas entregadas:", error);
+      setVentasEntregadasAnio(0);
+    }
+  }, [selectedYear]);
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const normalized = (Array.isArray(data) ? data : []).map((item: any) => ({
-        id: item.id || item.Id,
-        metodo_pago: item.metodo_pago || item.Metodo_Pago,
-        fecha: item.Fecha || item.fecha || item.created_at || null,
-        estado: (item.estado || item.Estado || "").toString(),
-        user: {
-          id: item.id_usuario || item.Id_Usuario,
-          nombre:
-            item.user?.nombre ||
-            item.nombre_cliente ||
-            item.nombre ||
-            item.user?.Nombre ||
-            "Sin cliente",
+  const fetchClientesTop = useCallback(async () => {
+    setLoadingClientes(true);
+
+    try {
+      const token = localStorage.getItem("token");
+
+      const response = await fetch(
+        `${API_URL}/api/estadisticas/clientes-top?limit=10`,
+        {
+          headers: {
+            Authorization: token ? `Bearer ${token}` : "",
+            "Content-Type": "application/json",
+          },
         },
-      }));
+      );
 
-      setVentas(normalized);
-
-      try {
-        // Calcular ventas entregadas del año seleccionado
-        const year = selectedYear;
-        const deliveredCount = normalized.filter((v) => {
-          if (!v.fecha) return false;
-          const d = new Date(v.fecha);
-          const y = d.getFullYear();
-          return y === year && String(v.estado).toLowerCase() === "entregado";
-        }).length;
-        setVentasEntregadasAnio(deliveredCount);
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      } catch (err) {
-        // en caso de fechas inesperadas no bloqueamos el flujo
-        setVentasEntregadasAnio(0);
-      }
-    } catch (err) {
-      console.error("Error fetching ventas:", err);
+      const data = response.ok ? await response.json() : [];
+      setVentas(
+        Array.isArray(data)
+          ? data.map((cliente) => ({
+              user: {
+                nombre: cliente.nombre || "Sin cliente",
+                count: Number(cliente.count ?? cliente.total_compras ?? 0),
+              },
+            }))
+          : [],
+      );
+    } catch (error) {
+      console.error("Error obteniendo clientes top:", error);
       setVentas([]);
     } finally {
       setLoadingClientes(false);
-      setLoadingPagos(false);
     }
-  }, [selectedYear]);
+  }, []);
 
   // Obtener categorías más vendidas (reemplaza obtenerProductosComprados)
   const fetchCategoriasMasVendidas = useCallback(async () => {
@@ -506,15 +506,43 @@ function Analisis() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [productosComprados, setProductosComprados] = useState<any>(null);
 
+  // --- Datos para gráfico: Tipos de pago ---
+  const fetchTiposPago = useCallback(async () => {
+    setLoadingPagos(true);
+
+    try {
+      const token = localStorage.getItem("token");
+
+      const response = await fetch(`${API_URL}/api/estadisticas/metodos-pago`, {
+        headers: {
+          Authorization: token ? `Bearer ${token}` : "",
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = response.ok ? await response.json() : [];
+      setTiposPago(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Error obteniendo métodos de pago:", error);
+      setTiposPago([]);
+    } finally {
+      setLoadingPagos(false);
+    }
+  }, []);
+
   useEffect(() => {
-    fetchVentas();
+    fetchClientesTop();
+    fetchTiposPago();
+    fetchVentasEntregadas();
     fetchCategoriasMasVendidas();
     fetchVentasPorMes(selectedYear);
     fetchProductoMasVendido();
     fetchContarClientes();
     fetchGananciasAnio(selectedYear);
   }, [
-    fetchVentas,
+    fetchClientesTop,
+    fetchTiposPago,
+    fetchVentasEntregadas,
     fetchCategoriasMasVendidas,
     fetchVentasPorMes,
     fetchProductoMasVendido,
@@ -582,19 +610,15 @@ function Analisis() {
       },
     },
   };
+
   // --- Datos para gráfico: Clientes con más compras ---
   const obtenerClientesTop = (top = 10) => {
-    const map = new Map<string, number>();
-    ventas.forEach((v) => {
-      const nombre = v.user?.nombre || "Sin cliente";
-      map.set(nombre, (map.get(nombre) || 0) + 1);
-    });
-    const arr = Array.from(map.entries()).map(([nombre, count]) => ({
-      nombre,
-      count,
+    const arr = ventas.map((venta) => ({
+      nombre: venta.user?.nombre || "Sin cliente",
+      count: Number(venta.user?.count ?? 0),
     }));
-    arr.sort((a, b) => b.count - a.count);
-    return arr.slice(0, top);
+
+    return arr.sort((a, b) => b.count - a.count).slice(0, top);
   };
 
   const datosClientesTop = obtenerClientesTop(10);
@@ -620,20 +644,7 @@ function Analisis() {
     scales: { x: { beginAtZero: true } },
   };
 
-  // --- Datos para gráfico: Tipos de pago ---
-  const obtenerTiposPago = () => {
-    const map = new Map<string, number>();
-    ventas.forEach((v) => {
-      const metodo = v.metodo_pago || v.metodoPago || "Desconocido";
-      map.set(metodo, (map.get(metodo) || 0) + 1);
-    });
-    return Array.from(map.entries()).map(([metodo, count]) => ({
-      metodo,
-      count,
-    }));
-  };
-
-  const datosTiposPago = obtenerTiposPago();
+  const datosTiposPago = tiposPago;
 
   const coloresTipoPago = [
     "#0d6efd",
@@ -936,7 +947,7 @@ function Analisis() {
     maintainAspectRatio: true,
     plugins: {
       legend: {
-        position: "right" as const,
+        position: "top" as const,
       },
       tooltip: {
         callbacks: {
