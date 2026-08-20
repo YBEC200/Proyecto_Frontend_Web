@@ -644,7 +644,7 @@ export default function AsignarPedidos() {
           if (modalesParalelos) {
             setModalesParalelos(false);
           }
-        }, tiempoEspera);
+        });
       } else {
         console.error("Error guardar dirección:", {
           status: res.status,
@@ -712,7 +712,7 @@ export default function AsignarPedidos() {
         // Cerrar modal después de 4 segundos
         setTimeout(() => {
           setShowModalSuccess(false);
-        }, 4000);
+        });
 
         // Reset básico después de un pequeño delay
         setTimeout(() => {
