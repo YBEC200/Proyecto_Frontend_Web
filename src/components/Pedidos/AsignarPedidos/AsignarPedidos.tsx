@@ -121,6 +121,8 @@ export default function AsignarPedidos() {
   const [direccionExitoData, setDireccionExitoData] = useState<
     Record<string, string>
   >({});
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [isCreatingVenta, setIsCreatingVenta] = useState<boolean>(false);
 
   useEffect(() => {}, [showModalSuccess, showModalError]);
 
@@ -484,60 +486,70 @@ export default function AsignarPedidos() {
 
   // Crear venta y enviar al backend
   async function handleCrearVenta(e?: React.FormEvent<HTMLFormElement>) {
-    if (e) e.preventDefault();
+      if (e) e.preventDefault();
+    
+      if (!validarFormularioVenta()) return;
+    
+      // 1. Bloqueamos los controles e iniciamos el estado de carga
+      setIsCreatingVenta(true);
   
-    if (!validarFormularioVenta()) return;
+      try {
+        const details = rows.map((r) => ({
+          id_producto: Number(r.productoId),
+          cantidad: Number(r.cantidad),
+          costo: Number(r.precioUnit),
+        }));
+      
+        const estadoFinal =
+          tipoEntrega === "Recojo en Tienda" ? "Entregado" : "Pendiente";
+      
+        const payloadBase: Record<string, unknown> = {
+          id_usuario: Number(selectedUsuario),
+          fecha: getFechaActual(),
+          metodo_pago: selectedMetodoPago || null,
+          comprobante: selectedComprobante || null,
+          ruc: selectedComprobante === "Factura" ? ruc : null,
+          tipo_entrega: tipoEntrega,
+          costo_total: Number(total),
+          estado: estadoFinal,
+          details,
+        };
+      
+        // Caso 1: Recojo en tienda (Ejecuta la venta directamente)
+        if (tipoEntrega === "Recojo en Tienda") {
+          const payload = { ...payloadBase, id_direccion: null };
+          await enviarVenta(payload);
+          return; // El 'finally' se encargará de liberar el estado
+        }
+      
+        // Caso 2: Envío a Domicilio y NO hay dirección (Abre el modal de direcciones)
+        if (tipoEntrega === "Envío a Domicilio" && !idDireccion) {
+          setPendingVentaPayload(payloadBase);
+          setShowModalDireccion(true);
+          return; // El 'finally' liberará el botón para que pueda interactuar tras cerrar/completar el modal
+        }
+      
+        // Caso 3: Envío a Domicilio y SÍ hay dirección (Ejecuta la venta directamente)
+        const dirIdNum =
+          idDireccion !== null && idDireccion !== undefined
+            ? Number(idDireccion)
+            : null;
+      
+        const payloadFinal = {
+          ...payloadBase,
+          id_direccion: dirIdNum,
+        };
+      
+        await enviarVenta(payloadFinal);
   
-    const details = rows.map((r) => ({
-      id_producto: Number(r.productoId),
-      cantidad: Number(r.cantidad),
-      costo: Number(r.precioUnit),
-    }));
-  
-    const estadoFinal =
-      tipoEntrega === "Recojo en Tienda" ? "Entregado" : "Pendiente";
-  
-    // Payload base SIN id_direccion para evitar capturar un id inválido
-    const payloadBase: Record<string, unknown> = {
-      id_usuario: Number(selectedUsuario),
-      fecha: getFechaActual(),
-      metodo_pago: selectedMetodoPago || null,
-      comprobante: selectedComprobante || null,
-      ruc: selectedComprobante === "Factura" ? ruc : null,
-      tipo_entrega: tipoEntrega,
-      costo_total: Number(total),
-      estado: estadoFinal,
-      details,
-    };
-  
-    // Si es recojo, no necesitamos id_direccion
-    if (tipoEntrega === "Recojo en Tienda") {
-      const payload = { ...payloadBase, id_direccion: null };
-      await enviarVenta(payload);
-      return;
-    }
-  
-    // Si es envío y NO hay dirección aún, guardamos el payload base (sin id_direccion)
-    // para enviarlo después de crear la dirección en el modal
-    if (tipoEntrega === "Envío a Domicilio" && !idDireccion) {
-      setPendingVentaPayload(payloadBase);
-      setShowModalDireccion(true);
-      return;
-    }
-  
-    // Si ya tenemos idDireccion (string), convertirla a número y enviarla
-    const dirIdNum =
-      idDireccion !== null && idDireccion !== undefined
-        ? Number(idDireccion)
-        : null;
-  
-    const payloadFinal = {
-      ...payloadBase,
-      id_direccion: dirIdNum,
-    };
-  
-    await enviarVenta(payloadFinal);
+      } catch (err) {
+        console.error("Error en el flujo de creación de venta:", err);
+      } finally {
+        // 2. Liberamos los botones de forma segura al finalizar el flujo síncrono/asíncrono
+        setIsCreatingVenta(false);
+      }
   }
+
 
   function handleComprobanteChange(id: string) {
     setSelectedComprobante(id);
@@ -550,130 +562,123 @@ export default function AsignarPedidos() {
 
   // Guardar dirección a través del backend
   async function guardarDireccionSimulada() {
-    const ciudadInput = ciudad;
-    const calleInput =
-      (document.getElementById("calleInput") as HTMLInputElement)?.value || "";
-    const referenciaInput =
-      (document.getElementById("refInput") as HTMLTextAreaElement)?.value || "";
-  
-    if (!ciudadInput.trim()) {
-      alert("La ciudad es obligatoria.");
-      return;
-    }
-    if (!calleInput.trim()) {
-      alert("La calle es obligatoria.");
-      return;
-    }
-  
-    const token = localStorage.getItem("token");
-    const payload = {
-      ciudad: ciudadInput,
-      calle: calleInput,
-      referencia: referenciaInput || null,
-    };
-  
-    try {
-      const res = await fetch(`${API_URL}/api/directions`, {
-        method: "POST",
-        headers: {
-          Authorization: token ? `Bearer ${token}` : "",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-  
-      const body = await res.json().catch(() => null);
-  
-      if (res.ok) {
-        // Extraer id robustamente. Tu controlador devuelve 'id'
-        const posibleId =
-          body?.id ??
-          body?.Id ??
-          body?.data?.id ??
-          body?.data?.Id ??
-          body?.direccion?.id ??
-          null;
-  
-        const direccionId = Number(posibleId);
-  
-        if (!Number.isFinite(direccionId) || direccionId <= 0) {
-          console.error("No se pudo extraer un id válido de la respuesta:", body);
-          alert("La dirección se creó pero no se devolvió un id válido desde el servidor.");
-          return;
-        }
-  
-        // Actualizar estado del componente (puede ser asíncrono)
-        setIdDireccion(String(direccionId));
-        setDireccionTexto(`${ciudadInput}${calleInput ? ", " + calleInput : ""}`);
-  
-        // Mostrar modal de éxito con la info
-        setDireccionExitoData({
-          ciudad: ciudadInput,
-          calle: calleInput,
-          referencia: referenciaInput,
-          id: String(direccionId),
-        });
-  
-        // Aquí NO dependemos de idDireccion en estado (porque setState es async).
-        // Si hay una venta pendiente, la armamos usando el id recién obtenido.
-        if (pendingVentaPayload) {
-          const payloadFinal = {
-            ...pendingVentaPayload,
-            id_direccion: direccionId,
-          };
-          // Intentamos enviar la venta con el id correcto
-          await enviarVenta(payloadFinal);
-          // Limpiamos el payload pendiente
-          if (showModalSuccess) {
-            setModalesParalelos(true);
-          }
-        }
-  
-        // Cerrar modal y limpiar inputs
-        setShowModalDireccion(false);
-        setShowModalDireccionExito(true);
-  
-        (document.getElementById("calleInput") as HTMLInputElement).value = "";
-        (document.getElementById("refInput") as HTMLTextAreaElement).value = "";
-        setCiudad("");
-  
-        // Si hay modales paralelos, sincronizamos el cierre
-        // const tiempoEspera = modalesParalelos ? 4000 : 3000;
-        setTimeout(() => {
-          setShowModalDireccionExito(false);
-          if (modalesParalelos) {
-            setModalesParalelos(false);
-          }
-        });
-      } else {
-        console.error("Error guardar dirección:", {
-          status: res.status,
-          statusText: res.statusText,
-          body,
-        });
-  
-        let errorMsg =
-          body?.message ||
-          body?.error ||
-          `Error ${res.status}: ${res.statusText}`;
-  
-        if (res.status === 404) {
-          errorMsg =
-            "El endpoint de direcciones no existe. Verifica que el backend esté configurado correctamente.";
-        } else if (res.status === 422) {
-          errorMsg =
-            "Datos de validación inválidos: " +
-            JSON.stringify(body?.errors || body);
-        }
-  
-        alert(errorMsg);
+      const ciudadInput = ciudad;
+      const calleInput =
+        (document.getElementById("calleInput") as HTMLInputElement)?.value || "";
+      const referenciaInput =
+        (document.getElementById("refInput") as HTMLTextAreaElement)?.value || "";
+    
+      if (!ciudadInput.trim()) {
+        alert("La ciudad es obligatoria.");
+        return;
       }
-    } catch (err) {
-      console.error("Fetch error guardar dirección:", err);
-      alert(
-        `Error de conexión al guardar la dirección. Verifica que el servidor esté en ${API_URL}`,
-      );
-    }
+      if (!calleInput.trim()) {
+        alert("La calle es obligatoria.");
+        return;
+      }
+    
+      const token = localStorage.getItem("token");
+      const payload = {
+        ciudad: ciudadInput,
+        calle: calleInput,
+        referencia: referenciaInput || null,
+      };
+    
+      // 1. Activamos el estado de carga justo antes de empezar los procesos asíncronos
+      setIsSaving(true);
+  
+      try {
+        const res = await fetch(`${API_URL}/api/directions`, {
+          method: "POST",
+          headers: {
+            Authorization: token ? `Bearer ${token}` : "",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
+    
+        const body = await res.json().catch(() => null);
+    
+        if (res.ok) {
+          const posibleId =
+            body?.id ??
+            body?.Id ??
+            body?.data?.id ??
+            body?.data?.Id ??
+            body?.direccion?.id ??
+            null;
+    
+          const direccionId = Number(posibleId);
+    
+          if (!Number.isFinite(direccionId) || direccionId <= 0) {
+            console.error("No se pudo extraer un id válido de la respuesta:", body);
+            alert("La dirección se creó pero no se devolvió un id válido desde el servidor.");
+            return; // El bloque 'finally' se ejecutará de todas formas y liberará el botón
+          }
+    
+          setIdDireccion(String(direccionId));
+          setDireccionTexto(`${ciudadInput}${calleInput ? ", " + calleInput : ""}`);
+    
+          setDireccionExitoData({
+            ciudad: ciudadInput,
+            calle: calleInput,
+            referencia: referenciaInput,
+            id: String(direccionId),
+          });
+    
+          if (pendingVentaPayload) {
+            const payloadFinal = {
+              ...pendingVentaPayload,
+              id_direccion: direccionId,
+            };
+            // El botón seguirá bloqueado mientras se procesa esta segunda petición:
+            await enviarVenta(payloadFinal);
+            if (showModalSuccess) {
+              setModalesParalelos(true);
+            }
+          }
+    
+          setShowModalDireccion(false);
+          setShowModalDireccionExito(true);
+    
+          (document.getElementById("calleInput") as HTMLInputElement).value = "";
+          (document.getElementById("refInput") as HTMLTextAreaElement).value = "";
+          setCiudad("");
+    
+          setTimeout(() => {
+            setShowModalDireccionExito(false);
+            if (modalesParalelos) {
+              setModalesParalelos(false);
+            }
+          });
+        } else {
+          console.error("Error guardar dirección:", {
+            status: res.status,
+            statusText: res.statusText,
+            body,
+          });
+    
+          let errorMsg =
+            body?.message ||
+            body?.error ||
+            `Error ${res.status}: ${res.statusText}`;
+    
+          if (res.status === 404) {
+            errorMsg = "El endpoint de direcciones no existe. Verifica que el backend esté configurado correctamente.";
+          } else if (res.status === 422) {
+            errorMsg = "Datos de validación inválidos: " + JSON.stringify(body?.errors || body);
+          }
+    
+          alert(errorMsg);
+        }
+      } catch (err) {
+        console.error("Fetch error guardar dirección:", err);
+        alert(`Error de conexión al guardar la dirección. Verifica que el servidor esté en ${API_URL}`);
+      } finally {
+        // 2. El bloque 'finally' se ejecuta SIEMPRE al terminar, falle o funcione la petición.
+        // Aquí desbloqueamos el botón de forma segura.
+        setIsSaving(false);
+      }
   }
 
   async function enviarVenta(payload: Record<string, unknown>) {
@@ -1206,6 +1211,7 @@ export default function AsignarPedidos() {
                                     type="button"
                                     className="btn btn-success btn-sm"
                                     onClick={addRow}
+                                    disabled={isCreatingVenta} // 👈 Evita agregar filas en carga
                                     title="Agregar fila"
                                   >
                                     <i className="bx bx-plus"></i>
@@ -1214,7 +1220,7 @@ export default function AsignarPedidos() {
                                     type="button"
                                     className="btn btn-danger btn-sm"
                                     onClick={() => removeRow(row.id)}
-                                    disabled={rows.length === 1}
+                                    disabled={rows.length === 1 || isCreatingVenta} // 👈 Evita eliminar filas en carga
                                     title="Eliminar fila"
                                   >
                                     <i className="bx bx-minus"></i>
@@ -1236,11 +1242,18 @@ export default function AsignarPedidos() {
                           type="submit"
                           className="btn btn-primary"
                           disabled={
-                            selectedComprobante === "Factura" &&
-                            (!ruc || ruc.length !== 11)
+                            isCreatingVenta || // 👈 Bloquea si está procesando la venta
+                            (selectedComprobante === "Factura" && (!ruc || ruc.length !== 11))
                           }
                         >
-                          Guardar Venta
+                          {isCreatingVenta ? (
+                            <>
+                              <i className="bx bx-loader-alt bx-spin me-1"></i>
+                              Procesando...
+                            </>
+                          ) : (
+                            "Guardar Venta"
+                          )}
                         </button>
                       </div>
                     </div>
@@ -1329,9 +1342,11 @@ export default function AsignarPedidos() {
                       type="button"
                       className="btn btn-primary"
                       onClick={guardarDireccionSimulada}
+                      disabled={isSaving} // 👈 Esto bloquea el botón físicamente
                     >
-                      <i className="bx bx-check me-1"></i>
-                      Guardar Dirección
+                      {/* Cambia el icono dinámicamente si está cargando */}
+                      <i className={isSaving ? "bx bx-loader-alt bx-spin me-1" : "bx bx-check me-1"}></i>
+                      {isSaving ? "Guardando..." : "Guardar Dirección"}
                     </button>
                   </div>
                 </div>
