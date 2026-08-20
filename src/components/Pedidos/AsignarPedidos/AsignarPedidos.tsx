@@ -638,7 +638,7 @@ export default function AsignarPedidos() {
         setCiudad("");
   
         // Si hay modales paralelos, sincronizamos el cierre
-        const tiempoEspera = modalesParalelos ? 4000 : 3000;
+        // const tiempoEspera = modalesParalelos ? 4000 : 3000;
         setTimeout(() => {
           setShowModalDireccionExito(false);
           if (modalesParalelos) {
