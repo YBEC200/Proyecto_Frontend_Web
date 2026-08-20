@@ -106,7 +106,9 @@ export default function AsignarPedidos() {
   const [showModalDireccionExito, setShowModalDireccionExito] = useState(false);
   const [showModalDuplicado, setShowModalDuplicado] = useState(false);
   const [showModalValidacion, setShowModalValidacion] = useState(false);
+  const [modalesParalelos, setModalesParalelos] = useState(false);
   const [erroresValidacion, setErroresValidacion] = useState<string[]>([]);
+
   const [successMessage, setSuccessMessage] = useState("");
   const [successData, setSuccessData] = useState<Record<string, unknown>>({});
   const [errorMessage, setErrorMessage] = useState("");
@@ -622,7 +624,9 @@ export default function AsignarPedidos() {
           // Intentamos enviar la venta con el id correcto
           await enviarVenta(payloadFinal);
           // Limpiamos el payload pendiente
-          setPendingVentaPayload(null);
+          if (showModalSuccess) {
+            setModalesParalelos(true);
+          }
         }
   
         // Cerrar modal y limpiar inputs
@@ -633,9 +637,14 @@ export default function AsignarPedidos() {
         (document.getElementById("refInput") as HTMLTextAreaElement).value = "";
         setCiudad("");
   
+        // Si hay modales paralelos, sincronizamos el cierre
+        const tiempoEspera = modalesParalelos ? 4000 : 3000;
         setTimeout(() => {
           setShowModalDireccionExito(false);
-        }, 3000);
+          if (modalesParalelos) {
+            setModalesParalelos(false);
+          }
+        }, tiempoEspera);
       } else {
         console.error("Error guardar dirección:", {
           status: res.status,
@@ -1336,121 +1345,231 @@ export default function AsignarPedidos() {
               showModalDireccionExito) && (
               <div
                 className="modal-backdrop fade show"
-                style={{ zIndex: 1040 }}
+                style={{ 
+                  zIndex: 1040,
+                  opacity: modalesParalelos ? 0.8 : 0.5 // Más oscuro si hay 2 modales
+                }}
                 onClick={() => {
-                  if (showModalSuccess) setShowModalSuccess(false);
-                  if (showModalError) setShowModalError(false);
-                  if (showModalDireccion) setShowModalDireccion(false);
-                  if (showModalDireccionExito)
-                    setShowModalDireccionExito(false);
+                  // Solo cerrar si hay un único modal (no paralelos)
+                  if (!modalesParalelos) {
+                    if (showModalSuccess) setShowModalSuccess(false);
+                    if (showModalError) setShowModalError(false);
+                    if (showModalDireccion) setShowModalDireccion(false);
+                    if (showModalDireccionExito)
+                      setShowModalDireccionExito(false);
+                  }
                 }}
               ></div>
             )}
 
             {/* Modal Éxito - Venta */}
-            <div
-              className={`modal fade ${showModalSuccess ? "show" : ""}`}
-              id="modalSuccess"
-              tabIndex={-1}
-              inert={!showModalSuccess}
-              style={{
-                display: showModalSuccess ? "block" : "none",
-                zIndex: 1050,
-              }}
-            >
-              <div className="modal-dialog modal-dialog-centered">
-                <div className="modal-content border-success shadow-lg">
-                  <div className="modal-header bg-success text-white">
-                    <h5 className="modal-title">
-                      <i
-                        className="bx bx-check-circle me-2"
-                        style={{ fontSize: "1.5rem" }}
-                      ></i>
-                      ¡Venta Registrada Exitosamente!
-                    </h5>
-                  </div>
-                  <div className="modal-body">
-                    <div className="alert alert-success-light mb-3">
-                      <p className="mb-0 text-success fw-bold">
-                        {successMessage}
-                      </p>
-                    </div>
+            {(showModalSuccess || showModalDireccionExito) && (
+              <div
+                style={{
+                  position: "fixed",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "2rem",
+                  zIndex: 1050,
+                  pointerEvents: "none",
+                  flexWrap: "wrap",
+                }}
+              >
+                {/* Modal Éxito - Venta */}
+                {showModalSuccess && (
+                  <div
+                    style={{
+                      pointerEvents: "auto",
+                      maxWidth: modalesParalelos ? "500px" : "100%",
+                      width: modalesParalelos ? "45vw" : "90vw",
+                    }}
+                  >
+                    <div className="modal fade show" style={{ display: "block" }}>
+                      <div className="modal-dialog modal-dialog-centered">
+                        <div className="modal-content border-success shadow-lg">
+                          <div className="modal-header bg-success text-white">
+                            <h5 className="modal-title">
+                              <i
+                                className="bx bx-check-circle me-2"
+                                style={{ fontSize: "1.5rem" }}
+                              ></i>
+                              ¡Venta Registrada Exitosamente!
+                            </h5>
+                          </div>
+                          <div className="modal-body">
+                            <div className="alert alert-success-light mb-3">
+                              <p className="mb-0 text-success fw-bold">
+                                {successMessage}
+                              </p>
+                            </div>
 
-                    {Object.entries(successData).length > 0 && (
-                      <div className="success-details">
-                        <h6 className="mb-3">Detalles de la venta:</h6>
-                        <table className="table table-sm table-borderless">
-                          <tbody>
-                            {Object.entries(successData).map(([key, value]) => (
-                              <tr key={key}>
-                                <td
-                                  className="fw-bold"
-                                  style={{ width: "40%" }}
-                                >
-                                  {key === "usuario"
-                                    ? "Cliente"
-                                    : key === "metodo_pago"
-                                      ? "Método Pago"
-                                      : key === "cantidad_items"
-                                        ? "Items"
-                                        : key === "total"
-                                          ? "Total (S/)"
-                                          : key === "estado"
-                                            ? "Estado"
-                                            : key === "fecha"
-                                              ? "Fecha"
-                                              : key === "comprobante"
-                                                ? "Comprobante"
-                                                : key}
-                                  :
-                                </td>
-                                <td className="text-end">
-                                  {key === "total"
-                                    ? `${Number(value).toFixed(2)}`
-                                    : String(value)}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                    {qrToken && (
-                      <div className="mt-4 d-flex justify-content-center">
-                        <div className="text-center">
-                          <h6 className="fw-bold mb-2">
-                            📦 Código QR para validación de entrega
-                          </h6>
+                            {Object.entries(successData).length > 0 && (
+                              <div className="success-details">
+                                <h6 className="mb-3">Detalles de la venta:</h6>
+                                <table className="table table-sm table-borderless">
+                                  <tbody>
+                                    {Object.entries(successData).map(
+                                      ([key, value]) => (
+                                        <tr key={key}>
+                                          <td
+                                            className="fw-bold"
+                                            style={{ width: "40%" }}
+                                          >
+                                            {key === "usuario"
+                                              ? "Cliente"
+                                              : key === "metodo_pago"
+                                                ? "Método Pago"
+                                                : key === "cantidad_items"
+                                                  ? "Items"
+                                                  : key === "total"
+                                                    ? "Total (S/)"
+                                                    : key === "estado"
+                                                      ? "Estado"
+                                                      : key === "fecha"
+                                                        ? "Fecha"
+                                                        : key === "comprobante"
+                                                          ? "Comprobante"
+                                                          : key}
+                                            :
+                                          </td>
+                                          <td className="text-end">
+                                            {key === "total"
+                                              ? `${Number(value).toFixed(2)}`
+                                              : String(value)}
+                                          </td>
+                                        </tr>
+                                      ),
+                                    )}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                            {qrToken && (
+                              <div className="mt-4 d-flex justify-content-center">
+                                <div className="text-center">
+                                  <h6 className="fw-bold mb-2">
+                                    📦 Código QR para validación
+                                  </h6>
 
-                          <QRCodeCanvas
-                            value={qrToken} // 👈 EL TOKEN SE CONVIERTE EN QR
-                            size={180}
-                            bgColor="#ffffff"
-                            fgColor="#000000"
-                            level="H"
-                            includeMargin={true}
-                          />
+                                  <QRCodeCanvas
+                                    value={qrToken}
+                                    size={120}
+                                    bgColor="#ffffff"
+                                    fgColor="#000000"
+                                    level="H"
+                                    includeMargin={true}
+                                  />
 
-                          <p className="text-muted small mt-2">
-                            Escanea este código al momento de entregar el pedido
-                          </p>
+                                  <p className="text-muted small mt-2">
+                                    Escanea al entregar
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          <div className="modal-footer">
+                            <button
+                              type="button"
+                              className="btn btn-success"
+                              onClick={() => setShowModalSuccess(false)}
+                            >
+                              <i className="bx bx-check me-1"></i>
+                              Aceptar
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    )}
+                    </div>
                   </div>
-                  <div className="modal-footer">
-                    <button
-                      type="button"
-                      className="btn btn-success"
-                      onClick={() => setShowModalSuccess(false)}
-                    >
-                      <i className="bx bx-check me-1"></i>
-                      Aceptar
-                    </button>
+                )}
+
+                {/* Modal Éxito - Dirección */}
+                {showModalDireccionExito && (
+                  <div
+                    style={{
+                      pointerEvents: "auto",
+                      maxWidth: modalesParalelos ? "500px" : "100%",
+                      width: modalesParalelos ? "45vw" : "90vw",
+                    }}
+                  >
+                    <div className="modal fade show" style={{ display: "block" }}>
+                      <div className="modal-dialog modal-dialog-centered">
+                        <div className="modal-content border-success shadow-lg">
+                          <div className="modal-header bg-success text-white">
+                            <h5 className="modal-title">
+                              <i
+                                className="bx bx-map-pin me-2"
+                                style={{ fontSize: "1.5rem" }}
+                              ></i>
+                              Dirección Guardada
+                            </h5>
+                          </div>
+                          <div className="modal-body">
+                            <div className="alert alert-success-light mb-3">
+                              <p className="mb-0 text-success fw-bold">
+                                ¡Dirección registrada exitosamente!
+                              </p>
+                            </div>
+
+                            {Object.entries(direccionExitoData).length > 0 && (
+                              <div className="direccion-details">
+                                <div className="card bg-light">
+                                  <div className="card-body">
+                                    <p className="mb-2">
+                                      <strong>
+                                        <i className="bx bx-building me-2"></i>
+                                        Ciudad:
+                                      </strong>
+                                      <br />
+                                      <span>{direccionExitoData.ciudad}</span>
+                                    </p>
+                                    <p className="mb-2">
+                                      <strong>
+                                        <i className="bx bx-street-view me-2"></i>
+                                        Calle:
+                                      </strong>
+                                      <br />
+                                      <span>{direccionExitoData.calle}</span>
+                                    </p>
+                                    {direccionExitoData.referencia && (
+                                      <p className="mb-0">
+                                        <strong>
+                                          <i className="bx bx-note me-2"></i>
+                                          Referencia:
+                                        </strong>
+                                        <br />
+                                        <span>
+                                          {direccionExitoData.referencia}
+                                        </span>
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          <div className="modal-footer">
+                            <button
+                              type="button"
+                              className="btn btn-success"
+                              onClick={() => setShowModalDireccionExito(false)}
+                            >
+                              <i className="bx bx-check me-1"></i>
+                              Aceptar
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
-            </div>
+            )}
 
             {/* Modal Error */}
             <div
