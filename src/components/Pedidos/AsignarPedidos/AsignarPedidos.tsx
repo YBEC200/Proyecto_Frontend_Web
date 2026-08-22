@@ -486,70 +486,68 @@ export default function AsignarPedidos() {
 
   // Crear venta y enviar al backend
   async function handleCrearVenta(e?: React.FormEvent<HTMLFormElement>) {
-      if (e) e.preventDefault();
-    
-      if (!validarFormularioVenta()) return;
-    
-      // 1. Bloqueamos los controles e iniciamos el estado de carga
-      setIsCreatingVenta(true);
-  
-      try {
-        const details = rows.map((r) => ({
-          id_producto: Number(r.productoId),
-          cantidad: Number(r.cantidad),
-          costo: Number(r.precioUnit),
-        }));
-      
-        const estadoFinal =
-          tipoEntrega === "Recojo en Tienda" ? "Entregado" : "Pendiente";
-      
-        const payloadBase: Record<string, unknown> = {
-          id_usuario: Number(selectedUsuario),
-          fecha: getFechaActual(),
-          metodo_pago: selectedMetodoPago || null,
-          comprobante: selectedComprobante || null,
-          ruc: selectedComprobante === "Factura" ? ruc : null,
-          tipo_entrega: tipoEntrega,
-          costo_total: Number(total),
-          estado: estadoFinal,
-          details,
-        };
-      
-        // Caso 1: Recojo en tienda (Ejecuta la venta directamente)
-        if (tipoEntrega === "Recojo en Tienda") {
-          const payload = { ...payloadBase, id_direccion: null };
-          await enviarVenta(payload);
-          return; // El 'finally' se encargará de liberar el estado
-        }
-      
-        // Caso 2: Envío a Domicilio y NO hay dirección (Abre el modal de direcciones)
-        if (tipoEntrega === "Envío a Domicilio" && !idDireccion) {
-          setPendingVentaPayload(payloadBase);
-          setShowModalDireccion(true);
-          return; // El 'finally' liberará el botón para que pueda interactuar tras cerrar/completar el modal
-        }
-      
-        // Caso 3: Envío a Domicilio y SÍ hay dirección (Ejecuta la venta directamente)
-        const dirIdNum =
-          idDireccion !== null && idDireccion !== undefined
-            ? Number(idDireccion)
-            : null;
-      
-        const payloadFinal = {
-          ...payloadBase,
-          id_direccion: dirIdNum,
-        };
-      
-        await enviarVenta(payloadFinal);
-  
-      } catch (err) {
-        console.error("Error en el flujo de creación de venta:", err);
-      } finally {
-        // 2. Liberamos los botones de forma segura al finalizar el flujo síncrono/asíncrono
-        setIsCreatingVenta(false);
-      }
-  }
+    if (e) e.preventDefault();
 
+    if (!validarFormularioVenta()) return;
+
+    // 1. Bloqueamos los controles e iniciamos el estado de carga
+    setIsCreatingVenta(true);
+
+    try {
+      const details = rows.map((r) => ({
+        id_producto: Number(r.productoId),
+        cantidad: Number(r.cantidad),
+        costo: Number(r.precioUnit),
+      }));
+
+      const estadoFinal =
+        tipoEntrega === "Recojo en Tienda" ? "Entregado" : "Pendiente";
+
+      const payloadBase: Record<string, unknown> = {
+        id_usuario: Number(selectedUsuario),
+        fecha: getFechaActual(),
+        metodo_pago: selectedMetodoPago || null,
+        comprobante: selectedComprobante || null,
+        ruc: selectedComprobante === "Factura" ? ruc : null,
+        tipo_entrega: tipoEntrega,
+        costo_total: Number(total),
+        estado: estadoFinal,
+        details,
+      };
+
+      // Caso 1: Recojo en tienda (Ejecuta la venta directamente)
+      if (tipoEntrega === "Recojo en Tienda") {
+        const payload = { ...payloadBase, id_direccion: null };
+        await enviarVenta(payload);
+        return; // El 'finally' se encargará de liberar el estado
+      }
+
+      // Caso 2: Envío a Domicilio y NO hay dirección (Abre el modal de direcciones)
+      if (tipoEntrega === "Envío a Domicilio" && !idDireccion) {
+        setPendingVentaPayload(payloadBase);
+        setShowModalDireccion(true);
+        return; // El 'finally' liberará el botón para que pueda interactuar tras cerrar/completar el modal
+      }
+
+      // Caso 3: Envío a Domicilio y SÍ hay dirección (Ejecuta la venta directamente)
+      const dirIdNum =
+        idDireccion !== null && idDireccion !== undefined
+          ? Number(idDireccion)
+          : null;
+
+      const payloadFinal = {
+        ...payloadBase,
+        id_direccion: dirIdNum,
+      };
+
+      await enviarVenta(payloadFinal);
+    } catch (err) {
+      console.error("Error en el flujo de creación de venta:", err);
+    } finally {
+      // 2. Liberamos los botones de forma segura al finalizar el flujo síncrono/asíncrono
+      setIsCreatingVenta(false);
+    }
+  }
 
   function handleComprobanteChange(id: string) {
     setSelectedComprobante(id);
@@ -562,123 +560,128 @@ export default function AsignarPedidos() {
 
   // Guardar dirección a través del backend
   async function guardarDireccionSimulada() {
-      const ciudadInput = ciudad;
-      const calleInput =
-        (document.getElementById("calleInput") as HTMLInputElement)?.value || "";
-      const referenciaInput =
-        (document.getElementById("refInput") as HTMLTextAreaElement)?.value || "";
-    
-      if (!ciudadInput.trim()) {
-        alert("La ciudad es obligatoria.");
-        return;
-      }
-      if (!calleInput.trim()) {
-        alert("La calle es obligatoria.");
-        return;
-      }
-    
-      const token = localStorage.getItem("token");
-      const payload = {
-        ciudad: ciudadInput,
-        calle: calleInput,
-        referencia: referenciaInput || null,
-      };
-    
-      // 1. Activamos el estado de carga justo antes de empezar los procesos asíncronos
-      setIsSaving(true);
-  
-      try {
-        const res = await fetch(`${API_URL}/api/directions`, {
-          method: "POST",
-          headers: {
-            Authorization: token ? `Bearer ${token}` : "",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-        });
-    
-        const body = await res.json().catch(() => null);
-    
-        if (res.ok) {
-          const posibleId =
-            body?.id ??
-            body?.Id ??
-            body?.data?.id ??
-            body?.data?.Id ??
-            body?.direccion?.id ??
-            null;
-    
-          const direccionId = Number(posibleId);
-    
-          if (!Number.isFinite(direccionId) || direccionId <= 0) {
-            console.error("No se pudo extraer un id válido de la respuesta:", body);
-            alert("La dirección se creó pero no se devolvió un id válido desde el servidor.");
-            return; // El bloque 'finally' se ejecutará de todas formas y liberará el botón
-          }
-    
-          setIdDireccion(String(direccionId));
-          setDireccionTexto(`${ciudadInput}${calleInput ? ", " + calleInput : ""}`);
-    
-          setDireccionExitoData({
-            ciudad: ciudadInput,
-            calle: calleInput,
-            referencia: referenciaInput,
-            id: String(direccionId),
-          });
-    
-          if (pendingVentaPayload) {
-            const payloadFinal = {
-              ...pendingVentaPayload,
-              id_direccion: direccionId,
-            };
-            // El botón seguirá bloqueado mientras se procesa esta segunda petición:
-            await enviarVenta(payloadFinal);
-            if (showModalSuccess) {
-              setModalesParalelos(true);
-            }
-          }
-    
-          setShowModalDireccion(false);
-          setShowModalDireccionExito(true);
-    
-          (document.getElementById("calleInput") as HTMLInputElement).value = "";
-          (document.getElementById("refInput") as HTMLTextAreaElement).value = "";
-          setCiudad("");
-    
-          setTimeout(() => {
-            setShowModalDireccionExito(false);
-            if (modalesParalelos) {
-              setModalesParalelos(false);
-            }
-          });
-        } else {
-          console.error("Error guardar dirección:", {
-            status: res.status,
-            statusText: res.statusText,
+    const ciudadInput = ciudad;
+    const calleInput =
+      (document.getElementById("calleInput") as HTMLInputElement)?.value || "";
+    const referenciaInput =
+      (document.getElementById("refInput") as HTMLTextAreaElement)?.value || "";
+
+    if (!ciudadInput.trim()) {
+      alert("La ciudad es obligatoria.");
+      return;
+    }
+    if (!calleInput.trim()) {
+      alert("La calle es obligatoria.");
+      return;
+    }
+
+    const token = localStorage.getItem("token");
+    const payload = {
+      ciudad: ciudadInput,
+      calle: calleInput,
+      referencia: referenciaInput || null,
+    };
+
+    // 1. Activamos el estado de carga justo antes de empezar los procesos asíncronos
+    setIsSaving(true);
+
+    try {
+      const res = await fetch(`${API_URL}/api/directions`, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          Authorization: token ? `Bearer ${token}` : "",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const body = await res.json().catch(() => null);
+
+      if (res.ok) {
+        const posibleId =
+          body?.id ??
+          body?.Id ??
+          body?.data?.id ??
+          body?.data?.Id ??
+          body?.direccion?.id ??
+          null;
+
+        const direccionId = Number(posibleId);
+
+        if (!Number.isFinite(direccionId) || direccionId <= 0) {
+          console.error(
+            "No se pudo extraer un id válido de la respuesta:",
             body,
-          });
-    
-          let errorMsg =
-            body?.message ||
-            body?.error ||
-            `Error ${res.status}: ${res.statusText}`;
-    
-          if (res.status === 404) {
-            errorMsg = "El endpoint de direcciones no existe. Verifica que el backend esté configurado correctamente.";
-          } else if (res.status === 422) {
-            errorMsg = "Datos de validación inválidos: " + JSON.stringify(body?.errors || body);
-          }
-    
-          alert(errorMsg);
+          );
+          alert(
+            "La dirección se creó pero no se devolvió un id válido desde el servidor.",
+          );
+          return; // El bloque 'finally' se ejecutará de todas formas y liberará el botón
         }
-      } catch (err) {
-        console.error("Fetch error guardar dirección:", err);
-        alert(`Error de conexión al guardar la dirección. Verifica que el servidor esté en ${API_URL}`);
-      } finally {
-        // 2. El bloque 'finally' se ejecuta SIEMPRE al terminar, falle o funcione la petición.
-        // Aquí desbloqueamos el botón de forma segura.
-        setIsSaving(false);
+
+        setIdDireccion(String(direccionId));
+        setDireccionTexto(
+          `${ciudadInput}${calleInput ? ", " + calleInput : ""}`,
+        );
+
+        setDireccionExitoData({
+          ciudad: ciudadInput,
+          calle: calleInput,
+          referencia: referenciaInput,
+          id: String(direccionId),
+        });
+
+        if (pendingVentaPayload) {
+          const payloadFinal = {
+            ...pendingVentaPayload,
+            id_direccion: direccionId,
+          };
+          // El botón seguirá bloqueado mientras se procesa esta segunda petición:
+          await enviarVenta(payloadFinal);
+
+          setModalesParalelos(true);
+        }
+
+        setShowModalDireccion(false);
+        setShowModalDireccionExito(true);
+
+        (document.getElementById("calleInput") as HTMLInputElement).value = "";
+        (document.getElementById("refInput") as HTMLTextAreaElement).value = "";
+        setCiudad("");
+      } else {
+        console.error("Error guardar dirección:", {
+          status: res.status,
+          statusText: res.statusText,
+          body,
+        });
+
+        let errorMsg =
+          body?.message ||
+          body?.error ||
+          `Error ${res.status}: ${res.statusText}`;
+
+        if (res.status === 404) {
+          errorMsg =
+            "El endpoint de direcciones no existe. Verifica que el backend esté configurado correctamente.";
+        } else if (res.status === 422) {
+          errorMsg =
+            "Datos de validación inválidos: " +
+            JSON.stringify(body?.errors || body);
+        }
+
+        alert(errorMsg);
       }
+    } catch (err) {
+      console.error("Fetch error guardar dirección:", err);
+      alert(
+        `Error de conexión al guardar la dirección. Verifica que el servidor esté en ${API_URL}`,
+      );
+    } finally {
+      // 2. El bloque 'finally' se ejecuta SIEMPRE al terminar, falle o funcione la petición.
+      // Aquí desbloqueamos el botón de forma segura.
+      setIsSaving(false);
+    }
   }
 
   async function enviarVenta(payload: Record<string, unknown>) {
@@ -714,35 +717,17 @@ export default function AsignarPedidos() {
         setSuccessMessage("¡Venta creada correctamente!");
         setShowModalSuccess(true);
 
-        // Cerrar modal después de 4 segundos
-        setTimeout(() => {
-          setShowModalSuccess(false);
-        });
-
         // Reset básico después de un pequeño delay
-        setTimeout(() => {
-          setRows([
-            {
-              id: "r" + Date.now(),
-              productoId: "",
-              cantidad: 1,
-              precioUnit: 0,
-              subtotal: 0,
-            },
-          ]);
-          setTotal(0);
-          setSelectedUsuario("");
-          setIdDireccion(null);
-          setDireccionTexto("");
-          setCiudad("");
-          setCalle("");
-          setReferencia("");
-          setSelectedMetodoPago("");
-          setSelectedComprobante("");
-          setRuc("");
-          // Estado y fecha son automáticos, no se resetean
-          setTipoEntrega("Envío a Domicilio");
-        }, 500);
+
+        setRows([
+          {
+            id: "r" + Date.now(),
+            productoId: "",
+            cantidad: 1,
+            precioUnit: 0,
+            subtotal: 0,
+          },
+        ]);
       } else {
         console.error("Error crear venta:", body);
 
@@ -1220,7 +1205,9 @@ export default function AsignarPedidos() {
                                     type="button"
                                     className="btn btn-danger btn-sm"
                                     onClick={() => removeRow(row.id)}
-                                    disabled={rows.length === 1 || isCreatingVenta} // 👈 Evita eliminar filas en carga
+                                    disabled={
+                                      rows.length === 1 || isCreatingVenta
+                                    } // 👈 Evita eliminar filas en carga
                                     title="Eliminar fila"
                                   >
                                     <i className="bx bx-minus"></i>
@@ -1243,7 +1230,8 @@ export default function AsignarPedidos() {
                           className="btn btn-primary"
                           disabled={
                             isCreatingVenta || // 👈 Bloquea si está procesando la venta
-                            (selectedComprobante === "Factura" && (!ruc || ruc.length !== 11))
+                            (selectedComprobante === "Factura" &&
+                              (!ruc || ruc.length !== 11))
                           }
                         >
                           {isCreatingVenta ? (
@@ -1345,7 +1333,13 @@ export default function AsignarPedidos() {
                       disabled={isSaving} // 👈 Esto bloquea el botón físicamente
                     >
                       {/* Cambia el icono dinámicamente si está cargando */}
-                      <i className={isSaving ? "bx bx-loader-alt bx-spin me-1" : "bx bx-check me-1"}></i>
+                      <i
+                        className={
+                          isSaving
+                            ? "bx bx-loader-alt bx-spin me-1"
+                            : "bx bx-check me-1"
+                        }
+                      ></i>
                       {isSaving ? "Guardando..." : "Guardar Dirección"}
                     </button>
                   </div>
@@ -1359,10 +1353,11 @@ export default function AsignarPedidos() {
               showModalDireccion ||
               showModalDireccionExito) && (
               <div
-                className="modal-backdrop fade show"
-                style={{ 
+                style={{
+                  position: "fixed",
+                  inset: 0,
+                  backgroundColor: "rgba(0, 0, 0, 0.5)",
                   zIndex: 1040,
-                  opacity: modalesParalelos ? 0.8 : 0.5 // Más oscuro si hay 2 modales
                 }}
                 onClick={() => {
                   // Solo cerrar si hay un único modal (no paralelos)
@@ -1382,17 +1377,15 @@ export default function AsignarPedidos() {
               <div
                 style={{
                   position: "fixed",
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
+                  inset: 0,
                   display: "flex",
+                  flexDirection: "row",
                   alignItems: "center",
                   justifyContent: "center",
-                  gap: "2rem",
+                  gap: "20px",
                   zIndex: 1050,
                   pointerEvents: "none",
-                  flexWrap: "wrap",
+                  flexWrap: "nowrap",
                 }}
               >
                 {/* Modal Éxito - Venta */}
@@ -1400,11 +1393,21 @@ export default function AsignarPedidos() {
                   <div
                     style={{
                       pointerEvents: "auto",
-                      maxWidth: modalesParalelos ? "500px" : "100%",
-                      width: modalesParalelos ? "45vw" : "90vw",
+                      width: modalesParalelos ? "45vw" : "min(90vw, 500px)",
+                      maxWidth: "500px",
                     }}
                   >
-                    <div className="modal fade show" style={{ display: "block" }}>
+                    <div
+                      className="modal fade show"
+                      style={{
+                        display: "block",
+                        position: "relative",
+                        width: "auto",
+                        height: "auto",
+                        overflow: "unset",
+                        zIndex: 1050,
+                      }}
+                    >
                       <div className="modal-dialog modal-dialog-centered">
                         <div className="modal-content border-success shadow-lg">
                           <div className="modal-header bg-success text-white">
@@ -1491,7 +1494,31 @@ export default function AsignarPedidos() {
                             <button
                               type="button"
                               className="btn btn-success"
-                              onClick={() => setShowModalSuccess(false)}
+                              onClick={() => {
+                                setShowModalSuccess(false);
+
+                                setRows([
+                                  {
+                                    id: "r" + Date.now(),
+                                    productoId: "",
+                                    cantidad: 1,
+                                    precioUnit: 0,
+                                    subtotal: 0,
+                                  },
+                                ]);
+
+                                setTotal(0);
+                                setSelectedUsuario("");
+                                setIdDireccion(null);
+                                setDireccionTexto("");
+                                setCiudad("");
+                                setCalle("");
+                                setReferencia("");
+                                setSelectedMetodoPago("");
+                                setSelectedComprobante("");
+                                setRuc("");
+                                setTipoEntrega("Envío a Domicilio");
+                              }}
                             >
                               <i className="bx bx-check me-1"></i>
                               Aceptar
@@ -1508,11 +1535,21 @@ export default function AsignarPedidos() {
                   <div
                     style={{
                       pointerEvents: "auto",
-                      maxWidth: modalesParalelos ? "500px" : "100%",
-                      width: modalesParalelos ? "45vw" : "90vw",
+                      width: modalesParalelos ? "45vw" : "min(90vw, 500px)",
+                      maxWidth: "500px",
                     }}
                   >
-                    <div className="modal fade show" style={{ display: "block" }}>
+                    <div
+                      className="modal fade show"
+                      style={{
+                        display: "block",
+                        position: "relative",
+                        width: "auto",
+                        height: "auto",
+                        overflow: "unset",
+                        zIndex: 1050,
+                      }}
+                    >
                       <div className="modal-dialog modal-dialog-centered">
                         <div className="modal-content border-success shadow-lg">
                           <div className="modal-header bg-success text-white">
@@ -1735,84 +1772,6 @@ export default function AsignarPedidos() {
                     >
                       <i className="bx bx-x me-1"></i>
                       Cerrar
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Modal Éxito - Dirección */}
-            <div
-              className={`modal fade ${showModalDireccionExito ? "show" : ""}`}
-              id="modalDireccionExito"
-              tabIndex={-1}
-              inert={!showModalDireccionExito}
-              style={{
-                display: showModalDireccionExito ? "block" : "none",
-                zIndex: 1050,
-              }}
-            >
-              <div className="modal-dialog modal-dialog-centered">
-                <div className="modal-content border-success shadow-lg">
-                  <div className="modal-header bg-success text-white">
-                    <h5 className="modal-title">
-                      <i
-                        className="bx bx-map-pin me-2"
-                        style={{ fontSize: "1.5rem" }}
-                      ></i>
-                      Dirección Guardada
-                    </h5>
-                  </div>
-                  <div className="modal-body">
-                    <div className="alert alert-success-light mb-3">
-                      <p className="mb-0 text-success fw-bold">
-                        ¡Dirección registrada exitosamente!
-                      </p>
-                    </div>
-
-                    {Object.entries(direccionExitoData).length > 0 && (
-                      <div className="direccion-details">
-                        <div className="card bg-light">
-                          <div className="card-body">
-                            <p className="mb-2">
-                              <strong>
-                                <i className="bx bx-building me-2"></i>
-                                Ciudad:
-                              </strong>
-                              <br />
-                              <span>{direccionExitoData.ciudad}</span>
-                            </p>
-                            <p className="mb-2">
-                              <strong>
-                                <i className="bx bx-street-view me-2"></i>
-                                Calle:
-                              </strong>
-                              <br />
-                              <span>{direccionExitoData.calle}</span>
-                            </p>
-                            {direccionExitoData.referencia && (
-                              <p className="mb-0">
-                                <strong>
-                                  <i className="bx bx-note me-2"></i>
-                                  Referencia:
-                                </strong>
-                                <br />
-                                <span>{direccionExitoData.referencia}</span>
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <div className="modal-footer">
-                    <button
-                      type="button"
-                      className="btn btn-success"
-                      onClick={() => setShowModalDireccionExito(false)}
-                    >
-                      <i className="bx bx-check me-1"></i>
-                      Aceptar
                     </button>
                   </div>
                 </div>

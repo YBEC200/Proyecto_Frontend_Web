@@ -1,8 +1,14 @@
 import { useState, useEffect } from "react";
 import Nav from "../Layout/Nav";
 import Sidebar from "../Layout/Sidebar";
-import { updateCurrentUserLoggedIn } from "./useUpdateCurrentUser";
+import {
+  getCurrentUserId,
+  updateCurrentUserLoggedIn,
+} from "./useUpdateCurrentUser";
 import "./Usuarios.css";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import * as XLSX from "xlsx";
 const API_URL = import.meta.env.VITE_API_URL;
 
 interface Compra {
@@ -40,6 +46,7 @@ interface Usuario {
 
 function formatFecha(fecha: string) {
   if (!fecha) return "";
+
   const date = new Date(fecha);
   // Ejemplo: 2025-11-13 07:00:42
   return `${date.getFullYear()}-${(date.getMonth() + 1)
@@ -54,11 +61,17 @@ function formatFecha(fecha: string) {
 }
 function Usuarios() {
   // States de filtros y datos
+  const currentUserId = getCurrentUserId();
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
   const [fechaRegistroFiltro, setFechaRegistroFiltro] = useState("");
   const [fechaActualizacionFiltro, setFechaActualizacionFiltro] = useState("");
   const [searchInput, setSearchInput] = useState("");
+  const [appliedRoleFilter, setAppliedRoleFilter] = useState("");
+  const [appliedFechaRegistroFiltro, setAppliedFechaRegistroFiltro] =
+    useState("");
+  const [appliedFechaActualizacionFiltro, setAppliedFechaActualizacionFiltro] =
+    useState("");
 
   // Users data state
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
@@ -69,6 +82,7 @@ function Usuarios() {
   const [editRol, setEditRol] = useState("");
   const [editEstado, setEditEstado] = useState("");
   const [editError, setEditError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   // Modal state
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<Usuario | null>(null);
@@ -96,11 +110,11 @@ function Usuarios() {
     const params = new URLSearchParams();
 
     if (searchTerm) params.append("nombre", searchTerm);
-    if (roleFilter) params.append("rol", roleFilter);
-    if (fechaRegistroFiltro)
-      params.append("fecha_creacion", fechaRegistroFiltro);
-    if (fechaActualizacionFiltro)
-      params.append("fecha_actualizacion", fechaActualizacionFiltro);
+    if (appliedRoleFilter) params.append("rol", appliedRoleFilter);
+    if (appliedFechaRegistroFiltro)
+      params.append("fecha_creacion", appliedFechaRegistroFiltro);
+    if (appliedFechaActualizacionFiltro)
+      params.append("fecha_actualizacion", appliedFechaActualizacionFiltro);
 
     try {
       const response = await fetch(
@@ -220,9 +234,10 @@ function Usuarios() {
     }
     if (!selectedUser) return;
     const token = localStorage.getItem("token");
+    setIsSubmitting(true);
     try {
       const response = await fetch(
-        `${API_URL}/api/usuarios/${selectedUser.id}`,
+        `${API_URL}/api/usuarios/${selectedUser.id}/update-admin`,
         {
           method: "PUT",
           headers: {
@@ -246,7 +261,7 @@ function Usuarios() {
           estado: editEstado,
         });
 
-        fetchUsuarios();
+        await fetchUsuarios();
         setShowEditModal(false);
         setSuccessMessage("Usuario editado correctamente.");
         setShowSuccessModal(true);
@@ -260,12 +275,16 @@ function Usuarios() {
       setEditError("Error de conexión.");
       setErrorMessage("Error de conexión al editar.");
       setShowErrorModal(true);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   // Función para manejar la eliminación de usuario
   const handleDeleteUser = async () => {
-    if (!selectedUser) return;
+    if (!selectedUser || selectedUser.id === getCurrentUserId()) {
+      return;
+    }
 
     // Validación: verificar que el usuario puede ser eliminado
     if (!usuariosEliminables.has(selectedUser.id)) {
@@ -278,6 +297,7 @@ function Usuarios() {
     }
 
     const token = localStorage.getItem("token");
+    setIsSubmitting(true);
     try {
       const response = await fetch(
         `${API_URL}/api/usuarios/${selectedUser.id}`,
@@ -291,7 +311,7 @@ function Usuarios() {
       );
       if (response.ok) {
         setShowDeleteModal(false);
-        fetchUsuarios();
+        await fetchUsuarios();
         setSuccessMessage("Usuario eliminado correctamente.");
         setShowSuccessModal(true);
       } else {
@@ -304,29 +324,111 @@ function Usuarios() {
       setShowDeleteModal(false);
       setErrorMessage("Error de conexión al eliminar.");
       setShowErrorModal(true);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   // Función para aplicar filtros
   const applyFilters = () => {
-    // Sólo aplicar si hay cambios (evita re-fetch innecesario)
-    if (searchTerm !== searchInput.trim()) {
-      setSearchTerm(searchInput.trim());
-    }
+    setSearchTerm(searchInput.trim());
+    setAppliedRoleFilter(roleFilter);
+    setAppliedFechaRegistroFiltro(fechaRegistroFiltro);
+    setAppliedFechaActualizacionFiltro(fechaActualizacionFiltro);
   };
 
-  // Función para manejar "Enter" en el campo de búsqueda
-  const handleKeyDownApply = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      applyFilters();
+  const handleClearFilters = () => {
+    setSearchInput("");
+    setSearchTerm("");
+    setRoleFilter("");
+    setAppliedRoleFilter("");
+    setFechaRegistroFiltro("");
+    setAppliedFechaRegistroFiltro("");
+    setFechaActualizacionFiltro("");
+    setAppliedFechaActualizacionFiltro("");
+  };
+
+  const handleDownloadPDF = () => {
+    if (usuarios.length === 0) {
+      alert("No hay usuarios para descargar");
+      return;
     }
+
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text("Reporte de Usuarios", 14, 15);
+    autoTable(doc, {
+      head: [
+        [
+          "ID",
+          "Nombre",
+          "Correo",
+          "Rol",
+          "Estado",
+          "Registro",
+          "Actualización",
+        ],
+      ],
+      body: usuarios.map((user) => [
+        user.id,
+        user.nombre,
+        user.correo,
+        user.rol,
+        user.estado,
+        formatFecha(user.created_at),
+        formatFecha(user.updated_at),
+      ]),
+      startY: 22,
+      styles: { font: "helvetica", fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [63, 81, 181], textColor: [255, 255, 255] },
+      margin: { top: 10, right: 10, bottom: 10, left: 10 },
+    });
+    doc.save(`usuarios_${new Date().toISOString().split("T")[0]}.pdf`);
+  };
+
+  const handleDownloadExcel = () => {
+    if (usuarios.length === 0) {
+      alert("No hay usuarios para descargar");
+      return;
+    }
+
+    const worksheet = XLSX.utils.json_to_sheet(
+      usuarios.map((user) => ({
+        ID: user.id,
+        Nombre: user.nombre,
+        Correo: user.correo,
+        Rol: user.rol,
+        Estado: user.estado,
+        "Fecha de Registro": formatFecha(user.created_at),
+        "Fecha de Actualización": formatFecha(user.updated_at),
+      })),
+    );
+    worksheet["!cols"] = [
+      { wch: 8 },
+      { wch: 25 },
+      { wch: 30 },
+      { wch: 18 },
+      { wch: 14 },
+      { wch: 22 },
+      { wch: 22 },
+    ];
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Usuarios");
+    XLSX.writeFile(
+      workbook,
+      `usuarios_${new Date().toISOString().split("T")[0]}.xlsx`,
+    );
   };
 
   useEffect(() => {
     fetchUsuarios();
     // eslint-disable-next-line
-  }, [searchTerm, roleFilter, fechaRegistroFiltro, fechaActualizacionFiltro]);
+  }, [
+    searchTerm,
+    appliedRoleFilter,
+    appliedFechaRegistroFiltro,
+    appliedFechaActualizacionFiltro,
+  ]);
 
   // Verificar eliminabilidad de usuarios después de cargarlos
   useEffect(() => {
@@ -456,10 +558,9 @@ function Usuarios() {
                         <input
                           type="search"
                           className="form-control ps-5 radius-30"
-                          placeholder="Presione 'Enter' para confirmar la búsqueda"
-                          value={searchTerm}
+                          placeholder="Escriba el nombre del usuario"
+                          value={searchInput}
                           onChange={(e) => setSearchInput(e.target.value)}
-                          onKeyDown={handleKeyDownApply}
                         />
                       </div>
                     </div>
@@ -508,81 +609,41 @@ function Usuarios() {
                         }
                       />
                     </div>
+                    <div className="col-12 d-flex justify-content-end">
+                      <div className="filtro-acciones">
+                        <button
+                          className="btn btn-primary d-flex align-items-center justify-content-center gap-2"
+                          onClick={applyFilters}
+                          title="Aplicar filtros seleccionados"
+                          disabled={loading}
+                        >
+                          <i className="bx bx-search"></i> Buscar
+                        </button>
+                        <button
+                          className="btn btn-secondary d-flex align-items-center justify-content-center gap-2"
+                          title="Limpiar filtros"
+                          onClick={handleClearFilters}
+                        >
+                          <i className="bx bx-x"></i> Limpiar
+                        </button>
+                        <button
+                          className="btn btn-outline-danger"
+                          title="Descargar tabla en PDF"
+                          onClick={handleDownloadPDF}
+                        >
+                          <i className="bx bx-download"></i> PDF
+                        </button>
+                        <button
+                          className="btn btn-outline-success"
+                          title="Descargar tabla en Excel"
+                          onClick={handleDownloadExcel}
+                        >
+                          <i className="bx bx-download"></i> Excel
+                        </button>
+                      </div>
+                    </div>
                   </div>
 
-                  <table className="table align-middle mb-0">
-                    <thead className="table-light">
-                      <tr>
-                        <th>ID</th>
-                        <th>Nombre Completo</th>
-                        <th>Correo</th>
-                        <th>Rol</th>
-                        <th>Estado</th>
-                        <th>Fecha de Registro</th>
-                        <th>Fecha de Actualizacion</th>
-                        <th>Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {usuarios.map((user) => (
-                        <tr key={user.id} className="client-row">
-                          <td>{user.id}</td>
-                          <td className="client-name">{user.nombre}</td>
-                          <td>{user.correo}</td>
-                          <td className="client-role">{user.rol}</td>
-                          <td className="client-estado">{user.estado}</td>
-                          <td>{formatFecha(user.created_at)}</td>
-                          <td>{formatFecha(user.updated_at)}</td>
-                          <td>
-                            <div className="d-flex justify-content-center gap-2">
-                              <button
-                                className="btn-action-details"
-                                onClick={() => {
-                                  setSelectedUser(user);
-                                  setShowOrdersModal(true);
-                                  fetchUserVentas(user.id);
-                                }}
-                              >
-                                <i className="bx bx-receipt"></i>
-                              </button>
-                              <button
-                                className="btn-action-edit"
-                                onClick={() => {
-                                  setSelectedUser(user);
-                                  setShowEditModal(true);
-                                }}
-                              >
-                                <i className="bx bx-edit"></i>
-                              </button>
-                              <button
-                                className="btn-action-delete"
-                                title={
-                                  usuariosEliminables.has(user.id)
-                                    ? "Eliminar usuario"
-                                    : "No se puede eliminar: usuario con ventas asociadas"
-                                }
-                                onClick={() => {
-                                  setSelectedUser(user);
-                                  setShowDeleteModal(true);
-                                }}
-                                disabled={!usuariosEliminables.has(user.id)}
-                                style={{
-                                  opacity: usuariosEliminables.has(user.id)
-                                    ? "1"
-                                    : "0.5",
-                                  cursor: usuariosEliminables.has(user.id)
-                                    ? "pointer"
-                                    : "not-allowed",
-                                }}
-                              >
-                                <i className="bx bx-trash"></i>
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
                   {loading && (
                     <div style={{ textAlign: "center", padding: "2em" }}>
                       <div
@@ -601,6 +662,83 @@ function Usuarios() {
                         Cargando usuarios, por favor espera...
                       </div>
                     </div>
+                  )}
+                  {!loading && usuarios.length > 0 && (
+                    <table className="table align-middle mb-0">
+                      <thead className="table-light">
+                        <tr>
+                          <th>ID</th>
+                          <th>Nombre Completo</th>
+                          <th>Correo</th>
+                          <th>Rol</th>
+                          <th>Estado</th>
+                          <th>Fecha de Registro</th>
+                          <th>Fecha de Actualizacion</th>
+                          <th>Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {usuarios.map((user) => (
+                          <tr key={user.id} className="client-row">
+                            <td>{user.id}</td>
+                            <td className="client-name">{user.nombre}</td>
+                            <td>{user.correo}</td>
+                            <td className="client-role">{user.rol}</td>
+                            <td className="client-estado">{user.estado}</td>
+                            <td>{formatFecha(user.created_at)}</td>
+                            <td>{formatFecha(user.updated_at)}</td>
+                            <td>
+                              <div className="d-flex justify-content-center gap-2">
+                                <button
+                                  className="btn-action-details"
+                                  onClick={() => {
+                                    setSelectedUser(user);
+                                    setShowOrdersModal(true);
+                                    fetchUserVentas(user.id);
+                                  }}
+                                >
+                                  <i className="bx bx-receipt"></i>
+                                </button>
+                                <button
+                                  className="btn-action-edit"
+                                  onClick={() => {
+                                    setSelectedUser(user);
+                                    setShowEditModal(true);
+                                  }}
+                                >
+                                  <i className="bx bx-edit"></i>
+                                </button>
+                                {user.id !== currentUserId && (
+                                  <button
+                                    className="btn-action-delete"
+                                    title={
+                                      usuariosEliminables.has(user.id)
+                                        ? "Eliminar usuario"
+                                        : "No se puede eliminar: usuario con ventas asociadas"
+                                    }
+                                    onClick={() => {
+                                      setSelectedUser(user);
+                                      setShowDeleteModal(true);
+                                    }}
+                                    disabled={!usuariosEliminables.has(user.id)}
+                                    style={{
+                                      opacity: usuariosEliminables.has(user.id)
+                                        ? "1"
+                                        : "0.5",
+                                      cursor: usuariosEliminables.has(user.id)
+                                        ? "pointer"
+                                        : "not-allowed",
+                                    }}
+                                  >
+                                    <i className="bx bx-trash"></i>
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   )}
                   {!loading && usuarios.length === 0 && (
                     <div
@@ -636,7 +774,6 @@ function Usuarios() {
                     <form
                       onSubmit={async (e) => {
                         e.preventDefault();
-                        setShowEditModal(false);
                         await handleEditUser(e);
                       }}
                     >
@@ -698,8 +835,23 @@ function Usuarios() {
                         >
                           Cancelar
                         </button>
-                        <button type="submit" className="btn btn-primary">
-                          Guardar cambios
+                        <button
+                          type="submit"
+                          className="btn btn-primary"
+                          disabled={isSubmitting}
+                        >
+                          {isSubmitting ? (
+                            <>
+                              <span
+                                className="spinner-border spinner-border-sm me-2"
+                                role="status"
+                                aria-hidden="true"
+                              ></span>
+                              Guardando...
+                            </>
+                          ) : (
+                            "Guardar cambios"
+                          )}
                         </button>
                       </div>
                     </form>
@@ -866,8 +1018,22 @@ function Usuarios() {
                         type="button"
                         className="btn btn-danger"
                         onClick={handleDeleteUser}
+                        disabled={isSubmitting}
                       >
-                        <i className="bx bx-trash"></i> Eliminar
+                        {isSubmitting ? (
+                          <>
+                            <span
+                              className="spinner-border spinner-border-sm me-2"
+                              role="status"
+                              aria-hidden="true"
+                            ></span>
+                            Eliminando...
+                          </>
+                        ) : (
+                          <>
+                            <i className="bx bx-trash"></i> Eliminar
+                          </>
+                        )}
                       </button>
                     </div>
                   </div>

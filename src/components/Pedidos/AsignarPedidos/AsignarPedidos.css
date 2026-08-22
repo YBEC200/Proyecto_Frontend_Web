@@ -138,6 +138,33 @@
   opacity: 1;
 }
 
+.success-modal-item {
+  width: min(90vw, 500px);
+  pointer-events: auto;
+}
+
+.success-modal-item.parallel {
+  width: min(44vw, 500px);
+}
+
+.success-modal-item > .modal {
+  position: static;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.success-modal-item > .modal > .modal-dialog {
+  max-width: none;
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .success-modal-item.parallel {
+    width: min(90vw, 500px);
+  }
+}
+
 .shadow-lg {
   box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.175) !important;
 }

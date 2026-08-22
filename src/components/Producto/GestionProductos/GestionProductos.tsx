@@ -52,6 +52,10 @@ export default function GestionProductos() {
   const [maxInput, setMaxInput] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [appliedPriceRange, setAppliedPriceRange] = useState({
+    min: "",
+    max: "",
+  });
   const [appliedCategoryFilter, setAppliedCategoryFilter] = useState("");
   const [appliedStatusFilter, setAppliedStatusFilter] = useState("");
   // Modales
@@ -141,8 +145,10 @@ export default function GestionProductos() {
     const params = new URLSearchParams();
 
     if (searchTerm) params.append("nombre", searchTerm);
-    if (priceRange.min) params.append("precio_min", priceRange.min);
-    if (priceRange.max) params.append("precio_max", priceRange.max);
+    if (appliedPriceRange.min)
+      params.append("precio_min", appliedPriceRange.min);
+    if (appliedPriceRange.max)
+      params.append("precio_max", appliedPriceRange.max);
     if (appliedCategoryFilter)
       params.append("categoria", appliedCategoryFilter);
     if (appliedStatusFilter) params.append("estado", appliedStatusFilter);
@@ -221,12 +227,8 @@ export default function GestionProductos() {
     if (searchTerm !== searchInput.trim()) {
       setSearchTerm(searchInput.trim());
     }
-    if (
-      priceRange.min !== (minInput ?? "") ||
-      priceRange.max !== (maxInput ?? "")
-    ) {
-      setPriceRange({ min: minInput ?? "", max: maxInput ?? "" });
-    }
+    setPriceRange({ min: minInput ?? "", max: maxInput ?? "" });
+    setAppliedPriceRange({ min: minInput ?? "", max: maxInput ?? "" });
     setAppliedCategoryFilter(categoryFilter);
     setAppliedStatusFilter(statusFilter);
   };
@@ -240,16 +242,9 @@ export default function GestionProductos() {
     setStatusFilter("");
     setAppliedCategoryFilter("");
     setAppliedStatusFilter("");
+    setAppliedPriceRange({ min: "", max: "" });
     setSearchTerm("");
     setPriceRange({ min: "", max: "" });
-  };
-
-  // Aplicar filtros al presionar Enter en los inputs
-  const handleKeyDownApply = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      applyFilters();
-    }
   };
 
   // Función para descargar en PDF
@@ -597,8 +592,10 @@ export default function GestionProductos() {
     searchTerm,
     priceRange.min,
     priceRange.max,
-    categoryFilter,
-    statusFilter,
+    appliedPriceRange.min,
+    appliedPriceRange.max,
+    appliedCategoryFilter,
+    appliedStatusFilter,
     currentPage, // Paginacion cargada
   ]);
 
@@ -752,10 +749,9 @@ export default function GestionProductos() {
                         <input
                           type="search"
                           className="form-control ps-5 radius-30"
-                          placeholder="Presione 'Enter' para confirmar la búsqueda"
+                          placeholder="Escriba el nombre del producto"
                           value={searchInput}
                           onChange={(e) => setSearchInput(e.target.value)}
-                          onKeyDown={handleKeyDownApply}
                         />
                       </div>
                     </div>
@@ -771,7 +767,6 @@ export default function GestionProductos() {
                         placeholder="S/ mínimo"
                         value={minInput}
                         onChange={(e) => setMinInput(e.target.value)}
-                        onKeyDown={handleKeyDownApply}
                       />
                     </div>
 
@@ -786,7 +781,6 @@ export default function GestionProductos() {
                         placeholder="S/ máximo"
                         value={maxInput}
                         onChange={(e) => setMaxInput(e.target.value)}
-                        onKeyDown={handleKeyDownApply}
                       />
                     </div>
 
@@ -825,7 +819,7 @@ export default function GestionProductos() {
                       </select>
                     </div>
 
-                    <div className="col-12 col-lg-2">
+                    <div className="col-12 d-flex justify-content-end">
                       <div className="filtro-acciones">
                         <button
                           className="btn btn-primary d-flex align-items-center justify-content-center gap-2"

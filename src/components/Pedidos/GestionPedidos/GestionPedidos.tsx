@@ -157,6 +157,7 @@ function GestionPedidos() {
       const token = localStorage.getItem("token");
       const response = await fetch(`${API_URL}/api/usuarios`, {
         headers: {
+          Accept: "application/json",
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
@@ -185,6 +186,7 @@ function GestionPedidos() {
       const token = localStorage.getItem("token");
       const res = await fetch(`${API_URL}/api/ventas/stats`, {
         headers: {
+          Accept: "application/json",
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
@@ -235,6 +237,7 @@ function GestionPedidos() {
         `${API_URL}/api/ventas?${params.toString()}`,
         {
           headers: {
+            Accept: "application/json",
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
@@ -335,6 +338,7 @@ function GestionPedidos() {
 
       const response = await fetch(`${API_URL}/api/ventas/${ventaId}`, {
         headers: {
+          Accept: "application/json",
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
@@ -560,6 +564,7 @@ function GestionPedidos() {
         `${API_URL}/api/comprobantes/boletas/${venta.codigo_unico}`,
         {
           headers: {
+            Accept: "application/json",
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
@@ -621,14 +626,6 @@ function GestionPedidos() {
       dateStart: "",
       dateEnd: "",
     });
-  };
-
-  // Permitir aplicar filtros con Enter en el input de búsqueda
-  const handleKeyDownApply = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      handleApplyFilters();
-    }
   };
 
   // useEffect para cargar ventas solo cuando appliedFilters cambia
@@ -903,10 +900,9 @@ function GestionPedidos() {
                         <input
                           type="search"
                           className="form-control ps-5 radius-30"
-                          placeholder="Presione 'Enter' para confirmar"
+                          placeholder="Escriba el nombre del cliente"
                           value={searchInput}
                           onChange={(e) => setSearchInput(e.target.value)}
-                          onKeyDown={handleKeyDownApply}
                         />
                       </div>
                     </div>
@@ -961,7 +957,7 @@ function GestionPedidos() {
                       />
                     </div>
 
-                    <div className="col-12 col-lg-2">
+                    <div className="col-12 col-lg-2 d-flex justify-content-end">
                       <div className="filtro-acciones">
                         <button
                           className="btn btn-primary d-flex align-items-center justify-content-center gap-2"

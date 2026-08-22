@@ -377,13 +377,6 @@ export default function VerLotes({
     setEstadoFilter(estadoFilterInput);
   };
 
-  // Handler para Enter en inputs: aplicar los filtros al presionar Enter
-  const handleKeyDownApply = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key !== "Enter") return;
-    e.preventDefault();
-    handleApplyFilters();
-  };
-
   // Función para descargar en PDF
   const handleDescargarPDF = () => {
     if (lotes.length === 0) {
@@ -623,10 +616,9 @@ export default function VerLotes({
                     name="search"
                     type="search"
                     className="form-control ps-5 radius-30"
-                    placeholder="Presione 'Enter' para buscar"
+                    placeholder="Escriba el nombre del lote"
                     value={searchInput}
                     onChange={(e) => setSearchInput(e.target.value)}
-                    onKeyDown={handleKeyDownApply}
                   />
                 </div>
               </div>
@@ -645,7 +637,6 @@ export default function VerLotes({
                   placeholder="Mínimo"
                   value={minPrecioInput}
                   onChange={(e) => setMinPrecioInput(e.target.value)}
-                  onKeyDown={handleKeyDownApply}
                 />
               </div>
             </div>
@@ -662,7 +653,6 @@ export default function VerLotes({
                   placeholder="Máximo"
                   value={maxPrecioInput}
                   onChange={(e) => setMaxPrecioInput(e.target.value)}
-                  onKeyDown={handleKeyDownApply}
                 />
               </div>
             </div>
@@ -680,7 +670,6 @@ export default function VerLotes({
                   className="form-control radius-30"
                   value={startDateInput}
                   onChange={(e) => setStartDateInput(e.target.value)}
-                  onKeyDown={handleKeyDownApply}
                 />
               </div>
             </div>
@@ -696,7 +685,6 @@ export default function VerLotes({
                   className="form-control radius-30"
                   value={endDateInput}
                   onChange={(e) => setEndDateInput(e.target.value)}
-                  onKeyDown={handleKeyDownApply}
                 />
               </div>
             </div>
@@ -714,7 +702,6 @@ export default function VerLotes({
                   placeholder="Mínimo"
                   value={minCantidadInput}
                   onChange={(e) => setMinCantidadInput(e.target.value)}
-                  onKeyDown={handleKeyDownApply}
                 />
               </div>
             </div>
@@ -731,7 +718,6 @@ export default function VerLotes({
                   placeholder="Máximo"
                   value={maxCantidadInput}
                   onChange={(e) => setMaxCantidadInput(e.target.value)}
-                  onKeyDown={handleKeyDownApply}
                 />
               </div>
             </div>
@@ -755,7 +741,7 @@ export default function VerLotes({
               </div>
             </div>
 
-            <div className="col-12 col-lg-2">
+            <div className="col-12 d-flex justify-content-end">
               <div className="filtro-acciones">
                 <button
                   className="btn btn-primary d-flex align-items-center justify-content-center gap-2"
