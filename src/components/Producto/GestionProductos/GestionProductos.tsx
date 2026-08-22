@@ -45,6 +45,7 @@ function formatPrice(v: number | string | undefined) {
 
 export default function GestionProductos() {
   // Filtros de búsqueda
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [priceRange, setPriceRange] = useState({ min: "", max: "" });
   const [searchInput, setSearchInput] = useState("");
@@ -106,6 +107,7 @@ export default function GestionProductos() {
     has_next: false,
     has_prev: false,
   });
+  const [isDeletingImage, setIsDeletingImage] = useState(false);
 
   // Obtener nombre de categoría
   const getCategoryName = (producto: Producto) =>
@@ -427,7 +429,9 @@ export default function GestionProductos() {
 
   // Eliminar imagen secundaria
   const handleDeleteSecondaryImage = async (imageId: number | string) => {
+    if (isDeletingImage) return;
     const token = localStorage.getItem("token");
+    setIsDeletingImage(true);
     try {
       const res = await fetch(
         `${API_URL}/api/imagenes-secundarias/${imageId}`,
@@ -460,6 +464,7 @@ export default function GestionProductos() {
       setErrorMessage("Error de conexión al eliminar la imagen.");
       setShowErrorModal(true);
     } finally {
+      setIsDeletingImage(false);
       setImageToDelete(null);
       setShowConfirmDeleteImage(false);
     }
@@ -472,6 +477,7 @@ export default function GestionProductos() {
 
   const handleUpdate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (isSubmitting) return;
     if (!selectedProduct) return;
 
     const form = e.currentTarget;
@@ -484,6 +490,8 @@ export default function GestionProductos() {
     const id_categoria = String(formData.get("categoria") ?? "");
 
     const token = localStorage.getItem("token");
+
+    setIsSubmitting(true);
 
     try {
       const res = await fetch(
@@ -535,12 +543,16 @@ export default function GestionProductos() {
       console.error("Fetch error:", error);
       setErrorMessage("Error de conexión al actualizar el producto.");
       setShowErrorModal(true);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   // Eliminar producto (si no tiene lotes vinculados)
   const handleDelete = async (id: string) => {
+    if (isSubmitting) return;
     const token = localStorage.getItem("token");
+    setIsSubmitting(true);
     try {
       const res = await fetch(`${API_URL}/api/productos/${id}`, {
         method: "DELETE",
@@ -569,6 +581,8 @@ export default function GestionProductos() {
       console.error("Delete error:", error);
       setErrorMessage("Error de conexión al eliminar el producto.");
       setShowErrorModal(true);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -1050,6 +1064,7 @@ export default function GestionProductos() {
                         type="button"
                         className="btn-close"
                         onClick={() => setShowEditModal(false)}
+                        disabled={isSubmitting}
                       ></button>
                     </div>
                     <form onSubmit={handleUpdate}>
@@ -1252,6 +1267,7 @@ export default function GestionProductos() {
                                             }}
                                           />
                                           <button
+                                            type="button"
                                             className="btn btn-sm btn-danger position-absolute top-0 end-0 m-1"
                                             style={{
                                               opacity: 0.85,
@@ -1280,11 +1296,27 @@ export default function GestionProductos() {
                           type="button"
                           className="btn btn-secondary"
                           onClick={() => setShowEditModal(false)}
+                          disabled={isSubmitting}
                         >
                           Cancelar
                         </button>
-                        <button type="submit" className="btn btn-primary">
-                          Guardar cambios
+                        <button
+                          type="submit"
+                          className="btn btn-primary"
+                          disabled={isSubmitting}
+                        >
+                          {isSubmitting ? (
+                            <>
+                              <span
+                                className="spinner-border spinner-border-sm me-2"
+                                role="status"
+                                aria-hidden="true"
+                              ></span>
+                              Guardando...
+                            </>
+                          ) : (
+                            "Guardar cambios"
+                          )}
                         </button>
                       </div>
                     </form>
@@ -1307,6 +1339,7 @@ export default function GestionProductos() {
                           setShowDeleteModal(false);
                           setDeleteTarget(null);
                         }}
+                        disabled={isSubmitting}
                       ></button>
                     </div>
                     <div className="modal-body">
@@ -1328,20 +1361,37 @@ export default function GestionProductos() {
                           setShowDeleteModal(false);
                           setDeleteTarget(null);
                         }}
+                        disabled={isSubmitting}
                       >
                         Cancelar
                       </button>
                       <button
                         type="button"
                         className="btn btn-danger"
+                        disabled={isSubmitting}
                         onClick={async () => {
                           if (!deleteTarget) return;
+
                           await handleDelete(deleteTarget.id);
-                          setShowDeleteModal(false);
-                          setDeleteTarget(null);
+
+                          if (!isSubmitting) {
+                            setShowDeleteModal(false);
+                            setDeleteTarget(null);
+                          }
                         }}
                       >
-                        Eliminar
+                        {isSubmitting ? (
+                          <>
+                            <span
+                              className="spinner-border spinner-border-sm me-2"
+                              role="status"
+                              aria-hidden="true"
+                            ></span>
+                            Eliminando...
+                          </>
+                        ) : (
+                          "Eliminar"
+                        )}
                       </button>
                     </div>
                   </div>
@@ -1363,6 +1413,7 @@ export default function GestionProductos() {
                           setShowConfirmDeleteImage(false);
                           setImageToDelete(null);
                         }}
+                        disabled={isDeletingImage}
                       ></button>
                     </div>
                     <div className="modal-body text-center">
@@ -1382,18 +1433,34 @@ export default function GestionProductos() {
                           setShowConfirmDeleteImage(false);
                           setImageToDelete(null);
                         }}
+                        disabled={isDeletingImage}
                       >
                         Cancelar
                       </button>
                       <button
                         type="button"
                         className="btn btn-danger"
+                        disabled={isDeletingImage}
                         onClick={async () => {
-                          if (!imageToDelete) return;
+                          if (!imageToDelete || isDeletingImage) return;
+
                           await handleDeleteSecondaryImage(imageToDelete.id);
                         }}
                       >
-                        Eliminar
+                        {isDeletingImage ? (
+                          <>
+                            <span
+                              className="spinner-border spinner-border-sm me-2"
+                              role="status"
+                              aria-hidden="true"
+                            ></span>
+                            Eliminando...
+                          </>
+                        ) : (
+                          <>
+                            <i className="bx bx-trash"></i> Eliminar
+                          </>
+                        )}
                       </button>
                     </div>
                   </div>

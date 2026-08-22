@@ -489,6 +489,7 @@ function GestionPedidos() {
 
   // Función para cancelar la venta
   const handleConfirmarCancelacion = async () => {
+    if (cancelacionEnProceso) return; // Evitar múltiples clics
     const textoRequerido =
       "Soy conciente que al cancelar una venta puedo comprometer datos de la empresa";
 
@@ -525,7 +526,6 @@ function GestionPedidos() {
           (result && result.message) ||
             "Error al cancelar la venta. Intenta de nuevo.",
         );
-        setCancelacionEnProceso(false);
         return;
       }
 
@@ -541,6 +541,7 @@ function GestionPedidos() {
     } catch (err) {
       console.error("Error cancelando venta:", err);
       setErrorCancelacion("Error de conexión. Intenta de nuevo.");
+    } finally {
       setCancelacionEnProceso(false);
     }
   };
@@ -1125,77 +1126,76 @@ function GestionPedidos() {
                       </tbody>
                     </table>
                   )}
-                  {!loading && ventas.length > 0 && (
-                    <div className="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
-                      <div className="text-muted small">
-                        Mostrando{" "}
-                        <strong>
-                          {(paginationData.current_page - 1) *
-                            paginationData.per_page +
-                            1}
-                        </strong>{" "}
-                        a{" "}
-                        <strong>
-                          {Math.min(
-                            paginationData.current_page *
-                              paginationData.per_page,
-                            paginationData.total,
-                          )}
-                        </strong>{" "}
-                        de <strong>{paginationData.total}</strong> ventas
-                      </div>
-                      <nav aria-label="Paginación">
-                        <ul className="pagination mb-0">
-                          <li
-                            className={`page-item ${!paginationData.has_prev ? "disabled" : ""}`}
-                          >
-                            <button
-                              className="page-link"
-                              onClick={() => setCurrentPage(currentPage - 1)}
-                              disabled={!paginationData.has_prev || loading}
-                            >
-                              Anterior
-                            </button>
-                          </li>
-
-                          {Array.from(
-                            { length: Math.min(totalPages, 5) },
-                            (_, i) => {
-                              const pageNum = Math.max(1, currentPage - 2) + i;
-                              if (pageNum > totalPages) return null;
-                              return (
-                                <li
-                                  key={pageNum}
-                                  className={`page-item ${currentPage === pageNum ? "active" : ""}`}
-                                >
-                                  <button
-                                    className="page-link"
-                                    onClick={() => setCurrentPage(pageNum)}
-                                    disabled={loading}
-                                  >
-                                    {pageNum}
-                                  </button>
-                                </li>
-                              );
-                            },
-                          )}
-
-                          <li
-                            className={`page-item ${!paginationData.has_next ? "disabled" : ""}`}
-                          >
-                            <button
-                              className="page-link"
-                              onClick={() => setCurrentPage(currentPage + 1)}
-                              disabled={!paginationData.has_next || loading}
-                            >
-                              Siguiente
-                            </button>
-                          </li>
-                        </ul>
-                      </nav>
-                    </div>
-                  )}
                 </div>
+                {!loading && ventas.length > 0 && (
+                  <div className="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+                    <div className="text-muted small">
+                      Mostrando{" "}
+                      <strong>
+                        {(paginationData.current_page - 1) *
+                          paginationData.per_page +
+                          1}
+                      </strong>{" "}
+                      a{" "}
+                      <strong>
+                        {Math.min(
+                          paginationData.current_page * paginationData.per_page,
+                          paginationData.total,
+                        )}
+                      </strong>{" "}
+                      de <strong>{paginationData.total}</strong> ventas
+                    </div>
+                    <nav aria-label="Paginación">
+                      <ul className="pagination mb-0">
+                        <li
+                          className={`page-item ${!paginationData.has_prev ? "disabled" : ""}`}
+                        >
+                          <button
+                            className="page-link"
+                            onClick={() => setCurrentPage(currentPage - 1)}
+                            disabled={!paginationData.has_prev || loading}
+                          >
+                            Anterior
+                          </button>
+                        </li>
+
+                        {Array.from(
+                          { length: Math.min(totalPages, 5) },
+                          (_, i) => {
+                            const pageNum = Math.max(1, currentPage - 2) + i;
+                            if (pageNum > totalPages) return null;
+                            return (
+                              <li
+                                key={pageNum}
+                                className={`page-item ${currentPage === pageNum ? "active" : ""}`}
+                              >
+                                <button
+                                  className="page-link"
+                                  onClick={() => setCurrentPage(pageNum)}
+                                  disabled={loading}
+                                >
+                                  {pageNum}
+                                </button>
+                              </li>
+                            );
+                          },
+                        )}
+
+                        <li
+                          className={`page-item ${!paginationData.has_next ? "disabled" : ""}`}
+                        >
+                          <button
+                            className="page-link"
+                            onClick={() => setCurrentPage(currentPage + 1)}
+                            disabled={!paginationData.has_next || loading}
+                          >
+                            Siguiente
+                          </button>
+                        </li>
+                      </ul>
+                    </nav>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1506,6 +1506,7 @@ function GestionPedidos() {
                   type="button"
                   className="btn-close btn-close-white"
                   onClick={handleCerrarModalCancelar}
+                  disabled={cancelacionEnProceso}
                   aria-label="Close"
                 ></button>
               </div>

@@ -23,6 +23,9 @@ export default function Perfil() {
     rol: "Administrador",
   });
   const [saving, setSaving] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     // Obtener datos del localStorage
@@ -64,18 +67,22 @@ export default function Perfil() {
       const correo = String(formData.correo ?? "").trim();
 
       if (!nombre) {
-        alert("El nombre es obligatorio.");
+        setErrorMessage("El nombre es obligatorio.");
+        setShowErrorModal(true);
         return;
       }
+
       if (!correo) {
-        alert("El correo es obligatorio.");
+        setErrorMessage("El correo es obligatorio.");
+        setShowErrorModal(true);
         return;
       }
 
       // Construir payload con solo campos cambiados respecto a userData
-      const dataToSend: Partial<UserData> = {};
-      if (nombre !== userData.nombre) dataToSend.nombre = nombre;
-      if (correo !== userData.correo) dataToSend.correo = correo;
+      const dataToSend = {
+        nombre,
+        correo,
+      };
 
       if (Object.keys(dataToSend).length === 0) {
         alert("No hay cambios para actualizar.");
@@ -86,40 +93,34 @@ export default function Perfil() {
 
       setSaving(true);
 
-      const response = await fetch(
-        `${API_URL}/api/usuarios/${userData.id}`,
-        {
-          method: "PUT",
-          headers: {
-            Authorization: token ? `Bearer ${token}` : "",
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          body: JSON.stringify(dataToSend),
+      const response = await fetch(`${API_URL}/api/usuarios/${userData.id}`, {
+        method: "PUT",
+        headers: {
+          Authorization: token ? `Bearer ${token}` : "",
+          "Content-Type": "application/json",
+          Accept: "application/json",
         },
-      );
+        body: JSON.stringify(dataToSend),
+      });
 
       // Intentar leer JSON (si hay body)
       const result = await response.json().catch(() => null);
 
       if (!response.ok) {
-        // Manejo de validación 422
         if (response.status === 422 && result?.errors) {
           const firstErrorField = Object.keys(result.errors)[0];
           const firstErrorMsg = result.errors[firstErrorField][0];
-          alert(`Error de validación: ${firstErrorMsg}`);
-          console.error("Validation errors:", result.errors);
-        } else if (response.status === 404) {
-          alert(result?.message || "Usuario no encontrado.");
-        } else if (response.status === 401 || response.status === 403) {
-          alert("No autorizado. Por favor inicia sesión nuevamente.");
-        } else {
-          // Fallback
-          alert(result?.message || `Error al actualizar (${response.status}).`);
-        }
-        throw new Error("HTTP error " + response.status);
-      }
 
+          setErrorMessage(firstErrorMsg);
+        } else {
+          setErrorMessage(
+            result?.message || `Error al actualizar (${response.status}).`,
+          );
+        }
+
+        setShowErrorModal(true);
+        return;
+      }
       // Si el backend devuelve el usuario actualizado en result.usuario o result.data, úsalo
       const updatedFromServer = result?.usuario ?? result?.data ?? result;
       const updatedUser = {
@@ -133,19 +134,21 @@ export default function Perfil() {
 
       setIsEditing(false);
       setFormData({});
-      alert("Perfil actualizado correctamente");
+      setUserData(updatedUser as UserData);
+      localStorage.setItem("user", JSON.stringify(updatedUser));
+
+      setIsEditing(false);
+      setFormData({});
+      setShowSuccessModal(true);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.error("Error actualizando usuario:", error);
-      if (
-        error?.message &&
-        String(error.message).includes("Failed to fetch")
-      ) {
-        alert(
-          "Error de conexión: Failed to fetch. Revisa VITE_API_URL, CORS y que el backend esté levantado.",
+
+      if (error?.message?.includes("Failed to fetch")) {
+        setErrorMessage(
+          "Error de conexión. Revisa que el backend esté funcionando.",
         );
-      } else {
-        // ya mostramos mensajes específicos arriba; aquí solo log
-        console.error(error);
+        setShowErrorModal(true);
       }
     } finally {
       setSaving(false);
@@ -159,6 +162,92 @@ export default function Perfil() {
         <Nav />
         <div className="page-wrapper">
           <div className="page-content">
+            {/* Modal de actualización exitosa */}
+            {showSuccessModal && (
+              <div className="modal show d-block" tabIndex={-1}>
+                <div className="modal-dialog modal-dialog-centered modal-md">
+                  <div className="modal-content">
+                    <div className="modal-header bg-success text-white">
+                      <div className="d-flex align-items-center gap-2">
+                        <i className="bx bx-check-circle fs-5"></i>
+                        <h5 className="modal-title mb-0">Datos actualizados</h5>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="btn-close btn-close-white"
+                        onClick={() => setShowSuccessModal(false)}
+                      ></button>
+                    </div>
+
+                    <div className="modal-body">
+                      <p className="mb-3">
+                        Tus datos fueron actualizados correctamente.
+                      </p>
+
+                      <div className="alert alert-success mb-0">
+                        <p className="mb-2">
+                          <strong>Nuevo nombre:</strong> {userData.nombre}
+                        </p>
+                        <p className="mb-0">
+                          <strong>Nuevo correo:</strong> {userData.correo}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="modal-footer">
+                      <button
+                        type="button"
+                        className="btn btn-success"
+                        onClick={() => setShowSuccessModal(false)}
+                      >
+                        <i className="bx bx-check me-1"></i>
+                        Aceptar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Modal de error */}
+            {showErrorModal && (
+              <div className="modal show d-block" tabIndex={-1}>
+                <div className="modal-dialog modal-dialog-centered modal-md">
+                  <div className="modal-content">
+                    <div className="modal-header bg-danger text-white">
+                      <div className="d-flex align-items-center gap-2">
+                        <i className="bx bx-error-circle fs-5"></i>
+                        <h5 className="modal-title mb-0">
+                          No se pudieron actualizar los datos
+                        </h5>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="btn-close btn-close-white"
+                        onClick={() => setShowErrorModal(false)}
+                      ></button>
+                    </div>
+
+                    <div className="modal-body">
+                      <p className="mb-0">{errorMessage}</p>
+                    </div>
+
+                    <div className="modal-footer">
+                      <button
+                        type="button"
+                        className="btn btn-danger"
+                        onClick={() => setShowErrorModal(false)}
+                      >
+                        <i className="bx bx-x me-1"></i>
+                        Cerrar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             {/* Breadcrumb */}
             <div className="page-breadcrumb d-none d-sm-flex align-items-center mb-3">
               <div className="breadcrumb-title pe-3">Perfil de Usuario</div>
@@ -364,7 +453,7 @@ export default function Perfil() {
             </div>
           </div>
         </div>
-      </div> 
+      </div>
     </div>
   );
 }

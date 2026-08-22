@@ -488,6 +488,8 @@ export default function AsignarPedidos() {
   async function handleCrearVenta(e?: React.FormEvent<HTMLFormElement>) {
     if (e) e.preventDefault();
 
+    if (isCreatingVenta) return;
+
     if (!validarFormularioVenta()) return;
 
     // 1. Bloqueamos los controles e iniciamos el estado de carga
@@ -560,6 +562,7 @@ export default function AsignarPedidos() {
 
   // Guardar dirección a través del backend
   async function guardarDireccionSimulada() {
+    if (isSaving) return; // Evitar múltiples clics
     const ciudadInput = ciudad;
     const calleInput =
       (document.getElementById("calleInput") as HTMLInputElement)?.value || "";
@@ -871,6 +874,7 @@ export default function AsignarPedidos() {
                             className="form-select"
                             value={selectedUsuario}
                             onChange={(e) => setSelectedUsuario(e.target.value)}
+                            disabled={isCreatingVenta}
                           >
                             <option value="">Seleccione</option>
                             {usuarios.map((u) => (
@@ -910,6 +914,7 @@ export default function AsignarPedidos() {
                             onChange={(e) =>
                               setSelectedMetodoPago(e.target.value)
                             }
+                            disabled={isCreatingVenta}
                           >
                             <option value="">Seleccione</option>
                             <option value="Efectivo">Efectivo</option>
@@ -930,6 +935,7 @@ export default function AsignarPedidos() {
                             onChange={(e) =>
                               handleComprobanteChange(e.target.value)
                             }
+                            disabled={isCreatingVenta}
                           >
                             <option value="">Seleccione</option>
                             {sampleComprobantes.map((c) => (
@@ -955,6 +961,7 @@ export default function AsignarPedidos() {
                               value={ruc}
                               onChange={(e) => setRuc(e.target.value)}
                               placeholder="Ingresa RUC"
+                              disabled={isCreatingVenta}
                             />
                             {selectedComprobante === "Factura" &&
                               ruc.length > 0 &&
@@ -976,6 +983,7 @@ export default function AsignarPedidos() {
                               if (e.target.value === "Recojo en Tienda")
                                 setIdDireccion(null);
                             }}
+                            disabled={isCreatingVenta}
                           >
                             <option value="Envío a Domicilio">
                               Envío a Domicilio
@@ -1086,6 +1094,7 @@ export default function AsignarPedidos() {
                                     type="text"
                                     className="form-control"
                                     value={row.productoName ?? ""}
+                                    disabled={isCreatingVenta}
                                     onChange={(e) =>
                                       handleProductoInputChange(
                                         row.id,
@@ -1159,6 +1168,7 @@ export default function AsignarPedidos() {
                                   step="1"
                                   className="form-control"
                                   value={row.cantidad}
+                                  disabled={isCreatingVenta}
                                   max={Number(
                                     productos.find(
                                       (p) => String(p.id) === row.productoId,
@@ -1276,6 +1286,7 @@ export default function AsignarPedidos() {
                       className="btn-close btn-close-white"
                       onClick={() => setShowModalDireccion(false)}
                       aria-label="Cerrar"
+                      disabled={isSaving}
                     ></button>
                   </div>
                   <div className="modal-body">
@@ -1286,6 +1297,7 @@ export default function AsignarPedidos() {
                         className="form-select"
                         value={ciudad}
                         onChange={(e) => setCiudad(e.target.value)}
+                        disabled={isSaving}
                       >
                         <option value="">Seleccione un distrito</option>
                         {DISTRITOS_HUANCAYO.map((distrito) => (
@@ -1305,6 +1317,7 @@ export default function AsignarPedidos() {
                         id="calleInput"
                         className="form-control"
                         placeholder="Ingresa la calle y número"
+                        disabled={isSaving}
                       />
                     </div>
                     <div className="mb-3">
@@ -1314,6 +1327,7 @@ export default function AsignarPedidos() {
                         className="form-control"
                         rows={2}
                         placeholder="Ej: cerca al parque, departamento 305"
+                        disabled={isSaving}
                       ></textarea>
                     </div>
                   </div>
@@ -1322,6 +1336,7 @@ export default function AsignarPedidos() {
                       type="button"
                       className="btn btn-secondary"
                       onClick={() => setShowModalDireccion(false)}
+                      disabled={isSaving}
                     >
                       <i className="bx bx-x me-1"></i>
                       Cancelar

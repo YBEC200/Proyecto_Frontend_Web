@@ -85,6 +85,7 @@ export default function VerLotes({
     has_next: false,
     has_prev: false,
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Abrir modal editar
   const handleEditLote = (lote: Lote) => {
@@ -95,6 +96,7 @@ export default function VerLotes({
   // Enviar actualización del lote
   const handleUpdateLote = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (isSubmitting) return;
     if (!selectedLote) return;
     const form = e.currentTarget;
     const formData = new FormData(form);
@@ -132,6 +134,8 @@ export default function VerLotes({
       payload.Precio_Compra = precioCompra;
     }
 
+    setIsSubmitting(true);
+
     try {
       const res = await fetch(`${API_URL}/api/lotes/${selectedLote.Id}`, {
         method: "PUT",
@@ -157,6 +161,8 @@ export default function VerLotes({
       console.error("Fetch error update lote:", error);
       setErrorMessage("Error de conexión al actualizar el lote.");
       setShowErrorModal(true);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -168,6 +174,7 @@ export default function VerLotes({
 
   // Eliminar lote
   const handleDeleteLote = async (Id: string) => {
+    if (isSubmitting) return;
     // Validación: verificar que el lote puede ser eliminado
     if (!lotesEliminables.has(Id)) {
       setErrorMessage(
@@ -180,6 +187,7 @@ export default function VerLotes({
     }
 
     const token = localStorage.getItem("token");
+    setIsSubmitting(true);
     try {
       const res = await fetch(`${API_URL}/api/lotes/${Id}`, {
         method: "DELETE",
@@ -202,6 +210,7 @@ export default function VerLotes({
       setErrorMessage("Error de conexión al eliminar el lote.");
       setShowErrorModal(true);
     } finally {
+      setIsSubmitting(true);
       setShowDeleteModalLote(false);
       setDeleteTargetLote(null);
     }
@@ -961,6 +970,7 @@ export default function VerLotes({
                           type="button"
                           className="btn-close"
                           onClick={() => setShowEditModalLote(false)}
+                          disabled={isSubmitting}
                         ></button>
                       </div>
                       <form onSubmit={handleUpdateLote}>
@@ -1028,11 +1038,27 @@ export default function VerLotes({
                             type="button"
                             className="btn btn-secondary"
                             onClick={() => setShowEditModalLote(false)}
+                            disabled={isSubmitting}
                           >
                             Cancelar
                           </button>
-                          <button type="submit" className="btn btn-primary">
-                            Guardar cambios
+                          <button
+                            type="submit"
+                            className="btn btn-primary"
+                            disabled={isSubmitting}
+                          >
+                            {isSubmitting ? (
+                              <>
+                                <span
+                                  className="spinner-border spinner-border-sm me-2"
+                                  role="status"
+                                  aria-hidden="true"
+                                ></span>
+                                Guardando...
+                              </>
+                            ) : (
+                              "Guardar cambios"
+                            )}
                           </button>
                         </div>
                       </form>
@@ -1055,6 +1081,7 @@ export default function VerLotes({
                             setShowDeleteModalLote(false);
                             setDeleteTargetLote(null);
                           }}
+                          disabled={isSubmitting}
                         ></button>
                       </div>
                       <div className="modal-body">
@@ -1068,6 +1095,7 @@ export default function VerLotes({
                         <button
                           type="button"
                           className="btn btn-secondary"
+                          disabled={isSubmitting}
                           onClick={() => {
                             setShowDeleteModalLote(false);
                             setDeleteTargetLote(null);
@@ -1078,12 +1106,27 @@ export default function VerLotes({
                         <button
                           type="button"
                           className="btn btn-danger"
+                          disabled={isSubmitting}
                           onClick={async () => {
-                            if (!deleteTargetLote) return;
+                            if (!deleteTargetLote || isSubmitting) return;
+
                             await handleDeleteLote(deleteTargetLote.Id);
                           }}
                         >
-                          Eliminar
+                          {isSubmitting ? (
+                            <>
+                              <span
+                                className="spinner-border spinner-border-sm me-2"
+                                role="status"
+                                aria-hidden="true"
+                              ></span>
+                              Eliminando...
+                            </>
+                          ) : (
+                            <>
+                              <i className="bx bx-trash"></i> Eliminar
+                            </>
+                          )}
                         </button>
                       </div>
                     </div>
