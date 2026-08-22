@@ -84,6 +84,7 @@ function Usuarios() {
   const [editError, setEditError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   // Modal state
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<Usuario | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -102,6 +103,10 @@ function Usuarios() {
   const [usuariosEliminables, setUsuariosEliminables] = useState<Set<number>>(
     new Set(),
   );
+  const [createNombre, setCreateNombre] = useState("");
+  const [createCorreo, setCreateCorreo] = useState("");
+  const [createRol, setCreateRol] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
 
   // Función para obtener usuarios desde la API con filtros
   const fetchUsuarios = async () => {
@@ -420,6 +425,62 @@ function Usuarios() {
     );
   };
 
+  const handleCreateUser = async () => {
+    if (isCreating) return;
+
+    if (!createNombre.trim() || !createCorreo.trim() || !createRol) {
+      setErrorMessage("Completa todos los campos obligatorios.");
+      setShowErrorModal(true);
+      return;
+    }
+
+    setIsCreating(true);
+
+    try {
+      const token = localStorage.getItem("token");
+
+      const response = await fetch(`${API_URL}/api/usuarios/adminstore`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          nombre: createNombre.trim(),
+          correo: createCorreo.trim(),
+          rol: createRol,
+        }),
+      });
+
+      const result = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        setErrorMessage(result?.message || "No se pudo crear el usuario.");
+        setShowErrorModal(true);
+        return;
+      }
+
+      await fetchUsuarios();
+
+      setShowCreateModal(false);
+      setCreateNombre("");
+      setCreateCorreo("");
+      setCreateRol("");
+
+      setSuccessMessage(
+        "Usuario creado correctamente. Se le asignó una contraseña temporal y deberá cambiarla después de iniciar sesión.",
+      );
+      setShowSuccessModal(true);
+    } catch (error) {
+      console.error("Error creando usuario:", error);
+      setErrorMessage("Error de conexión al crear el usuario.");
+      setShowErrorModal(true);
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
   useEffect(() => {
     fetchUsuarios();
     // eslint-disable-next-line
@@ -537,10 +598,23 @@ function Usuarios() {
             {/* Card principal */}
             <div className="card radius-10">
               <div className="card-header">
-                <div className="d-flex align-items-center">
-                  <div>
-                    <h6 className="mb-0">Lista de usuarios</h6>
-                  </div>
+                <div
+                  className="d-flex align-items-center"
+                  style={{
+                    width: "100%",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <h6 className="mb-0">Lista de usuarios</h6>
+
+                  <button
+                    type="button"
+                    className="btn btn-primary d-flex align-items-center gap-2"
+                    onClick={() => setShowCreateModal(true)}
+                  >
+                    <i className="bx bx-user-plus"></i>
+                    Crear usuario
+                  </button>
                 </div>
               </div>
 
@@ -851,6 +925,127 @@ function Usuarios() {
                             </>
                           ) : (
                             "Guardar cambios"
+                          )}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            )}
+            {/* Modal de Crear Usuario */}
+            {showCreateModal && (
+              <div className="modal show d-block" tabIndex={-1}>
+                <div className="modal-dialog modal-dialog-centered modal-md">
+                  <div className="modal-content">
+                    <div className="modal-header bg-primary text-white">
+                      <div className="d-flex align-items-center gap-2">
+                        <i className="bx bx-user-plus fs-5"></i>
+                        <h5 className="modal-title mb-0">Crear usuario</h5>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="btn-close btn-close-white"
+                        onClick={() => setShowCreateModal(false)}
+                        disabled={isCreating}
+                      ></button>
+                    </div>
+
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        handleCreateUser();
+                      }}
+                    >
+                      <div className="modal-body">
+                        <div className="mb-3">
+                          <label className="form-label">Nombre</label>
+                          <input
+                            type="text"
+                            className="form-control"
+                            value={createNombre}
+                            onChange={(e) => setCreateNombre(e.target.value)}
+                            required
+                          />
+                        </div>
+
+                        <div className="mb-3">
+                          <label className="form-label">Correo</label>
+                          <input
+                            type="email"
+                            className="form-control"
+                            value={createCorreo}
+                            onChange={(e) => setCreateCorreo(e.target.value)}
+                            required
+                          />
+                        </div>
+
+                        <div className="mb-3">
+                          <label className="form-label">Rol</label>
+                          <select
+                            className="form-select"
+                            value={createRol}
+                            onChange={(e) => setCreateRol(e.target.value)}
+                            required
+                          >
+                            <option value="">Seleccione un rol</option>
+                            <option value="Administrador">Administrador</option>
+                            <option value="Empleado">Empleado</option>
+                            <option value="Cliente">Cliente</option>
+                          </select>
+                        </div>
+
+                        <div className="alert alert-info d-flex align-items-start gap-2">
+                          <i className="bx bx-info-circle fs-5 me-2"></i>
+                          <div>
+                            <strong>Estado</strong>
+                            <p className="mb-0">
+                              Por defecto, el usuario se creará con estado
+                              "Inactivo". Podrá cambiarlo después de crear el
+                              usuario.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="alert alert-warning d-flex align-items-start gap-2">
+                          <i className="bx bx-info-circle fs-5"></i>
+                          <div>
+                            <strong>Contraseña temporal</strong>
+                            <p className="mb-0">
+                              Se asignará una contraseña temporal por defecto.
+                              El usuario deberá cambiarla después de iniciar
+                              sesión.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="modal-footer">
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          onClick={() => setShowCreateModal(false)}
+                          disabled={isCreating}
+                        >
+                          Cancelar
+                        </button>
+
+                        <button
+                          type="submit"
+                          className="btn btn-primary"
+                          disabled={isCreating}
+                        >
+                          {isCreating ? (
+                            <>
+                              <span className="spinner-border spinner-border-sm me-2"></span>
+                              Creando...
+                            </>
+                          ) : (
+                            <>
+                              <i className="bx bx-user-plus me-1"></i>
+                              Crear usuario
+                            </>
                           )}
                         </button>
                       </div>
